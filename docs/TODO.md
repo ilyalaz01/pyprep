@@ -53,7 +53,7 @@
 | T1.5 | Author Sphere 1 lesson + ~15 cards (Class architecture). | Validation green | ✅ (15 cards, validator green; awaiting owner spot-check vs gold sample) |
 | T1.6 | Author Sphere 2 lesson + ~15 cards (Inheritance & exceptions). | Validation green | ✅ (15 cards, validator green; awaiting next spot-check after Sphere 3) |
 | T1.7 | Author Sphere 3 lesson + ~12 cards (Dunder methods). | Validation green | ✅ (12 cards, validator green; awaiting owner spot-check #2) |
-| T1.8 | Author Sphere 4 lesson + ~12 cards (Properties, decorators). | Validation green | ⬜ |
+| T1.8 | Author Sphere 4 lesson + ~12 cards (Properties, decorators). | Validation green | 🟡 |
 | T1.9 | Author Sphere 5 lesson + ~10 cards (Generators, context managers). | Validation green | ⬜ |
 | T1.10 | Build content validator: `scripts/validate_content.py` — schema, ID uniqueness, sphere refs, min-cards-per-task ≥ 3. | Run via `uv run validate-content` | ✅ (per-sphere counts; strict per-sub-task deferred — NOTES N006) |
 | T1.11 | Write ≥ 5 `code_task` cards for Module 1 with hidden pytest harness. | Each runs and passes when correct | ⬜ |
