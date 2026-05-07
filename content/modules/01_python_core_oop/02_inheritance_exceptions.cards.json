@@ -1,0 +1,259 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s2",
+  "cards": [
+    {
+      "id": "m1-s2-c1",
+      "type": "flip",
+      "topic": "What `super().__init__()` actually does",
+      "topic_ru": "Что на самом деле делает `super().__init__()`",
+      "difficulty": 2,
+      "tags": ["inheritance", "super", "init", "interview-classic"],
+      "question": "What is `super()` and what does `super().__init__(...)` do in a subclass?",
+      "answer": "`super()` returns a proxy object that delegates attribute lookups to the *next class in the MRO* — usually the parent, but in multiple inheritance it's whatever C3 linearization picks next. `super().__init__(...)` runs that next class's `__init__`, so its state gets set. Without it, the parent's initializer never runs and any attribute the parent expected to set won't exist on the instance.",
+      "answer_explanation_md": "Two precise consequences worth saying out loud:\n\n1. `super()` is *not* the same as `Parent` — it follows the MRO. In single inheritance the difference is invisible; in multiple inheritance it's the whole point of `super()` over `Parent.__init__(self)`.\n2. `super().__init__()` is not called automatically. Forget it and `obj.<parent_attribute>` raises `AttributeError` — exactly because no one set it."
+    },
+
+    {
+      "id": "m1-s2-c2",
+      "type": "code_trap",
+      "topic": "Forgetting `super().__init__()` in a subclass",
+      "topic_ru": "Забыли `super().__init__()` в наследнике",
+      "difficulty": 3,
+      "tags": ["inheritance", "super", "init", "interview-classic"],
+      "code_snippet": "class Animal:\n    def __init__(self, name):\n        self.name = name\n\nclass Dog(Animal):\n    def __init__(self, name, breed):\n        # super().__init__(name) intentionally omitted\n        self.breed = breed\n\nd = Dog('rex', 'beagle')\nprint(d.breed)\nprint(d.name)",
+      "question": "What happens when this runs?",
+      "options": [
+        "Prints 'beagle' then 'rex' — Python auto-calls Animal.__init__",
+        "Prints 'beagle' then raises AttributeError on d.name",
+        "Raises TypeError on Dog('rex', 'beagle') because Animal expected name",
+        "Prints 'beagle' then None"
+      ],
+      "correct_index": 1,
+      "explanation_md": "Python does not auto-call `super().__init__`. `Dog.__init__` runs, sets `self.breed`, and returns. The parent's initializer never runs, so `self.name` was never assigned — accessing it raises `AttributeError: 'Dog' object has no attribute 'name'`.\n\nThe fix is the one-liner you'd add at the top of `Dog.__init__`:\n\n```python\nclass Dog(Animal):\n    def __init__(self, name, breed):\n        super().__init__(name)\n        self.breed = breed\n```\n\nIn a code review, missing `super().__init__()` is the most common 'why is this AttributeError happening' bug for new Python OOP code."
+    },
+
+    {
+      "id": "m1-s2-c3",
+      "type": "multiple_choice",
+      "topic": "`super().__init__()` vs `Parent.__init__(self)`",
+      "topic_ru": "`super().__init__()` vs `Parent.__init__(self)`",
+      "difficulty": 2,
+      "tags": ["inheritance", "super", "mro", "best-practice"],
+      "question": "Why is `super().__init__(...)` preferred over `Parent.__init__(self, ...)`?",
+      "options": [
+        "They are interchangeable; `super()` is just shorter syntax.",
+        "`super()` walks the MRO instead of pinning to a specific class — which means cooperative multiple inheritance keeps working when someone introduces a new base class. `Parent.__init__(self)` hardcodes the lookup and breaks that chain.",
+        "`super()` is faster because Python caches the proxy.",
+        "`Parent.__init__(self)` only works in Python 2."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — they have different behavior the moment multiple inheritance enters the picture.",
+        "Correct. The MRO-awareness is the whole reason `super()` exists. Even in single-inheritance code, using `super()` keeps the door open for someone to mix-in a class later without rewriting every `__init__`.",
+        "Performance is not the reason. The cost difference is irrelevant.",
+        "Both forms work in Python 3. The legacy `super(Parent, self)` two-argument form is the one that's specifically Python 2 / 3-compatible — modern Python 3 just writes `super()`."
+      ]
+    },
+
+    {
+      "id": "m1-s2-c4",
+      "type": "flip",
+      "topic": "Override-and-extend pattern with `super()`",
+      "topic_ru": "Паттерн `override-and-extend` через `super()`",
+      "difficulty": 2,
+      "tags": ["inheritance", "method-override", "super"],
+      "question": "When you override a method but want the parent's behavior to still happen, what is the canonical pattern?",
+      "answer": "Call `super().method(...)` from inside the override. The parent's logic runs first (or last, depending on where you place the call), and your subclass-specific code runs around it. This is the same pattern that makes a `TimestampLogger.log` reuse a `Logger.log` instead of duplicating it.",
+      "answer_explanation_md": "Two flavors in practice:\n\n```python\n# extend — parent does its thing, then we add\ndef save(self):\n    super().save()\n    self._notify()\n\n# wrap — we transform the input, then delegate\ndef log(self, msg):\n    super().log(f'[{self.tag}] {msg}')\n```\n\nReplace-without-extend (no `super()` call at all) is also valid, but ask yourself first whether the parent's behavior is something you actually want to skip."
+    },
+
+    {
+      "id": "m1-s2-c5",
+      "type": "code_trap",
+      "topic": "Method dispatch always finds the most-derived implementation",
+      "topic_ru": "Диспетчеризация метода всегда находит самую производную реализацию",
+      "difficulty": 3,
+      "tags": ["inheritance", "method-override", "dispatch", "tricky"],
+      "code_snippet": "class A:\n    def greet(self):\n        return f'Hello, {self.name()}'\n    def name(self):\n        return 'A'\n\nclass B(A):\n    def name(self):\n        return 'B'\n\nprint(B().greet())",
+      "question": "What does this print?",
+      "options": [
+        "Hello, A",
+        "Hello, B",
+        "Hello, AB",
+        "AttributeError"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`B().greet()` runs `A.greet` (inherited), but inside that method `self.name()` is a fresh attribute lookup on `self` — and `self` is a `B` instance. Python finds `B.name` first and uses it. Result: `'Hello, B'`.\n\nThis is the foundation of polymorphism in Python: a parent method that calls `self.something()` automatically picks up subclass overrides. It's also why dunder methods like `__str__` can be overridden meaningfully in subclasses without changing every caller."
+    },
+
+    {
+      "id": "m1-s2-c6",
+      "type": "fill_in",
+      "topic": "Override-and-extend with `super()`",
+      "topic_ru": "Override-and-extend через `super()`",
+      "difficulty": 3,
+      "tags": ["inheritance", "method-override", "super", "patterns"],
+      "code_snippet_with_blanks": "class Logger:\n    def log(self, msg):\n        print(msg)\n\nclass TimestampLogger(___):\n    def log(self, msg):\n        ___.log(f'[2026] {msg}')",
+      "accepted_answers": [
+        ["Logger"],
+        ["super\\(\\)"]
+      ],
+      "explanation_md": "The base class goes in the parentheses of the subclass declaration. Inside the override, `super().log(...)` walks the MRO and calls `Logger.log` with the timestamped message. Without `super()`, you'd be re-implementing `print(msg)` and losing the chain to any future mixin."
+    },
+
+    {
+      "id": "m1-s2-c7",
+      "type": "multiple_choice",
+      "topic": "MRO of a diamond-inheritance class",
+      "topic_ru": "MRO класса с diamond-наследованием",
+      "difficulty": 4,
+      "tags": ["inheritance", "mro", "diamond", "tricky"],
+      "question": "Given `class A: pass`, `class B(A): pass`, `class C(A): pass`, `class D(B, C): pass`, what does `D.__mro__` look like (ignoring the trailing `object`)?",
+      "options": [
+        "D, B, A, C, A",
+        "D, B, C, A",
+        "D, A, B, C",
+        "D, B, C"
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — C3 linearization never duplicates a class. Each class appears exactly once.",
+        "Correct. C3 reads bases left-to-right (`B` before `C`) and pushes the common ancestor (`A`) past both children to the end. Then `object` after `A`.",
+        "Wrong — the parent of `B` and `C` cannot come before them in the order.",
+        "Wrong — `A` must appear (every class ultimately reaches `object` through `A` here)."
+      ]
+    },
+
+    {
+      "id": "m1-s2-c8",
+      "type": "code_trap",
+      "topic": "`super()` in a diamond walks the MRO, not the strict parent",
+      "topic_ru": "`super()` в diamond идёт по MRO, а не строго к родителю",
+      "difficulty": 4,
+      "tags": ["inheritance", "mro", "super", "diamond", "tricky"],
+      "code_snippet": "class A:\n    def f(self):\n        return 'A'\n\nclass B(A):\n    def f(self):\n        return 'B' + super().f()\n\nclass C(A):\n    def f(self):\n        return 'C' + super().f()\n\nclass D(B, C):\n    pass\n\nprint(D().f())",
+      "question": "What does this print?",
+      "options": [
+        "BA",
+        "BCA",
+        "BACA",
+        "AttributeError"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`D.__mro__` is `D, B, C, A, object`. `D().f()` finds `B.f`. Inside `B.f`, `super()` is the *next* class in the MRO from `B` — which is `C`, not `A`. So `'B' + C.f(self)` runs, which itself calls `super().f()` — the next class after `C` in the MRO, which is `A`. `A.f` returns `'A'`.\n\nFinal: `'B' + 'C' + 'A'` = `'BCA'`.\n\nThis is the canonical 'why does `super()` matter' demo. With `Parent.f(self)` hardcoded in `B`, you'd always go straight to `A` and never reach `C`. Cooperative multiple inheritance only works because `super()` follows the linearization."
+    },
+
+    {
+      "id": "m1-s2-c9",
+      "type": "flip",
+      "topic": "When to look at `__mro__`",
+      "topic_ru": "Когда смотреть на `__mro__`",
+      "difficulty": 3,
+      "tags": ["inheritance", "mro", "debugging"],
+      "question": "When is checking `MyClass.__mro__` the right debugging move?",
+      "answer": "When you have multiple inheritance (or mixins) and a method call is hitting the wrong implementation. `__mro__` tells you the exact order Python will walk to find a name, including how C3 linearization interleaved your bases. If `super()` seems to skip a class, the answer is in the MRO — it tells you what 'next' actually means.",
+      "answer_explanation_md": "Practical workflow: `print(MyClass.__mro__)` (or `MyClass.mro()`) inside a debugger session. Compare to your mental model of 'what super() should call'. Mismatch → either rearrange your bases or rethink the inheritance structure. Mixins are great until two of them define the same method — at which point the MRO is the only honest source of truth."
+    },
+
+    {
+      "id": "m1-s2-c10",
+      "type": "code_trap",
+      "topic": "`finally` runs even when `try` returns",
+      "topic_ru": "`finally` отрабатывает даже когда `try` возвращает",
+      "difficulty": 2,
+      "tags": ["exceptions", "finally", "control-flow", "interview-classic"],
+      "code_snippet": "def f():\n    try:\n        return 1\n    finally:\n        print('cleanup')\n\nprint(f())",
+      "question": "What does this print?",
+      "options": [
+        "1",
+        "cleanup\\n1",
+        "1\\ncleanup",
+        "cleanup"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`return 1` evaluates the return value (`1`) but does not yet hand control back to the caller — `finally` always runs first, in this case printing `cleanup`. *Then* the function returns, and the outer `print(f())` prints `1`.\n\nFinal output:\n\n```\ncleanup\n1\n```\n\nThis is the single most-asked exception-handling trap for juniors. The mental model: `finally` is glued to the function's exit, no matter how the exit happens (return, exception, normal end)."
+    },
+
+    {
+      "id": "m1-s2-c11",
+      "type": "multiple_choice",
+      "topic": "Why bare `except:` is a code smell",
+      "topic_ru": "Почему `except:` без класса — плохая практика",
+      "difficulty": 2,
+      "tags": ["exceptions", "best-practice", "interview-classic"],
+      "question": "Why is `except:` (with no exception class) considered bad practice?",
+      "options": [
+        "It is slower than typed `except`.",
+        "It catches `BaseException`, including `SystemExit` and `KeyboardInterrupt` — making programs hard to terminate cleanly and hiding programmer errors. Always catch a specific exception class.",
+        "It only works in Python 2.",
+        "It silently re-raises the exception after the handler runs."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Performance has nothing to do with it.",
+        "Correct. The least-bad alternative when you really mean 'all errors I'd recover from' is `except Exception:` — which excludes `SystemExit`, `KeyboardInterrupt`, and `GeneratorExit`. For real handlers, name the exception class.",
+        "Wrong — bare `except` is valid syntax in both Python 2 and 3, just discouraged.",
+        "Wrong — it does not auto-re-raise. The exception is swallowed unless you re-raise explicitly."
+      ]
+    },
+
+    {
+      "id": "m1-s2-c12",
+      "type": "flip",
+      "topic": "`raise`, `raise SomeError(...)`, `raise X from Y`",
+      "topic_ru": "`raise`, `raise SomeError(...)`, `raise X from Y`",
+      "difficulty": 2,
+      "tags": ["exceptions", "raise", "chaining"],
+      "question": "What is the difference between `raise`, `raise SomeError(...)`, and `raise SomeError(...) from original`?",
+      "answer": "`raise` (no argument) re-raises the currently-handled exception inside an `except` block — useful for log-and-rethrow. `raise SomeError(...)` raises a new exception. `raise SomeError(...) from original` raises a new exception while attaching `original` as the cause, producing a clean two-level traceback ('the above exception caused the following exception').",
+      "answer_explanation_md": "Practical use:\n\n```python\ntry:\n    parse(payload)\nexcept ValueError as e:\n    raise AppError('bad input') from e   # <- chains for clean tracebacks\n```\n\nWithout `from e`, Python still chains *implicitly* (you'll see 'During handling of the above exception, another exception occurred'), but `from e` is more deliberate and avoids the implicit chain when you want to suppress it (`from None`)."
+    },
+
+    {
+      "id": "m1-s2-c13",
+      "type": "code_task",
+      "topic": "Build a small custom exception hierarchy",
+      "topic_ru": "Построить небольшую иерархию пользовательских исключений",
+      "difficulty": 3,
+      "tags": ["exceptions", "custom-exceptions", "hierarchy"],
+      "prompt_md": "Define three exception classes:\n\n- `AppError` — base class for all app-level errors. Subclass of `Exception`.\n- `ValidationError` — subclass of `AppError`. Used when user input fails a check.\n- `NotFoundError` — subclass of `AppError`. Used when a resource is missing.\n\nNo extra methods needed; the inheritance is the whole interface. A caller should be able to write `except AppError:` to catch either subclass.",
+      "starter_code": "# Define AppError, ValidationError, NotFoundError below.\n",
+      "solution_code": "class AppError(Exception):\n    \"\"\"Root of all app-level errors.\"\"\"\n\n\nclass ValidationError(AppError):\n    \"\"\"User input failed a check.\"\"\"\n\n\nclass NotFoundError(AppError):\n    \"\"\"Requested resource isn't there.\"\"\"\n",
+      "tests": "import pytest\nfrom solution import AppError, NotFoundError, ValidationError\n\ndef test_validation_is_an_app_error():\n    assert issubclass(ValidationError, AppError)\n\ndef test_not_found_is_an_app_error():\n    assert issubclass(NotFoundError, AppError)\n\ndef test_app_error_catches_either_subclass():\n    for exc_cls in (ValidationError, NotFoundError):\n        with pytest.raises(AppError):\n            raise exc_cls('boom')\n\ndef test_message_round_trips_through_str():\n    e = ValidationError('email missing')\n    assert str(e) == 'email missing'\n\ndef test_no_args_construct_works():\n    NotFoundError()\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m1-s2-c14",
+      "type": "flip",
+      "topic": "Why subclass `Exception`, not `BaseException`",
+      "topic_ru": "Почему наследоваться от `Exception`, а не от `BaseException`",
+      "difficulty": 2,
+      "tags": ["exceptions", "custom-exceptions", "best-practice"],
+      "question": "Why should custom exception classes subclass `Exception` rather than `BaseException`?",
+      "answer": "`BaseException` is the root of the *entire* exception hierarchy, including `SystemExit`, `KeyboardInterrupt`, and `GeneratorExit` — control-flow signals you don't want callers to catch by accident. Subclassing `Exception` (the parent of all 'ordinary' errors) means a caller's `except Exception:` can recover from your error, while `Ctrl-C` and `sys.exit()` still terminate the program cleanly.",
+      "answer_explanation_md": "Concrete consequence: if you write `class AppError(BaseException)` and a caller wraps a long loop in `except BaseException: log_and_continue()`, they now can't kill the process with Ctrl-C. The whole point of the `Exception` / `BaseException` split is to keep app errors recoverable while leaving system signals to bypass them. Stay on the recoverable side."
+    },
+
+    {
+      "id": "m1-s2-c15",
+      "type": "code_trap",
+      "topic": "Catching multiple exception types — comma vs tuple",
+      "topic_ru": "Ловим несколько типов исключений — запятая vs кортеж",
+      "difficulty": 3,
+      "tags": ["exceptions", "syntax", "tricky"],
+      "code_snippet": "try:\n    int('abc')\nexcept TypeError, ValueError:\n    print('caught')",
+      "question": "What happens when this runs?",
+      "options": [
+        "Prints 'caught'",
+        "SyntaxError at the `except` line",
+        "TypeError on int('abc'), not caught",
+        "ValueError caught, prints 'caught'"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`except TypeError, ValueError:` is **invalid Python 3 syntax** — a `SyntaxError` at parse time, before any code runs. The legal forms are:\n\n```python\nexcept (TypeError, ValueError):              # tuple of types\nexcept (TypeError, ValueError) as e:         # tuple, with name\nexcept ValueError as e:                      # single type\n```\n\nThe trap exists because Python 2 *used* to accept `except TypeError, e:` as 'catch TypeError, bind to `e`'. Python 3 dropped that form precisely because it was confusable with the comma-tuple form readers expect. The fix is parentheses."
+    }
+  ]
+}
