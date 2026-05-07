@@ -45,3 +45,38 @@ Owner directive: pin to 3.11 (no minor) so `uv` picks the latest 3.11.x
 patch consistently across the owner's machine and CI. 3.12 is deferred until
 Pyodide and a few transitive libs settle. Documented here so the choice
 doesn't drift silently when 3.12 starts looking attractive.
+
+---
+
+## N004 — `module_id` and `sphere_id` live on the wrapper, not on each card
+
+**Phase:** 1 (T1.1) · **Date:** 2026-05-07
+
+`PRD_content_authoring.md` §5 shows a card schema excerpt with
+`required: ["id", "module_id", "sphere_id", "type", "topic", "difficulty", "tags"]`.
+The actually-locked `content/schema/card.schema.json` makes `module_id`
+and `sphere_id` optional — and the gold sample
+(`00_fundamentals.cards.json`) supplies them at the wrapper level
+(`{module_id, sphere_id, cards: [...]}`), not on every card.
+
+**Resolution:** Schema and gold sample are authoritative. The PRD §5
+block is illustrative (it's annotated "(excerpt)"). The validator (T1.10)
+will derive each card's `module_id`/`sphere_id` from the wrapper rather
+than expecting them per-card. No PRD edit — the discrepancy is small
+enough that future readers can confirm against the schema directly.
+
+---
+
+## N005 — Module 1 has 7 spheres (m1-s0…m1-s6), not 6
+
+**Phase:** 1 audit · **Date:** 2026-05-07
+
+`curriculum.md` and `module.md` both enumerate 7 spheres for Module 1,
+ending with **m1-s6 — Concurrency & GIL** (a curriculum (ADDED) item).
+TODO.md Phase 1 only has tasks T1.5–T1.9 covering m1-s1 through m1-s5,
+leaving m1-s6 unscheduled. This is a backlog gap, not just a doc
+inconsistency.
+
+**Resolution:** Added a `(NEW)` task to TODO.md Phase 1 covering
+m1-s6. Phase 1 is not "done" until the validator confirms ≥ 3 cards
+per sub-task across all 7 spheres.
