@@ -51,7 +51,7 @@
 | T1.3 | Author `content/modules/01_python_core_oop/module.md` (module overview + map of spheres). | Renders cleanly, all spheres listed | ✅ pre-bootstrapped from spec (lists all 7 spheres per curriculum.md) |
 | T1.4 | Author Sphere 0 lesson (`00_fundamentals.md`) and ~15 cards. | Validation script green | ✅ (provided as gold sample) |
 | T1.5 | Author Sphere 1 lesson + ~15 cards (Class architecture). | Validation green | ✅ (15 cards, validator green; awaiting owner spot-check vs gold sample) |
-| T1.6 | Author Sphere 2 lesson + ~15 cards (Inheritance & exceptions). | Validation green | ⬜ |
+| T1.6 | Author Sphere 2 lesson + ~15 cards (Inheritance & exceptions). | Validation green | 🟡 |
 | T1.7 | Author Sphere 3 lesson + ~12 cards (Dunder methods). | Validation green | ⬜ |
 | T1.8 | Author Sphere 4 lesson + ~12 cards (Properties, decorators). | Validation green | ⬜ |
 | T1.9 | Author Sphere 5 lesson + ~10 cards (Generators, context managers). | Validation green | ⬜ |
