@@ -67,22 +67,35 @@ enough that future readers can confirm against the schema directly.
 
 ---
 
-## N007 — Sphere 1 distractor polish (post-MVP)
+## N007 — Distractor polish backlog (post-MVP)
 
-**Phase:** 1 (T1.5 follow-up) · **Date:** 2026-05-07 · **Priority:** low
-
-Owner spot-check on T1.5 flagged two distractors as too-weak / not
-plausible-junior-misconceptions:
-
-- `m1-s1-c2` option 4 currently: "Prints None". Replace with
-  something like: "Prints 'hi' but with a DeprecationWarning".
-- `m1-s1-c3` option 4 currently: "`__new__` runs only on subclasses;
-  `__init__` runs only on the base class". Replace with: "`__init__`
-  returns the new instance; `__new__` returns the type".
+**Phase:** 1 (Tx.x follow-ups) · **Date:** 2026-05-07 · **Priority:** low
 
 Per `PRD_content_authoring.md` §6 distractor rule, ≥ 2 of 4 options
-must be plausible-wrong-for-an-interesting-reason. These two cards
+must be plausible-wrong-for-an-interesting-reason. The cards below
 are still 3/4 strong; the polish is post-MVP.
+
+Owner spot-check #1 (T1.5 — Sphere 1):
+
+- `m1-s1-c2` option 4 currently: "Prints None". Stronger:
+  "Prints 'hi' but with a DeprecationWarning".
+- `m1-s1-c3` option 4 currently: "`__new__` runs only on subclasses;
+  `__init__` runs only on the base class". Stronger: "`__init__`
+  returns the new instance; `__new__` returns the type".
+
+Owner spot-check #2 (T1.6 — Sphere 2):
+
+- `m1-s2-c3` option 4 ("`Parent.__init__(self)` only works in
+  Python 2") is factually weaker than the other distractors — the
+  option_explanation already disarms it, but it's not as plausible
+  as it could be. Look for a stronger junior-plausible misconception.
+
+Cross-reference density (also from spot-check #2):
+
+- Sphere 1 cross-referenced m1-s0 in the lesson; Spheres 2 and 3 had
+  fewer natural tie-back hooks. Going forward, lean into them where
+  genuine: decorators → closures (s5↔s4), generators → iterators
+  (s5 internals), GIL → threading mental model (s6↔s5). Don't force.
 
 ---
 
