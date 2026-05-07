@@ -67,6 +67,25 @@ enough that future readers can confirm against the schema directly.
 
 ---
 
+## N006 — Validator enforces min-cards per *sphere*, not per sub-task
+
+**Phase:** 1 (T1.10) · **Date:** 2026-05-07
+
+`PRD_content_authoring.md` §7 specifies "Min 3 cards per sub-task"
+(e.g., `m1-s0-t1`). Cards in the gold sample don't carry a `subtask_id`
+field — only `sphere_id` (via the wrapper) and free-form `tags` —
+so per-sub-task enforcement isn't possible without a schema addition.
+
+**Resolution:** T1.10 enforces the looser invariant `cards-per-sphere
+≥ 3 × subtasks-per-sphere`, which is necessary but not sufficient for
+the strict spec (a sphere with 4 sub-tasks could pass with 12/0/0/0).
+Tightening to per-sub-task requires adding an optional `subtask_id`
+field to the card schema and the gold sample. Tracked as a
+post-Phase-1 backlog candidate; not blocking until coverage drift
+becomes a real problem.
+
+---
+
 ## N005 — Module 1 has 7 spheres (m1-s0…m1-s6), not 6
 
 **Phase:** 1 audit · **Date:** 2026-05-07
