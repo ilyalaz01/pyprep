@@ -1,0 +1,258 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s1",
+  "cards": [
+    {
+      "id": "m1-s1-c1",
+      "type": "flip",
+      "topic": "What `self` actually is",
+      "topic_ru": "Что на самом деле такое `self`",
+      "difficulty": 1,
+      "tags": ["init", "self", "interview-warmup"],
+      "question": "Inside a method, what is `self`, and how does it get there?",
+      "answer": "`self` is the first positional parameter of an instance method, and it refers to the instance the method was called on. Python binds it automatically when you call `obj.method()` — under the hood that is `Class.method(obj)`. The name `self` is convention; nothing in the language requires that exact spelling.",
+      "answer_explanation_md": "Two consequences worth saying out loud:\n\n1. If you write `def greet():` (no `self`), calling `obj.greet()` raises `TypeError: greet() takes 0 positional arguments but 1 was given` — Python is still passing the instance, you just have nowhere to receive it.\n2. You can call the unbound form yourself: `User.greet(u)` is identical to `u.greet()`. That equivalence is exactly what `@classmethod` and `@staticmethod` modify (next sub-task)."
+    },
+
+    {
+      "id": "m1-s1-c2",
+      "type": "code_trap",
+      "topic": "Method missing `self` parameter",
+      "topic_ru": "У метода забыли параметр `self`",
+      "difficulty": 2,
+      "tags": ["init", "self", "interview-classic"],
+      "code_snippet": "class Greeter:\n    def hello():\n        return 'hi'\n\ng = Greeter()\nprint(g.hello())",
+      "question": "What happens when this runs?",
+      "options": [
+        "Prints 'hi'",
+        "TypeError — hello() takes 0 positional arguments but 1 was given",
+        "AttributeError — Greeter has no method 'hello'",
+        "Prints None"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`g.hello()` is sugar for `Greeter.hello(g)` — Python passes the instance as the first positional argument. The function `hello` was defined to take zero arguments, so it complains.\n\nFix: add `self` to the signature. The error message itself is the giveaway in interviews — recognize the wording `takes 0 positional arguments but 1 was given` as 'forgot self'."
+    },
+
+    {
+      "id": "m1-s1-c3",
+      "type": "multiple_choice",
+      "topic": "`__init__` vs `__new__`",
+      "topic_ru": "`__init__` vs `__new__`",
+      "difficulty": 3,
+      "tags": ["init", "new", "object-creation", "tricky"],
+      "question": "Which statement about `__init__` and `__new__` is correct?",
+      "options": [
+        "`__init__` creates the object; `__new__` initializes it.",
+        "`__new__` creates and returns the new object; `__init__` then initializes the instance returned by `__new__`. For nearly all classes you only ever override `__init__`.",
+        "They are aliases for the same thing.",
+        "`__new__` runs only on subclasses; `__init__` runs only on the base class."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Reversed — `__new__` is the actual creation step.",
+        "Correct. `__new__(cls, ...)` is a static method that returns the new instance (typically by calling `super().__new__(cls)`); `__init__` then mutates that instance. The interview-relevant point: you only need `__new__` for immutable types (subclassing `int`, `str`, `tuple`) or singletons.",
+        "Wrong — they are different methods with different signatures and different timing.",
+        "Wrong — both run on every instance creation regardless of subclassing."
+      ]
+    },
+
+    {
+      "id": "m1-s1-c4",
+      "type": "code_trap",
+      "topic": "Augmented assignment on a class-level int",
+      "topic_ru": "Augmented-присваивание для int на уровне класса",
+      "difficulty": 3,
+      "tags": ["class-attributes", "instance-attributes", "rebinding", "tricky"],
+      "code_snippet": "class C:\n    total = 0\n\n    def add(self):\n        self.total += 1\n\na = C(); a.add(); a.add()\nb = C()\nprint(a.total, b.total, C.total)",
+      "question": "What does this print?",
+      "options": [
+        "2 0 0",
+        "2 2 2",
+        "2 0 2",
+        "0 0 0"
+      ],
+      "correct_index": 0,
+      "explanation_md": "`self.total += 1` expands to `self.total = self.total + 1`. The right-hand side reads `self.total` — finds nothing on the instance, falls through to the class attribute `C.total` (0). The assignment then **creates a new instance attribute** `a.total` set to 1.\n\nSo `a.total` becomes an instance attribute that shadows the class one; `b.total` still reads from the class (0); `C.total` was never mutated and stays 0.\n\nKey takeaway: `self.x = ...` always creates or rebinds an *instance* attribute, never the class one. To mutate a class attribute deliberately, write `C.total += 1` (or `type(self).total += 1`)."
+    },
+
+    {
+      "id": "m1-s1-c5",
+      "type": "flip",
+      "topic": "When a class attribute is the right tool",
+      "topic_ru": "Когда атрибут класса — правильный инструмент",
+      "difficulty": 2,
+      "tags": ["class-attributes", "design"],
+      "question": "Give two cases where defining an attribute at the class level (instead of in `__init__`) is the right call.",
+      "answer": "1) Constants and defaults that genuinely don't vary per instance — e.g., `MAX_RETRIES = 3`, `DEFAULT_TIMEOUT = 5.0`. 2) Class-wide registries or counters intentionally shared across instances — e.g., a class-level dict that maps registered subclasses, or a class-level counter incremented via `cls.count += 1` in `__init__`.",
+      "answer_explanation_md": "The interviewer is checking that you don't reflexively put everything in `__init__`. The dividing line is intent: 'this value is part of the class definition' → class attribute; 'this value is per-instance state' → instance attribute. Mutable class attributes (lists, dicts) need a comment explaining why they're shared, otherwise reviewers will flag them as the Sphere 0 trap."
+    },
+
+    {
+      "id": "m1-s1-c6",
+      "type": "code_trap",
+      "topic": "Class-attribute mutation vs instance shadowing",
+      "topic_ru": "Мутация атрибута класса vs затенение на экземпляре",
+      "difficulty": 2,
+      "tags": ["class-attributes", "instance-attributes", "shadowing"],
+      "code_snippet": "class Cfg:\n    timeout = 5\n\nx = Cfg(); y = Cfg()\nx.timeout = 10\nCfg.timeout = 30\nprint(x.timeout, y.timeout)",
+      "question": "What does this print?",
+      "options": [
+        "10 30",
+        "30 30",
+        "10 5",
+        "30 5"
+      ],
+      "correct_index": 0,
+      "explanation_md": "`x.timeout = 10` creates an instance attribute on `x`, shadowing the class attribute *for `x` only*. `Cfg.timeout = 30` rebinds the class-level attribute. `y` never had its own `timeout`, so the lookup falls through to the (now updated) class attribute → 30.\n\nThis is the same mechanism as c4: assignment via the instance always creates an instance attribute. The asymmetry — instance shadows class, but class change still affects unshadowed instances — is what the interviewer is testing."
+    },
+
+    {
+      "id": "m1-s1-c7",
+      "type": "flip",
+      "topic": "What `_protected` actually means in Python",
+      "topic_ru": "Что значит `_protected` в Python",
+      "difficulty": 2,
+      "tags": ["encapsulation", "conventions", "naming"],
+      "question": "What does a single leading underscore (`self._cache`) do at runtime?",
+      "answer": "Nothing. It is a convention — a polite signal that the attribute is internal to the class/module and may change. The language does not enforce it; outside code can still read and write `obj._cache` freely. The only language-level effect is on `from module import *`, which by default skips names starting with `_`.",
+      "answer_explanation_md": "Common follow-up: 'so how do you actually hide things?' Honest answer: you don't — Python deliberately favors readability and trust over enforced privacy. You communicate intent (`_protected`), document it, and rely on convention. If a colleague reaches into a `_private` attribute, that is on them, not on the language."
+    },
+
+    {
+      "id": "m1-s1-c8",
+      "type": "code_trap",
+      "topic": "Name mangling on a double-underscore attribute",
+      "topic_ru": "Name mangling для атрибута с двойным подчёркиванием",
+      "difficulty": 3,
+      "tags": ["encapsulation", "name-mangling", "tricky"],
+      "code_snippet": "class A:\n    def __init__(self):\n        self.__token = 'secret'\n\n    def show(self):\n        return self.__token\n\nclass B(A):\n    def show_token_directly(self):\n        return self.__token\n\nb = B()\nprint(b.show())\nprint(b.show_token_directly())",
+      "question": "What happens?",
+      "options": [
+        "'secret' then 'secret'",
+        "'secret' then AttributeError",
+        "AttributeError on b.show()",
+        "'secret' then None"
+      ],
+      "correct_index": 1,
+      "explanation_md": "Inside class `A`, `self.__token` is rewritten by name mangling to `self._A__token`. Inside class `B`, `self.__token` is rewritten to `self._B__token` — which doesn't exist, because the attribute was set as `_A__token`.\n\nSo `A.show` (defined in A's body) finds it; `B.show_token_directly` (defined in B's body) doesn't, and raises `AttributeError: 'B' object has no attribute '_B__token'`.\n\nThis is exactly what name mangling is *for*: preventing accidental clashes when a subclass picks a same-named attribute. It is not a privacy mechanism."
+    },
+
+    {
+      "id": "m1-s1-c9",
+      "type": "fill_in",
+      "topic": "Reaching a name-mangled attribute from outside",
+      "topic_ru": "Доступ к name-mangled атрибуту снаружи",
+      "difficulty": 3,
+      "tags": ["encapsulation", "name-mangling", "patterns"],
+      "code_snippet_with_blanks": "class Wallet:\n    def __init__(self, n):\n        self.__balance = n\n\nw = Wallet(100)\n# Read the (deliberately mangled) balance from outside:\nprint(w.___)",
+      "accepted_answers": [
+        ["_Wallet__balance"]
+      ],
+      "explanation_md": "Name mangling rewrites `__balance` (defined inside `Wallet`) to `_Wallet__balance`. From outside the class you can still reach it by spelling the mangled name — which is exactly the point: this is a *clash-avoidance* mechanism, not a security boundary.\n\nIn an interview: never claim Python has private attributes. The honest pair of facts is 'mangling exists, it makes accidental subclass clashes impossible, and you can still bypass it with the mangled name.'"
+    },
+
+    {
+      "id": "m1-s1-c10",
+      "type": "multiple_choice",
+      "topic": "`@classmethod` vs `@staticmethod`",
+      "topic_ru": "`@classmethod` vs `@staticmethod`",
+      "difficulty": 2,
+      "tags": ["method-types", "classmethod", "staticmethod", "interview-classic"],
+      "question": "What is the practical difference between `@classmethod` and `@staticmethod`?",
+      "options": [
+        "`@classmethod` receives the instance as the first argument; `@staticmethod` does not.",
+        "`@classmethod` receives the class (`cls`) as the first argument and is the standard way to write alternative constructors. `@staticmethod` receives nothing automatic — it's a plain function that lives in the class namespace.",
+        "They are interchangeable.",
+        "`@staticmethod` is faster because it skips the descriptor protocol."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — instance methods receive the instance. `@classmethod` receives the *class*, not the instance.",
+        "Correct. The `cls` parameter is what makes `@classmethod` useful for `from_*` constructors: returning `cls(...)` produces an instance of the actual subclass when called on a subclass, which a hardcoded `MyClass(...)` would not.",
+        "Wrong — they have different signatures and different binding behavior.",
+        "Performance is not the reason to choose between them. Pick by *what the method needs* — the class, or nothing."
+      ]
+    },
+
+    {
+      "id": "m1-s1-c11",
+      "type": "code_trap",
+      "topic": "`cls` vs hardcoded class name in alternative constructors",
+      "topic_ru": "`cls` vs захардкоженное имя класса в альтернативных конструкторах",
+      "difficulty": 3,
+      "tags": ["method-types", "classmethod", "inheritance", "tricky"],
+      "code_snippet": "class Shape:\n    @classmethod\n    def square(cls, side):\n        return cls(side, side)        # uses cls\n\n    def __init__(self, w, h):\n        self.w, self.h = w, h\n\nclass Box(Shape):\n    pass\n\nb = Box.square(4)\nprint(type(b).__name__)",
+      "question": "What does this print?",
+      "options": [
+        "Shape",
+        "Box",
+        "TypeError",
+        "type"
+      ],
+      "correct_index": 1,
+      "explanation_md": "Because `square` is a `@classmethod`, `cls` is bound to whichever class the method is called on. `Box.square(4)` binds `cls = Box`, so `cls(side, side)` constructs a `Box` instance.\n\nIf the method had been written as `return Shape(side, side)` (hardcoded class name) it would have returned a `Shape` even when called on `Box`. That subtle inheritance-friendliness is the main reason to write alternative constructors as `@classmethod` rather than `@staticmethod`."
+    },
+
+    {
+      "id": "m1-s1-c12",
+      "type": "code_task",
+      "topic": "Implement a `Date.from_string` alternative constructor",
+      "topic_ru": "Реализовать альтернативный конструктор `Date.from_string`",
+      "difficulty": 3,
+      "tags": ["method-types", "classmethod", "alternative-constructor"],
+      "prompt_md": "Implement a `Date` class with:\n\n- An `__init__(self, year: int, month: int, day: int)` that stores the three values as attributes `year`, `month`, `day`.\n- A `from_string(s: str)` alternative constructor (use `@classmethod`) that accepts strings of the form `'YYYY-MM-DD'` and returns a new instance. Use `cls(...)` so subclasses construct instances of the right type.\n\nNo input validation required.",
+      "starter_code": "class Date:\n    def __init__(self, year: int, month: int, day: int):\n        ...\n\n    # from_string here\n",
+      "solution_code": "class Date:\n    def __init__(self, year: int, month: int, day: int):\n        self.year = year\n        self.month = month\n        self.day = day\n\n    @classmethod\n    def from_string(cls, s: str):\n        y, m, d = (int(part) for part in s.split('-'))\n        return cls(y, m, d)\n",
+      "tests": "import pytest\nfrom solution import Date\n\ndef test_init_stores_attributes():\n    d = Date(2026, 5, 7)\n    assert (d.year, d.month, d.day) == (2026, 5, 7)\n\ndef test_from_string_parses_iso_like_date():\n    d = Date.from_string('2026-05-07')\n    assert (d.year, d.month, d.day) == (2026, 5, 7)\n\ndef test_from_string_returns_subclass_instance():\n    class Holiday(Date):\n        pass\n    h = Holiday.from_string('2026-01-01')\n    assert isinstance(h, Holiday)\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m1-s1-c13",
+      "type": "flip",
+      "topic": "`list[str]` vs `typing.List[str]`",
+      "topic_ru": "`list[str]` vs `typing.List[str]`",
+      "difficulty": 2,
+      "tags": ["type-hints", "modern-python"],
+      "question": "Why prefer `list[str]` over `typing.List[str]` in Python 3.9+?",
+      "answer": "Built-in collections (`list`, `dict`, `set`, `tuple`, `frozenset`) became subscriptable for type hints in Python 3.9 (PEP 585). `list[str]` is now the canonical form; `typing.List[str]` and friends are deprecated for new code (still work, but `typing` no longer needs to be imported just for collection generics).",
+      "answer_explanation_md": "The practical wins: one fewer import, less visual noise, and consistency with how the runtime spells these types. The capital-letter `typing.List` form remains in legacy code — recognize it but don't write it in new files. For the union syntax (`X | None`) the same shift happened in 3.10 (PEP 604)."
+    },
+
+    {
+      "id": "m1-s1-c14",
+      "type": "multiple_choice",
+      "topic": "`Optional[X]`, `X | None`, `Union[X, None]`",
+      "topic_ru": "`Optional[X]`, `X | None`, `Union[X, None]`",
+      "difficulty": 4,
+      "tags": ["type-hints", "optional", "union", "tricky"],
+      "question": "Which statement about `Optional[X]`, `X | None`, and `Union[X, None]` is correct?",
+      "options": [
+        "All three are exactly equivalent type expressions; modern code prefers `X | None` (3.10+).",
+        "`Optional[X]` means 'X with default None'; the others do not.",
+        "`X | None` only works at runtime; `Optional[X]` is checked statically.",
+        "`Union[X, None]` is the only form that allows omitting the parameter."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. All three encode the same type. `X | None` (PEP 604, 3.10+) is the modern form; `Optional[X]` and `Union[X, None]` are older equivalents from `typing`. None of them imply a default value — that has to be written separately as `def f(x: X | None = None)`.",
+        "Common confusion. `Optional` is *only* about the type (the value may be `None`). It does not give the parameter a default. You still have to write `= None` if you want `None` as the default.",
+        "Backwards — `X | None` works as a type expression both at runtime and statically.",
+        "Wrong — all three forms are static type annotations; none of them affect arguments."
+      ]
+    },
+
+    {
+      "id": "m1-s1-c15",
+      "type": "flip",
+      "topic": "Type hints are not enforced at runtime",
+      "topic_ru": "Type hints не проверяются в рантайме",
+      "difficulty": 4,
+      "tags": ["type-hints", "runtime", "tricky", "interview-classic"],
+      "question": "Are Python type hints enforced at runtime? What actually happens if a caller passes the 'wrong' type?",
+      "answer": "No. CPython does not check type hints at runtime — passing the 'wrong' type runs as if there were no annotation. Hints are consumed by static tools (mypy, pyright, ruff, IDEs) and by libraries that opt in (Pydantic, FastAPI, dataclasses with `__post_init__`, attrs) to do their own validation.",
+      "answer_explanation_md": "The interview-grade follow-up: 'so what *is* the value of writing them?' Three honest answers — refactoring safety (the type checker catches signature drift), documentation that doesn't lie (the signature is the contract), and integration with frameworks that *do* validate (FastAPI uses your annotations to validate requests). If you need runtime enforcement specifically, reach for Pydantic or `dataclasses` + manual `__post_init__` checks; the bare `def f(x: int) -> None` does nothing at call time."
+    }
+  ]
+}
