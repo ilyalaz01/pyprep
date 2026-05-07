@@ -54,10 +54,10 @@
 | T1.6 | Author Sphere 2 lesson + ~15 cards (Inheritance & exceptions). | Validation green | ✅ (15 cards, validator green; awaiting next spot-check after Sphere 3) |
 | T1.7 | Author Sphere 3 lesson + ~12 cards (Dunder methods). | Validation green | ✅ (12 cards, validator green; awaiting owner spot-check #2) |
 | T1.8 | Author Sphere 4 lesson + ~12 cards (Properties, decorators). | Validation green | ✅ |
-| T1.9 | Author Sphere 5 lesson + ~10 cards (Generators, context managers). | Validation green | 🟡 |
+| T1.9 | Author Sphere 5 lesson + ~10 cards (Generators, context managers). | Validation green | ✅ |
 | T1.10 | Build content validator: `scripts/validate_content.py` — schema, ID uniqueness, sphere refs, min-cards-per-task ≥ 3. | Run via `uv run validate-content` | ✅ (per-sphere counts; strict per-sub-task deferred — NOTES N006) |
 | T1.11 | Write ≥ 5 `code_task` cards for Module 1 with hidden pytest harness. | Each runs and passes when correct | ⬜ |
-| T1.12 | (NEW) Author Sphere 6 lesson + ~12 cards (Concurrency & GIL — m1-s6, curriculum (ADDED) item). | Validation green | ⬜ |
+| T1.12 | (NEW) Author Sphere 6 lesson + ~12 cards (Concurrency & GIL — m1-s6, curriculum (ADDED) item). | Validation green | 🟡 |
 | T1.13 | (NEW) Lock pack JSON schema in `content/schema/pack.schema.json` (referenced by PRD §2 but not yet present). | `jsonschema` validates `content/interview_packs/packs.json` | ⬜ |
 
 **Phase 1 exit gate:** Validator green, ≥ 75 cards, ≥ 5 `code_task` cards, all 7 spheres covered (m1-s0…m1-s6).
