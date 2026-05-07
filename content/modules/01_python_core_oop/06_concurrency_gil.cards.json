@@ -1,0 +1,204 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s6",
+  "cards": [
+    {
+      "id": "m1-s6-c1",
+      "type": "flip",
+      "topic": "What the GIL actually is",
+      "topic_ru": "Что такое GIL на самом деле",
+      "difficulty": 2,
+      "tags": ["gil", "threading", "interview-classic"],
+      "question": "What is the Global Interpreter Lock, and what does it prevent?",
+      "answer": "The GIL is a CPython implementation lock that lets only **one thread execute Python bytecode at a time**. It is released around I/O syscalls (file reads, network, `time.sleep`), so threading is useful for I/O-bound work. It is *not* released during pure-Python computation, so `threading` cannot give you parallel speedup on CPU-bound loops — you need `multiprocessing` for that.",
+      "answer_explanation_md": "Common misconception worth pre-empting in an interview: the GIL does not mean 'Python is single-threaded'. You can have many threads; only one runs Python bytecode at any instant. The lock is on the *interpreter*, not on the program. C extensions (NumPy, etc.) can — and often do — release the GIL during their work, which is why NumPy-heavy code multi-threads well even though plain-Python loops don't."
+    },
+
+    {
+      "id": "m1-s6-c2",
+      "type": "code_trap",
+      "topic": "Race condition under the GIL",
+      "topic_ru": "Race condition под GIL",
+      "difficulty": 4,
+      "tags": ["gil", "threading", "race-condition", "tricky"],
+      "code_snippet": "import threading\n\ncounter = 0\n\ndef inc():\n    global counter\n    for _ in range(100_000):\n        counter += 1\n\nthreads = [threading.Thread(target=inc) for _ in range(4)]\nfor t in threads: t.start()\nfor t in threads: t.join()\n\n# Did counter == 400_000?",
+      "question": "Is `counter` guaranteed to equal 400_000 after this runs?",
+      "options": [
+        "Yes — the GIL serializes thread execution, so increments are atomic.",
+        "No — `counter += 1` is multiple bytecodes (LOAD, ADD, STORE) and the GIL can switch between them. The final value can be less than 400_000. Use `threading.Lock` to make it safe.",
+        "Yes — Python integers are immutable, so `+= 1` cannot race.",
+        "Throws RuntimeError — Python forbids unsynchronized writes to globals from threads."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`counter += 1` is sugar for `counter = counter + 1` — at least three bytecodes. The GIL can release between any two of them, letting another thread read the same `counter` value, increment it, and write back. Both threads then 'see' their increment land, but only one of them actually moved the counter — so increments get lost.\n\nThe fix:\n\n```python\nlock = threading.Lock()\n\ndef inc():\n    global counter\n    for _ in range(100_000):\n        with lock:\n            counter += 1\n```\n\nThe GIL is a thread *scheduler*, not a mutual-exclusion guarantee for application data. Anything you mutate from multiple threads needs its own lock."
+    },
+
+    {
+      "id": "m1-s6-c3",
+      "type": "multiple_choice",
+      "topic": "Why `threading` doesn't speed up CPU-bound code",
+      "topic_ru": "Почему `threading` не ускоряет CPU-bound код",
+      "difficulty": 3,
+      "tags": ["gil", "threading", "cpu-bound", "interview-classic"],
+      "question": "You wrap a tight numeric loop in 4 threads on a 4-core machine and see no speedup. Why?",
+      "options": [
+        "The threads aren't pinned to separate cores by default.",
+        "Pure Python bytecode execution holds the GIL — only one thread runs Python at any moment, regardless of how many cores you have. Threading helps for I/O-bound work (the GIL is released during waits) but not for CPU-bound pure-Python loops. Use `multiprocessing` for CPU parallelism.",
+        "Python threads don't actually run in parallel; they run round-robin in the main thread.",
+        "You need to call `threading.Thread.parallelize_cpu(True)`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Core pinning is an OS-level concern that's usually irrelevant. The GIL bottleneck is at the interpreter level.",
+        "Correct. The GIL gates Python bytecode execution. CPU-bound pure-Python work spends ~all its time holding the GIL, so threads serialize. The escape hatches are `multiprocessing` (separate processes, separate GILs) or libraries that release the GIL during native work (NumPy, lxml, Pillow, etc.).",
+        "Wrong — Python threads are real OS threads. They just can't all run *Python bytecode* at once.",
+        "There is no such API. The decision to use multiple processes is made by reaching for `multiprocessing` (or `concurrent.futures.ProcessPoolExecutor`)."
+      ]
+    },
+
+    {
+      "id": "m1-s6-c4",
+      "type": "multiple_choice",
+      "topic": "Pick: `threading` vs `multiprocessing` vs `asyncio`",
+      "topic_ru": "Выбор: `threading` vs `multiprocessing` vs `asyncio`",
+      "difficulty": 3,
+      "tags": ["concurrency", "design", "decision"],
+      "question": "Which concurrency tool fits each workload?",
+      "options": [
+        "I/O-bound: multiprocessing. CPU-bound: threading. Concurrent waiting: asyncio.",
+        "I/O-bound (small set, blocking libs): threading. I/O-bound (many connections, async libs): asyncio. CPU-bound (chunky tasks): multiprocessing.",
+        "Always asyncio — modern Python has retired threading and multiprocessing.",
+        "It doesn't matter; the OS schedules them all the same way."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Reversed. Threading is wrong for CPU; multiprocessing is wrong for I/O (overhead is wasted on a wait).",
+        "Correct. Real signals: a few dozen blocking HTTP calls → threading; ten thousand async-ready connections → asyncio; chunky CPU work → multiprocessing. asyncio also works for I/O if your libraries support it, and is the right pick at high concurrency counts where threads would be expensive.",
+        "Wrong — both threading and multiprocessing are first-class and current.",
+        "The OS schedules threads similarly, but the GIL changes the practical cost. The point of choosing is to pay the right concurrency overhead for the workload."
+      ]
+    },
+
+    {
+      "id": "m1-s6-c5",
+      "type": "code_trap",
+      "topic": "Forgetting `t.start()` on a Thread",
+      "topic_ru": "Забыли `t.start()` у потока",
+      "difficulty": 2,
+      "tags": ["threading", "syntax", "interview-classic"],
+      "code_snippet": "import threading\n\nresults = []\n\ndef task():\n    results.append('done')\n\nt = threading.Thread(target=task)\nt.join()         # forgot t.start()!\nprint(results)",
+      "question": "What does this print?",
+      "options": [
+        "['done']",
+        "[]",
+        "Hangs forever",
+        "RuntimeError: cannot join a thread that hasn't started"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`Thread(...)` only constructs the thread; nothing runs until `t.start()` is called. `t.join()` on an unstarted thread is a no-op (it returns immediately because the thread is already 'not running'). So the body never executes and `results` stays empty.\n\nThis is the most common 'why is my thread not doing anything?' bug. The two-step (construct → start → join) is non-negotiable. The `concurrent.futures.ThreadPoolExecutor` API exists partly to remove the foot-gun by collapsing construct + start into one call."
+    },
+
+    {
+      "id": "m1-s6-c6",
+      "type": "flip",
+      "topic": "`multiprocessing` trade-offs",
+      "topic_ru": "Trade-offs у `multiprocessing`",
+      "difficulty": 2,
+      "tags": ["multiprocessing", "concurrency", "design"],
+      "question": "What's the cost of using `multiprocessing` instead of threading, and when does it pay off?",
+      "answer": "Each worker is a fresh Python process — meaningful spawn overhead (especially on Windows / spawn-based start methods) and inter-process communication (IPC) cost: arguments and return values are pickled and shipped between processes. It pays off for **chunky CPU-bound** work where each task takes long enough to amortize the spawn + pickling overhead. For tiny tasks, multiprocessing is often *slower* than serial.",
+      "answer_explanation_md": "Practical sizing rules:\n\n- Per-task work ≪ 10ms → multiprocessing usually loses to serial; the overhead dominates.\n- Per-task work in seconds → multiprocessing scales near-linearly with cores for CPU-bound work.\n- Anything you pickle (closures, lambdas, locally-defined classes) needs to be picklable, or you'll get `PicklingError` from the worker. Top-level functions and standard data classes are safe; lambdas and inner functions are not."
+    },
+
+    {
+      "id": "m1-s6-c7",
+      "type": "flip",
+      "topic": "What `async`/`await` actually do",
+      "topic_ru": "Что на самом деле делают `async`/`await`",
+      "difficulty": 2,
+      "tags": ["asyncio", "async", "await", "interview-classic"],
+      "question": "What does `async def` do to a function, and what does `await` do at a call site?",
+      "answer": "`async def` defines a coroutine function. Calling it returns a *coroutine object* — the body has not run. `await coro` schedules the coroutine on the running event loop and yields control until it finishes, then returns its result. Mechanically, `async`/`await` is the same pause-and-resume model as Sphere 5's generators, with the event loop deciding which coroutine to resume next.",
+      "answer_explanation_md": "Two practical anchors worth saying out loud:\n\n- A coroutine object that's never awaited never runs. Forgetting `await` is the equivalent of calling a generator function and discarding the generator.\n- `await` only works inside an `async def` body. To run a coroutine from sync code, use `asyncio.run(coro)` — once, at the program's top level. Calling `asyncio.run` *from inside* a coroutine raises `RuntimeError`."
+    },
+
+    {
+      "id": "m1-s6-c8",
+      "type": "code_trap",
+      "topic": "`asyncio.gather` preserves input order, not completion order",
+      "topic_ru": "`asyncio.gather` сохраняет порядок входов, а не завершений",
+      "difficulty": 3,
+      "tags": ["asyncio", "gather", "tricky"],
+      "code_snippet": "import asyncio\n\nasync def slow(x):\n    await asyncio.sleep(0.05 * x)\n    return x\n\nasync def main():\n    return await asyncio.gather(slow(3), slow(1), slow(2))\n\nprint(asyncio.run(main()))",
+      "question": "What does this print?",
+      "options": [
+        "[1, 2, 3]",
+        "[3, 1, 2]",
+        "[3, 2, 1]",
+        "Anything — gather is non-deterministic"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`asyncio.gather` returns the results in the **same order as the input coroutines**, regardless of which finished first. So `[slow(3), slow(1), slow(2)]` produces `[3, 1, 2]`.\n\nThe coroutines *do* run concurrently — `slow(1)` finishes first wall-clock-wise, `slow(2)` next, `slow(3)` last — but `gather` collects results positionally. If you want completion order, use `asyncio.as_completed(coros)` and iterate.\n\nThis trips up juniors who think 'gather' implies 'race-and-collect'."
+    },
+
+    {
+      "id": "m1-s6-c9",
+      "type": "fill_in",
+      "topic": "Concurrent fetch with `asyncio.gather`",
+      "topic_ru": "Параллельный fetch через `asyncio.gather`",
+      "difficulty": 2,
+      "tags": ["asyncio", "gather", "patterns"],
+      "code_snippet_with_blanks": "import asyncio\n\nasync def fetch(url): ...\n\nasync def main(urls):\n    # Run all fetches concurrently and collect results\n    return await asyncio.___(*(fetch(u) for u in urls))",
+      "accepted_answers": [
+        ["gather"]
+      ],
+      "explanation_md": "`asyncio.gather(*coros)` runs the coroutines concurrently and returns a list of results in input order. The `*` splat is necessary — `gather` takes coroutines as positional arguments, not as a single iterable. (If you have an iterable directly, you can also use `asyncio.gather(*coros)` or convert via `list(coros)`.)"
+    },
+
+    {
+      "id": "m1-s6-c10",
+      "type": "flip",
+      "topic": "I/O-bound vs CPU-bound mental model",
+      "topic_ru": "Ментальная модель: I/O-bound vs CPU-bound",
+      "difficulty": 2,
+      "tags": ["concurrency", "io-bound", "cpu-bound", "design"],
+      "question": "How do you tell whether a task is I/O-bound or CPU-bound, and which concurrency tool maps to each?",
+      "answer": "**I/O-bound**: the task spends most of its time waiting for something outside Python — network, disk, sleep timers, DB. Use `threading` or `asyncio` (the GIL is released during waits, so concurrency works). **CPU-bound**: the task spends most of its time running Python bytecode (loops, parsing, math). Use `multiprocessing` (or libraries that release the GIL in C). The signal that tells the two apart is whether the task is waiting on something or computing on something.",
+      "answer_explanation_md": "Quick diagnostic: if `asyncio.gather(...)` over your tasks doesn't speed them up, they're CPU-bound — there's nothing for the event loop to do while a coroutine is computing. Move that work to a `ProcessPoolExecutor`. Conversely, if a multiprocessing pool over short tasks runs *slower* than serial, the per-task spawn + pickling overhead is dominating — switch to threads or back to serial."
+    },
+
+    {
+      "id": "m1-s6-c11",
+      "type": "code_task",
+      "topic": "Implement a concurrent doubler with `asyncio.gather`",
+      "topic_ru": "Реализовать конкурентный удвоитель через `asyncio.gather`",
+      "difficulty": 3,
+      "tags": ["asyncio", "gather", "patterns"],
+      "prompt_md": "Implement two functions:\n\n- `async def fetch(x: int) -> int` — yield control once with `await asyncio.sleep(0)`, then return `x * 2`.\n- `async def gather_doubles(items: list[int]) -> list[int]` — given a list of ints, run `fetch` concurrently on each via `asyncio.gather`, and return the list of doubled values **in input order**.\n\nThe synchronous entry point for the test harness will be `asyncio.run(gather_doubles(items))`.",
+      "starter_code": "import asyncio\n\nasync def fetch(x: int) -> int:\n    ...\n\nasync def gather_doubles(items):\n    ...\n",
+      "solution_code": "import asyncio\n\nasync def fetch(x: int) -> int:\n    await asyncio.sleep(0)\n    return x * 2\n\nasync def gather_doubles(items):\n    return await asyncio.gather(*(fetch(x) for x in items))\n",
+      "tests": "import asyncio\nimport pytest\nfrom solution import fetch, gather_doubles\n\ndef test_fetch_doubles_a_value():\n    assert asyncio.run(fetch(5)) == 10\n\ndef test_gather_returns_in_input_order():\n    result = asyncio.run(gather_doubles([3, 1, 2]))\n    assert result == [6, 2, 4]\n\ndef test_gather_handles_empty_input():\n    assert asyncio.run(gather_doubles([])) == []\n\ndef test_gather_returns_a_list_not_a_tuple():\n    result = asyncio.run(gather_doubles([1, 2, 3]))\n    assert isinstance(result, list)\n",
+      "allowlist": ["pytest", "asyncio"]
+    },
+
+    {
+      "id": "m1-s6-c12",
+      "type": "code_trap",
+      "topic": "Forgetting `await` returns a coroutine, not the value",
+      "topic_ru": "Забыли `await` — получили coroutine, а не значение",
+      "difficulty": 3,
+      "tags": ["asyncio", "await", "tricky", "interview-classic"],
+      "code_snippet": "import asyncio\n\nasync def get_value():\n    return 42\n\nasync def main():\n    result = get_value()       # forgot await\n    return result\n\nx = asyncio.run(main())\nprint(type(x).__name__)",
+      "question": "What does this print?",
+      "options": [
+        "int",
+        "coroutine",
+        "Task",
+        "NoneType"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`get_value()` returns a *coroutine object*. Without `await`, the body never runs. `main` returns that coroutine object up through `asyncio.run`, which returns it as `x`. `type(x).__name__` is `'coroutine'`.\n\nThe fix is `result = await get_value()`. Python also emits a `RuntimeWarning: coroutine 'get_value' was never awaited` when the unawaited coroutine is garbage-collected — which is your runtime hint to look for a missing `await`. In strict-mode test setups, that warning is often elevated to an error to catch this exact bug."
+    }
+  ]
+}
