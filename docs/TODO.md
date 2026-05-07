@@ -47,7 +47,7 @@
 | ID | Task | DoD | Status |
 |---|---|---|---|
 | T1.1 | Lock the content JSON schema in `content/schema/card.schema.json`. Five card types as variants. | `jsonschema` validates | ✅ pre-bootstrapped from spec; module_id/sphere_id are wrapper-level not per-card (see NOTES N004) |
-| T1.2 | Lock lesson Markdown frontmatter spec in `content/schema/lesson.frontmatter.example.md`. | Documented in `PRD_content_authoring.md` | ⬜ |
+| T1.2 | Lock lesson Markdown frontmatter spec in `content/schema/lesson.frontmatter.example.md`. | Documented in `PRD_content_authoring.md` | 🟡 |
 | T1.3 | Author `content/modules/01_python_core_oop/module.md` (module overview + map of spheres). | Renders cleanly, all spheres listed | ✅ pre-bootstrapped from spec (lists all 7 spheres per curriculum.md) |
 | T1.4 | Author Sphere 0 lesson (`00_fundamentals.md`) and ~15 cards. | Validation script green | ✅ (provided as gold sample) |
 | T1.5 | Author Sphere 1 lesson + ~15 cards (Class architecture). | Validation green | ⬜ |
