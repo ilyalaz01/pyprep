@@ -1,0 +1,205 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s4",
+  "cards": [
+    {
+      "id": "m1-s4-c1",
+      "type": "flip",
+      "topic": "What `@property` actually does",
+      "topic_ru": "Что на самом деле делает `@property`",
+      "difficulty": 2,
+      "tags": ["property", "encapsulation", "interview-classic"],
+      "question": "What does `@property` do, and when is it the right tool over a plain attribute?",
+      "answer": "`@property` turns a method into a read-only attribute — callers write `obj.x` and get the method's return value. Combined with `@x.setter`, you get write access too, with the chance to validate or transform the input. The right tool when (a) you started with a plain attribute and need to add validation or computation later without breaking callers, or (b) the value is genuinely derived (`@property def full_name(self): return f'{first} {last}'`).",
+      "answer_explanation_md": "The key insight: from the caller's perspective, `obj.age` looks identical whether `age` is an attribute or a property. That means you can introduce a property *later*, after the class has shipped, without changing any call site. This is the practical reason Python culture says 'don't write Java-style `get_x` / `set_x` upfront' — you can always upgrade to a property when you actually need one."
+    },
+
+    {
+      "id": "m1-s4-c2",
+      "type": "code_trap",
+      "topic": "Setter validation runs from `__init__` too",
+      "topic_ru": "Сеттер срабатывает и в `__init__`",
+      "difficulty": 3,
+      "tags": ["property", "setter", "init", "tricky"],
+      "code_snippet": "class User:\n    def __init__(self, age):\n        self.age = age           # uses the setter!\n\n    @property\n    def age(self):\n        return self._age\n\n    @age.setter\n    def age(self, value):\n        if value < 0:\n            raise ValueError('negative age')\n        self._age = value\n\nu = User(-1)",
+      "question": "What happens?",
+      "options": [
+        "Object created; u._age == -1",
+        "Object created; u._age == 0 (validation silently floors)",
+        "ValueError: 'negative age' — the setter runs even from inside __init__",
+        "AttributeError because _age is not yet defined when the property fires"
+      ],
+      "correct_index": 2,
+      "explanation_md": "`self.age = age` is *not* a plain attribute write — it goes through the setter you defined just below. The setter runs even when called from `__init__`, validates the input, and raises before `_age` is ever set.\n\nThis is intentional and usually what you want. The trap is when you try to bypass it: writing `self.age = age` thinking 'I'll skip validation in init' — you don't. To bypass, write to the underlying `self._age = age` directly. To validate, use the property as you already are."
+    },
+
+    {
+      "id": "m1-s4-c3",
+      "type": "multiple_choice",
+      "topic": "`@property` vs explicit `get_x` / `set_x` methods",
+      "topic_ru": "`@property` vs явные методы `get_x` / `set_x`",
+      "difficulty": 3,
+      "tags": ["property", "design", "best-practice"],
+      "question": "When does `@property` win over explicit `get_x()` / `set_x()` methods, and when does it not?",
+      "options": [
+        "`@property` is always preferable — it's more Pythonic.",
+        "`@property` wins when the access feels like an attribute (validation, computed values, lazy initialization). Explicit methods win when the operation is genuinely an action that may take arguments, take time, or have side effects worth signaling at the call site.",
+        "Explicit methods always win because they make work visible.",
+        "They are interchangeable; pick whichever matches your old codebase."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Too absolute. There are real cases where `fetch()` or `save()` is the right verb because the operation is heavy.",
+        "Correct. The dividing line is whether the operation reads/writes like an attribute. `user.age = 30` → property. `user.save_to_db()` → method. The Python idiom is to start with attributes, add properties when validation needs arrive, and reach for explicit methods when the call signals real work.",
+        "Wrong — most reads in Python are attribute-shaped. Insisting on methods for every getter is a Java import.",
+        "Style choices have rationales. Picking by 'whichever matches old code' is exactly how a codebase ends up inconsistent."
+      ]
+    },
+
+    {
+      "id": "m1-s4-c4",
+      "type": "fill_in",
+      "topic": "Canonical `@property` + setter pattern",
+      "topic_ru": "Канонический паттерн `@property` + сеттер",
+      "difficulty": 2,
+      "tags": ["property", "setter", "patterns"],
+      "code_snippet_with_blanks": "class Score:\n    def __init__(self, n):\n        self._n = n\n\n    ___\n    def n(self):\n        return self._n\n\n    @___\n    def n(self, value):\n        self._n = max(0, value)",
+      "accepted_answers": [
+        ["@property"],
+        ["n\\.setter"]
+      ],
+      "explanation_md": "The pattern is two methods named the same way (`n`), the getter decorated with `@property` and the setter decorated with `@<name>.setter`. The setter is registered on the descriptor returned by `@property`, which is why the decorator references the property name (`n.setter`) rather than the class name."
+    },
+
+    {
+      "id": "m1-s4-c5",
+      "type": "flip",
+      "topic": "What a decorator actually is",
+      "topic_ru": "Что такое декоратор на самом деле",
+      "difficulty": 2,
+      "tags": ["decorators", "closures", "interview-classic"],
+      "question": "Mechanically, what is a decorator? What does `@my_decorator` do to the function below it?",
+      "answer": "A decorator is a function that takes a function and returns a function (usually a wrapper that adds behavior around the original). `@my_decorator` is pure syntactic sugar — it rewrites `def f(...): ...` to `f = my_decorator(f)`. The wrapper retains a reference to the original via closure (Sphere 0's LEGB), which is how it knows what to call.",
+      "answer_explanation_md": "The decorator-as-sugar identity is worth saying out loud in interviews — it tells the interviewer you understand decorators are not magic, just function composition. Two equivalent forms:\n\n```python\n@my_decorator\ndef f(): ...\n\n# is identical to:\ndef f(): ...\nf = my_decorator(f)\n```\n\nFrom there, decorators-with-arguments and `functools.wraps` are just additional layers on the same idea."
+    },
+
+    {
+      "id": "m1-s4-c6",
+      "type": "code_trap",
+      "topic": "Decorator without `*args, **kwargs` only fits one signature",
+      "topic_ru": "Декоратор без `*args, **kwargs` подходит только для одной сигнатуры",
+      "difficulty": 3,
+      "tags": ["decorators", "args", "kwargs", "tricky"],
+      "code_snippet": "def announce(fn):\n    def wrapper():               # no *args/**kwargs\n        print('calling')\n        return fn()\n    return wrapper\n\n@announce\ndef add(x, y):\n    return x + y\n\nprint(add(2, 3))",
+      "question": "What happens?",
+      "options": [
+        "Prints 'calling' then 5",
+        "TypeError: wrapper() takes 0 positional arguments but 2 were given",
+        "Prints 'calling' then None",
+        "TypeError on the @announce line at definition time"
+      ],
+      "correct_index": 1,
+      "explanation_md": "After decoration, `add` *is* `wrapper`. Calling `add(2, 3)` passes 2 and 3 to `wrapper`, which was defined to accept no arguments. Python raises `TypeError: wrapper() takes 0 positional arguments but 2 were given`.\n\nFix: forward arguments through.\n\n```python\ndef wrapper(*args, **kwargs):\n    print('calling')\n    return fn(*args, **kwargs)\n```\n\nThe `*args, **kwargs` pattern is what makes a decorator reusable across functions with different signatures. Production decorators essentially always use it."
+    },
+
+    {
+      "id": "m1-s4-c7",
+      "type": "code_task",
+      "topic": "Implement a `@timeit` decorator with `functools.wraps`",
+      "topic_ru": "Реализовать декоратор `@timeit` с `functools.wraps`",
+      "difficulty": 3,
+      "tags": ["decorators", "wraps", "patterns"],
+      "prompt_md": "Implement `timeit`, a decorator that:\n\n- Times the wrapped function's execution using `time.perf_counter()`.\n- Stores the elapsed seconds (a float) on the wrapper as an attribute named `last_elapsed`. Each call updates it.\n- Returns the wrapped function's return value unchanged.\n- Uses `functools.wraps` so the wrapper preserves the original `__name__` and `__doc__`.\n- Accepts any signature (positional + keyword arguments).",
+      "starter_code": "import time\nfrom functools import wraps\n\ndef timeit(fn):\n    ...\n",
+      "solution_code": "import time\nfrom functools import wraps\n\ndef timeit(fn):\n    @wraps(fn)\n    def wrapper(*args, **kwargs):\n        start = time.perf_counter()\n        result = fn(*args, **kwargs)\n        wrapper.last_elapsed = time.perf_counter() - start\n        return result\n    wrapper.last_elapsed = 0.0\n    return wrapper\n",
+      "tests": "import pytest\nfrom solution import timeit\n\n@timeit\ndef add(x, y):\n    \"\"\"Add two numbers.\"\"\"\n    return x + y\n\ndef test_returns_wrapped_value():\n    assert add(2, 3) == 5\n\ndef test_records_last_elapsed_as_float():\n    add(1, 1)\n    assert isinstance(add.last_elapsed, float)\n    assert add.last_elapsed >= 0\n\ndef test_wraps_preserves_name_and_doc():\n    assert add.__name__ == 'add'\n    assert add.__doc__ == 'Add two numbers.'\n\ndef test_accepts_kwargs():\n    assert add(x=2, y=4) == 6\n",
+      "allowlist": ["pytest", "time", "functools"]
+    },
+
+    {
+      "id": "m1-s4-c8",
+      "type": "flip",
+      "topic": "Decorators with arguments: the three-layer shape",
+      "topic_ru": "Декораторы с аргументами: три уровня вложенности",
+      "difficulty": 4,
+      "tags": ["decorators", "decorator-factory", "tricky"],
+      "question": "If you want to write `@retry(times=3)`, how does the structure differ from a plain decorator? Sketch the three layers.",
+      "answer": "Plain decorator is one function; decorator-with-arguments is **three** nested functions: an outer factory that takes the decorator's arguments and returns a decorator, the decorator itself that takes the function and returns a wrapper, and the wrapper that runs at call time. The `@retry(times=3)` syntax first calls `retry(times=3)` (returning a decorator), then applies that decorator to the function below.",
+      "answer_explanation_md": "The canonical shape:\n\n```python\ndef retry(times):           # ← takes decorator args\n    def decorator(fn):      # ← takes the function\n        def wrapper(*args, **kwargs):   # ← runs at call time\n            ...\n        return wrapper\n    return decorator\n```\n\nRecognize this whenever you see `@something(...)` — three layers, not one. A common confusion is mixing up which layer the closure variables live in (`times` lives in `retry`'s scope; `fn` lives in `decorator`'s scope)."
+    },
+
+    {
+      "id": "m1-s4-c9",
+      "type": "code_trap",
+      "topic": "Without `@wraps`, the function loses its name",
+      "topic_ru": "Без `@wraps` функция теряет имя",
+      "difficulty": 3,
+      "tags": ["decorators", "wraps", "introspection"],
+      "code_snippet": "def announce(fn):\n    def wrapper(*args, **kwargs):\n        return fn(*args, **kwargs)\n    return wrapper\n\n@announce\ndef add(x, y):\n    \"\"\"Add two numbers.\"\"\"\n    return x + y\n\nprint(add.__name__)\nprint(add.__doc__)",
+      "question": "What does this print?",
+      "options": [
+        "'add' then 'Add two numbers.'",
+        "'wrapper' then None",
+        "'wrapper' then 'Add two numbers.'",
+        "'add' then None"
+      ],
+      "correct_index": 1,
+      "explanation_md": "After `@announce`, `add` *is* `wrapper`. Its `__name__` is `'wrapper'` (because that's how `wrapper` was defined) and its `__doc__` is `None` (because `wrapper` has no docstring of its own). The original `add`'s metadata is lost.\n\nFix: `from functools import wraps` and decorate `wrapper` itself with `@wraps(fn)`. That copies `__name__`, `__doc__`, `__module__`, `__qualname__`, `__dict__`, and `__wrapped__` from the original onto the wrapper."
+    },
+
+    {
+      "id": "m1-s4-c10",
+      "type": "flip",
+      "topic": "What `functools.wraps` actually copies",
+      "topic_ru": "Что именно копирует `functools.wraps`",
+      "difficulty": 2,
+      "tags": ["decorators", "wraps", "introspection"],
+      "question": "What does `@functools.wraps(fn)` do mechanically, and why does it matter in production code?",
+      "answer": "`@functools.wraps(fn)` copies the wrapped function's `__name__`, `__doc__`, `__module__`, `__qualname__`, `__dict__`, and sets `__wrapped__ = fn` on the wrapper. It matters because debuggers, documentation generators (Sphinx), test discovery, and humans reading tracebacks all rely on those attributes. Without it, every decorated function looks like 'wrapper' in tools and stack traces — making debugging painful.",
+      "answer_explanation_md": "The `__wrapped__` attribute is also useful in test code: `add.__wrapped__(2, 3)` reaches the original function, bypassing whatever the decorator added (timing, retry, caching). That's the official escape hatch when you need to test the underlying function in isolation."
+    },
+
+    {
+      "id": "m1-s4-c11",
+      "type": "code_trap",
+      "topic": "`@wraps` placement matters",
+      "topic_ru": "Положение `@wraps` имеет значение",
+      "difficulty": 3,
+      "tags": ["decorators", "wraps", "syntax"],
+      "code_snippet": "from functools import wraps\n\ndef announce(fn):\n    @wraps                # missing the (fn) call!\n    def wrapper(*args, **kwargs):\n        return fn(*args, **kwargs)\n    return wrapper\n\n@announce\ndef add(x, y): return x + y",
+      "question": "What happens at module load time?",
+      "options": [
+        "Nothing — `@wraps` works without parentheses too.",
+        "TypeError when `announce` runs: `wraps()` missing 1 required positional argument: 'wrapped'.",
+        "ValueError later, when `add` is called.",
+        "Silent — `wrapper` works but loses metadata."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`@wraps` (no call) tries to use `wraps` *itself* as the decorator factory — but `wraps` is a function expecting an argument (the function to wrap). The error fires at module load when `announce(add)` runs. The fix is to call it: `@wraps(fn)`.\n\nThe gotcha is that the syntactic shape of `@wraps` looks fine — it's only at runtime that Python evaluates the decorator expression and discovers the missing argument."
+    },
+
+    {
+      "id": "m1-s4-c12",
+      "type": "multiple_choice",
+      "topic": "Which attributes does `@functools.wraps` preserve?",
+      "topic_ru": "Какие атрибуты сохраняет `@functools.wraps`",
+      "difficulty": 3,
+      "tags": ["decorators", "wraps", "introspection"],
+      "question": "Which attributes of the wrapped function does `@functools.wraps` copy onto the wrapper by default?",
+      "options": [
+        "Only `__name__` and `__doc__`.",
+        "`__name__`, `__doc__`, `__module__`, `__qualname__`, `__dict__`, and sets `__wrapped__` on the wrapper.",
+        "Everything — including the function's bytecode (`__code__`).",
+        "Only `__qualname__` (so tracebacks look right)."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Incomplete — modern `wraps` also copies `__qualname__` (used in tracebacks for nested classes/methods) and `__module__`.",
+        "Correct. The exact set is in `functools.WRAPPER_ASSIGNMENTS` (copied) plus `functools.WRAPPER_UPDATES` (merged into `__dict__`). The `__wrapped__` attribute is the back-reference for tools that want to reach the original.",
+        "Wrong — `__code__` would make the wrapper *be* the original at the bytecode level, defeating the wrap. `wraps` only copies metadata.",
+        "Wrong — that's only one of the assignments."
+      ]
+    }
+  ]
+}
