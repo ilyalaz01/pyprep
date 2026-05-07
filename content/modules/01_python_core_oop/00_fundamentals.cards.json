@@ -1,0 +1,261 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s0",
+  "cards": [
+    {
+      "id": "m1-s0-c1",
+      "type": "flip",
+      "topic": "Mutable vs immutable built-in types",
+      "topic_ru": "Изменяемые vs неизменяемые встроенные типы",
+      "difficulty": 1,
+      "tags": ["mutability", "interview-warmup"],
+      "question": "Which of Python's built-in types are mutable, and which are immutable? Name them.",
+      "answer": "Immutable: int, float, bool, str, tuple, frozenset, bytes. Mutable: list, dict, set, bytearray.",
+      "answer_explanation_md": "Mutability changes whether assignment to a binding creates a new object (immutable) or whether the existing object is modified in place (mutable). This affects identity (`id()`), hashability (only immutable objects are hashable and can be dict keys), and aliasing behavior (multiple names pointing to the same mutable see each other's changes)."
+    },
+
+    {
+      "id": "m1-s0-c2",
+      "type": "code_trap",
+      "topic": "Mutable default argument shared across calls",
+      "topic_ru": "Изменяемый аргумент по умолчанию шарится между вызовами",
+      "difficulty": 2,
+      "tags": ["mutability", "default-args", "interview-classic"],
+      "code_snippet": "def add(x, items=[]):\n    items.append(x)\n    return items\n\nprint(add(1))\nprint(add(2))\nprint(add(3))",
+      "question": "What does this print?",
+      "options": [
+        "[1]\n[2]\n[3]",
+        "[1]\n[1, 2]\n[1, 2, 3]",
+        "[1]\n[2]\n[1, 2, 3]",
+        "TypeError on the second call"
+      ],
+      "correct_index": 1,
+      "explanation_md": "The default `items=[]` is evaluated **once**, when the function is defined. Every call that doesn't pass `items` mutates the same shared list object. So the second call appends to the list returned by the first call.\n\nThe canonical fix:\n\n```python\ndef add(x, items=None):\n    if items is None:\n        items = []\n    items.append(x)\n    return items\n```\n\nThis pattern (`is None` sentinel + create-inside) is mandatory for mutable defaults: list, dict, set, instances of custom mutable classes."
+    },
+
+    {
+      "id": "m1-s0-c3",
+      "type": "flip",
+      "topic": "Why tuples but not lists are hashable",
+      "topic_ru": "Почему tuple хешируется, а list — нет",
+      "difficulty": 2,
+      "tags": ["mutability", "hashable", "dict-keys"],
+      "question": "Why can you use a tuple as a dict key, but not a list?",
+      "answer": "Lists are mutable, tuples are immutable. Dict keys must be hashable, and hashability requires the object's hash to remain stable for the object's lifetime. A mutable object's contents (and thus its hash) could change after insertion, breaking the dict's invariants — so Python forbids it at the type level (`list.__hash__ is None`).",
+      "answer_explanation_md": "Caveat the interviewer may push on: a tuple is only hashable if **all its contents are also hashable**. `(1, 2, 3)` works; `(1, [2, 3])` does not, because the inner list breaks hashability."
+    },
+
+    {
+      "id": "m1-s0-c4",
+      "type": "code_trap",
+      "topic": "Class-level mutable attribute shared between instances",
+      "topic_ru": "Изменяемый атрибут на уровне класса шарится между экземплярами",
+      "difficulty": 3,
+      "tags": ["mutability", "class-attributes", "oop"],
+      "code_snippet": "class Cart:\n    items = []          # class attribute\n\n    def add(self, x):\n        self.items.append(x)\n\na = Cart(); a.add('apple')\nb = Cart(); b.add('banana')\nprint(b.items)",
+      "question": "What does this print?",
+      "options": [
+        "['banana']",
+        "['apple', 'banana']",
+        "[]",
+        "AttributeError"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`items = []` at class level creates **one** list shared by every `Cart` instance. `self.items.append(x)` does NOT create a new attribute on the instance — it mutates the shared class-level list. Both `a` and `b` see all appends.\n\nThe fix is to assign `self.items = []` inside `__init__`, which creates a fresh per-instance list:\n\n```python\nclass Cart:\n    def __init__(self):\n        self.items = []\n```\n\nThis trap is the single most-asked OOP gotcha in junior interviews. Recognize it instantly."
+    },
+
+    {
+      "id": "m1-s0-c5",
+      "type": "multiple_choice",
+      "topic": "LEGB resolution order",
+      "topic_ru": "Порядок поиска имён LEGB",
+      "difficulty": 2,
+      "tags": ["scope", "legb"],
+      "question": "In what order does Python resolve a name reference?",
+      "options": [
+        "Local → Global → Enclosing → Built-in",
+        "Local → Enclosing → Global → Built-in",
+        "Built-in → Global → Enclosing → Local",
+        "Local → Module → Class → Built-in"
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong order — Enclosing comes before Global, not after. The mnemonic is L-E-G-B.",
+        "Correct. LEGB: Local (current function), Enclosing (outer functions for nested defs), Global (module level), Built-in (`print`, `len`, etc).",
+        "Reverse order — wrong. Built-in is the last fallback, not the first lookup.",
+        "Module/Class isn't the canonical Python rule — there is no separate Class scope in lookups (class body is a special evaluation context, but for name resolution from inside methods it's not in the chain)."
+      ]
+    },
+
+    {
+      "id": "m1-s0-c6",
+      "type": "code_trap",
+      "topic": "UnboundLocalError without nonlocal",
+      "topic_ru": "UnboundLocalError без nonlocal",
+      "difficulty": 3,
+      "tags": ["scope", "nonlocal", "closures"],
+      "code_snippet": "def make_counter():\n    count = 0\n    def increment():\n        count = count + 1\n        return count\n    return increment\n\nc = make_counter()\nprint(c())",
+      "question": "What does this print?",
+      "options": [
+        "1",
+        "0",
+        "UnboundLocalError",
+        "NameError: count is not defined"
+      ],
+      "correct_index": 2,
+      "explanation_md": "Inside `increment`, the assignment `count = count + 1` makes Python treat `count` as a **local** variable for the entire function. When the right-hand side `count + 1` runs, the local `count` hasn't been assigned yet → `UnboundLocalError: local variable 'count' referenced before assignment`.\n\nThe fix is `nonlocal count` at the top of `increment`, which tells Python to bind to the enclosing function's `count` instead of creating a local one.\n\nThis is *exactly* why `nonlocal` exists — and it's a frequent interview prompt."
+    },
+
+    {
+      "id": "m1-s0-c7",
+      "type": "flip",
+      "topic": "global vs nonlocal",
+      "topic_ru": "global vs nonlocal",
+      "difficulty": 2,
+      "tags": ["scope", "global", "nonlocal"],
+      "question": "What is the difference between `global` and `nonlocal`?",
+      "answer": "`global x` inside a function binds the name `x` to the module-level (global) scope. `nonlocal x` binds it to the nearest enclosing **function** scope (not module). `nonlocal` is meaningful only inside a nested function.",
+      "answer_explanation_md": "`global` reaches all the way out to module scope, skipping any enclosing functions. `nonlocal` reaches exactly one level of function up (or further if not found there). For module-level scripts (no nesting), only `global` makes sense; `nonlocal` raises a SyntaxError."
+    },
+
+    {
+      "id": "m1-s0-c8",
+      "type": "fill_in",
+      "topic": "Canonical mutable-default fix pattern",
+      "topic_ru": "Канонический фикс для изменяемого аргумента по умолчанию",
+      "difficulty": 2,
+      "tags": ["mutability", "default-args", "patterns"],
+      "code_snippet_with_blanks": "def add_user(name, tags=___):\n    if tags ___ ___:\n        tags = ___\n    tags.append('new')\n    return tags",
+      "accepted_answers": [
+        ["None"],
+        ["is"],
+        ["None"],
+        ["\\[\\]", "list\\(\\)"]
+      ],
+      "explanation_md": "The pattern: default to `None`, check `is None`, create the empty container inside the function. Never use `if not tags:` — it would also trigger on a legitimate empty list passed in by the caller, breaking expected behavior."
+    },
+
+    {
+      "id": "m1-s0-c9",
+      "type": "code_trap",
+      "topic": "if __name__ == '__main__' and import behavior",
+      "topic_ru": "if __name__ == '__main__' и поведение при импорте",
+      "difficulty": 2,
+      "tags": ["modules", "main", "imports"],
+      "code_snippet": "# file: greet.py\nprint('top-level')\n\ndef greet():\n    print('hello')\n\nif __name__ == '__main__':\n    print('main block')\n    greet()\n\n# In a separate file:\n# import greet\n# greet.greet()",
+      "question": "What gets printed when you run `python -c 'import greet; greet.greet()'`?",
+      "options": [
+        "top-level\\nmain block\\nhello\\nhello",
+        "top-level\\nhello",
+        "main block\\nhello",
+        "hello"
+      ],
+      "correct_index": 1,
+      "explanation_md": "On `import greet`, the file is executed top-to-bottom **once**: `print('top-level')` runs. The `if __name__ == '__main__'` block does NOT run because at import time `__name__` equals `'greet'`, not `'main'`. Then `greet.greet()` runs, printing `hello`.\n\nKey takeaway: top-level code (including `print`) runs on import. The guard prevents only the *guarded* block, not everything else in the file."
+    },
+
+    {
+      "id": "m1-s0-c10",
+      "type": "multiple_choice",
+      "topic": "Identity vs equality of small integers (interning)",
+      "topic_ru": "Идентичность vs равенство малых целых (интернирование)",
+      "difficulty": 4,
+      "tags": ["identity", "equality", "interning", "tricky"],
+      "question": "Given `a = 256; b = 256; c = 257; d = 257`, which is true?",
+      "options": [
+        "a is b → True; c is d → True (all int comparisons are True)",
+        "a is b → True; c is d → False (small ints are interned, larger ints are not guaranteed to be)",
+        "a is b → False; c is d → False (Python never interns ints)",
+        "a == b → False (Python compares by identity for primitives)"
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "First half right, second wrong. CPython interns ints in roughly the [-5, 256] range; outside that range, two `257`s are different objects (different `id`).",
+        "Correct. CPython interns small ints in a fixed range. `is` (identity) is True only for the cached objects. **Always use `==` for value comparison; never `is` for ints.**",
+        "Wrong — small ints are interned in CPython.",
+        "Wrong — `==` always compares values, regardless of identity."
+      ]
+    },
+
+    {
+      "id": "m1-s0-c11",
+      "type": "code_trap",
+      "topic": "Tuple mutability with mutable contents",
+      "topic_ru": "Изменяемость кортежа с изменяемым содержимым",
+      "difficulty": 3,
+      "tags": ["mutability", "tuple", "list", "tricky"],
+      "code_snippet": "t = (1, 2, [3, 4])\nt[2].append(5)\nprint(t)",
+      "question": "What does this print or raise?",
+      "options": [
+        "TypeError — tuples are immutable",
+        "(1, 2, [3, 4, 5])",
+        "(1, 2, [3, 4])",
+        "(1, 2, [5])"
+      ],
+      "correct_index": 1,
+      "explanation_md": "The tuple `t` is immutable in the sense that you cannot reassign its slots: `t[2] = something` raises `TypeError`. But the **object at slot 2** is a list, which is mutable. `t[2].append(5)` doesn't reassign the slot — it mutates the list in place, which is allowed.\n\nThis is why a tuple containing a list is **not hashable**: the same tuple's contents could change after insertion, breaking dict invariants. Try it: `hash((1, 2, [3]))` raises `TypeError: unhashable type: 'list'`."
+    },
+
+    {
+      "id": "m1-s0-c12",
+      "type": "flip",
+      "topic": "Why == vs is matters",
+      "topic_ru": "Почему == и is — это разное",
+      "difficulty": 2,
+      "tags": ["identity", "equality", "interview-classic"],
+      "question": "When should you use `is` and when `==`?",
+      "answer": "Use `is` for identity (same object in memory) — almost always against singletons: `is None`, `is True`, `is False`. Use `==` for value equality — for everything else: numbers, strings, collections.",
+      "answer_explanation_md": "Common bug: `if x is 'hello':` — works on small strings due to interning, fails on dynamic strings. Always `==` for value comparison. The only safe `is` checks are against `None`, `True`, `False`, and module-level sentinels you control."
+    },
+
+    {
+      "id": "m1-s0-c13",
+      "type": "multiple_choice",
+      "topic": "Variable shadowing in comprehension scope (Python 3)",
+      "topic_ru": "Затенение переменных в области видимости comprehension (Python 3)",
+      "difficulty": 4,
+      "tags": ["scope", "comprehensions", "tricky"],
+      "question": "What does this print?\n\n```python\nx = 10\nresult = [x for x in range(3)]\nprint(x, result)\n```",
+      "options": [
+        "10 [0, 1, 2]",
+        "2 [0, 1, 2]",
+        "10 [10, 10, 10]",
+        "NameError"
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. In Python 3, list comprehensions have their own scope — the loop variable `x` is local to the comprehension, so the outer `x` (10) is unchanged.",
+        "Wrong for Python 3. This was the Python 2 behavior — the loop variable leaked into the surrounding scope. Python 3 fixed it.",
+        "Wrong. The comprehension iterates `range(3)`, producing 0, 1, 2.",
+        "Wrong. Both `x` and `result` are defined; no error."
+      ]
+    },
+
+    {
+      "id": "m1-s0-c14",
+      "type": "code_task",
+      "topic": "Implement a counter factory using nonlocal",
+      "topic_ru": "Реализовать фабрику счётчика через nonlocal",
+      "difficulty": 3,
+      "tags": ["closures", "nonlocal", "factory"],
+      "prompt_md": "Implement `make_counter(start: int = 0)` that returns a function. Each call to the returned function increments an internal counter (initially `start`) by 1 and returns the new value.\n\nMultiple counters from the same factory must be independent.",
+      "starter_code": "def make_counter(start: int = 0):\n    # your code here\n    pass\n",
+      "solution_code": "def make_counter(start: int = 0):\n    count = start\n    def step():\n        nonlocal count\n        count += 1\n        return count\n    return step\n",
+      "tests": "import pytest\nfrom solution import make_counter\n\ndef test_counts_from_zero_by_default():\n    c = make_counter()\n    assert c() == 1\n    assert c() == 2\n    assert c() == 3\n\ndef test_counts_from_custom_start():\n    c = make_counter(10)\n    assert c() == 11\n    assert c() == 12\n\ndef test_counters_are_independent():\n    a = make_counter()\n    b = make_counter(100)\n    assert a() == 1\n    assert b() == 101\n    assert a() == 2\n    assert b() == 102\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m1-s0-c15",
+      "type": "flip",
+      "topic": "Why mutable defaults persist across calls (mechanism)",
+      "topic_ru": "Почему изменяемые значения по умолчанию переживают вызовы (механизм)",
+      "difficulty": 3,
+      "tags": ["mutability", "default-args", "mechanism"],
+      "question": "Mechanically, *why* does `def f(items=[])` share the same list across calls?",
+      "answer": "Because Python evaluates default-argument expressions **once**, when the `def` statement runs (function definition time), and stores them on the function object itself (visible as `f.__defaults__`). On each call where the argument is omitted, Python uses that same stored object — not a fresh copy.",
+      "answer_explanation_md": "You can inspect this directly:\n\n```python\ndef f(items=[]):\n    items.append(1)\n    return items\n\nprint(f.__defaults__)   # ([],)\nf()\nprint(f.__defaults__)   # ([1],)   — the stored default is mutated!\n```\n\nThis is a deliberate language design choice (it makes function definition cheap and predictable), not a bug. The interview-grade question is: 'show me you understand the mechanism, not just the workaround.'"
+    }
+  ]
+}

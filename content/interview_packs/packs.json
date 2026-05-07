@@ -1,0 +1,106 @@
+{
+  "$schema": "../schema/pack.schema.json",
+  "version": 1,
+  "template": "template_v1",
+  "packs": [
+    {
+      "id": "junior-backend-python-core",
+      "title": "Junior Backend — Python Core",
+      "title_ru": "Junior Backend — ядро Python",
+      "description": "30-minute screen weighted toward Python core, OOP, and basic backend (FastAPI/Pydantic). Best as your first mock — it's the most common screening shape for Israeli junior backend roles.",
+      "request": {
+        "modules": [1, 2],
+        "spheres": ["m1-s0", "m1-s1", "m1-s2", "m1-s3", "m1-s5", "m2-s4", "m2-s7"],
+        "difficulty_min": 2,
+        "difficulty_max": 4,
+        "count": 10,
+        "duration_minutes": 30,
+        "role_label": "Junior Python Backend Developer (Student Position)",
+        "candidate_level": "junior",
+        "weakness_focus": false,
+        "language_hint": "English / Hebrew / Russian",
+        "type_mix": { "concept": 30, "code_trap": 35, "design": 15, "practical": 20 }
+      }
+    },
+
+    {
+      "id": "qa-automation-heavy",
+      "title": "QA Automation — Testing Heavy",
+      "title_ru": "QA Automation — упор на тестирование",
+      "description": "30-minute screen weighted toward pytest, fixtures, mocking, and Python automation patterns. Targets QA Automation Engineer and SDET roles.",
+      "request": {
+        "modules": [2, 3],
+        "spheres": ["m2-s1", "m2-s2", "m2-s4", "m2-s5", "m2-s6", "m3-s1", "m3-s2", "m3-s3", "m3-s4", "m3-s5"],
+        "difficulty_min": 2,
+        "difficulty_max": 4,
+        "count": 10,
+        "duration_minutes": 30,
+        "role_label": "Junior QA Automation Engineer (Python)",
+        "candidate_level": "junior",
+        "weakness_focus": false,
+        "language_hint": "English / Hebrew / Russian",
+        "type_mix": { "concept": 25, "code_trap": 30, "design": 15, "practical": 30 }
+      }
+    },
+
+    {
+      "id": "junior-python-mixed-weakness",
+      "title": "Junior Python — Mixed (Weakness-Focused)",
+      "title_ru": "Junior Python — микс по слабым темам",
+      "description": "45-minute screen across all modules, sampling weighted toward your weakest spheres. Use after ~2 weeks of practice when you have meaningful stats.",
+      "request": {
+        "modules": [1, 2, 3, 4],
+        "spheres": [],
+        "difficulty_min": 2,
+        "difficulty_max": 5,
+        "count": 12,
+        "duration_minutes": 45,
+        "role_label": "Junior Python Developer",
+        "candidate_level": "junior",
+        "weakness_focus": true,
+        "language_hint": "English / Hebrew / Russian",
+        "type_mix": { "concept": 30, "code_trap": 30, "design": 15, "practical": 25 }
+      }
+    },
+
+    {
+      "id": "refresh-quick-15",
+      "title": "Refresh — Quick 15",
+      "title_ru": "Освежить — быстрые 15 минут",
+      "description": "15-minute warm-up. Easy band only. Use the morning of an interview to prime your brain.",
+      "request": {
+        "modules": [1, 2, 3, 4],
+        "spheres": [],
+        "difficulty_min": 1,
+        "difficulty_max": 2,
+        "count": 5,
+        "duration_minutes": 15,
+        "role_label": "Junior Python Developer",
+        "candidate_level": "junior",
+        "weakness_focus": false,
+        "language_hint": "English / Hebrew / Russian",
+        "type_mix": { "concept": 50, "code_trap": 30, "design": 0, "practical": 20 }
+      }
+    },
+
+    {
+      "id": "pre-onsite-drill",
+      "title": "Pre-Onsite Drill",
+      "title_ru": "Подготовка к онсайту",
+      "description": "60-minute hard-band screen across all modules. No weakness focus — tests breadth and stress resistance. Use the night before a real onsite.",
+      "request": {
+        "modules": [1, 2, 3, 4],
+        "spheres": [],
+        "difficulty_min": 3,
+        "difficulty_max": 5,
+        "count": 15,
+        "duration_minutes": 60,
+        "role_label": "Junior-to-Mid Python Developer (Onsite Round)",
+        "candidate_level": "junior-strong",
+        "weakness_focus": false,
+        "language_hint": "English / Hebrew / Russian",
+        "type_mix": { "concept": 25, "code_trap": 30, "design": 25, "practical": 20 }
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pyprep.local/schemas/card.schema.json",
+  "title": "PyPrep Card",
+  "description": "A single learning card. The cards.json file at each sphere contains an array of these.",
+  "type": "object",
+  "required": ["id", "type", "topic", "difficulty", "tags"],
+  "properties": {
+    "id":         { "type": "string", "pattern": "^m[0-9]+-s[0-9]+-c[0-9]+$" },
+    "module_id":  { "type": "integer", "minimum": 1 },
+    "sphere_id":  { "type": "string", "pattern": "^m[0-9]+-s[0-9]+$" },
+    "type":       { "enum": ["flip", "code_trap", "multiple_choice", "fill_in", "code_task"] },
+    "topic":      { "type": "string", "maxLength": 120 },
+    "topic_ru":   { "type": "string", "maxLength": 160 },
+    "difficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "tags":       { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "source":     { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if":   { "properties": { "type": { "const": "flip" } } },
+      "then": { "required": ["question", "answer"],
+                "properties": {
+                  "question": { "type": "string", "minLength": 5 },
+                  "answer":   { "type": "string", "minLength": 5 },
+                  "answer_explanation_md": { "type": "string" }
+                }}
+    },
+    {
+      "if":   { "properties": { "type": { "const": "code_trap" } } },
+      "then": { "required": ["code_snippet", "question", "options", "correct_index", "explanation_md"],
+                "properties": {
+                  "code_snippet":   { "type": "string", "minLength": 5 },
+                  "question":       { "type": "string", "minLength": 5 },
+                  "options":        { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 6 },
+                  "correct_index":  { "type": "integer", "minimum": 0 },
+                  "explanation_md": { "type": "string", "minLength": 20 }
+                }}
+    },
+    {
+      "if":   { "properties": { "type": { "const": "multiple_choice" } } },
+      "then": { "required": ["question", "options", "correct_index", "option_explanations"],
+                "properties": {
+                  "question":            { "type": "string", "minLength": 5 },
+                  "options":             { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 6 },
+                  "correct_index":       { "type": "integer", "minimum": 0 },
+                  "option_explanations": { "type": "array", "items": { "type": "string" } }
+                }}
+    },
+    {
+      "if":   { "properties": { "type": { "const": "fill_in" } } },
+      "then": { "required": ["code_snippet_with_blanks", "accepted_answers"],
+                "properties": {
+                  "code_snippet_with_blanks": { "type": "string", "pattern": "___" },
+                  "accepted_answers":         { "type": "array", "items": { "type": "array", "items": { "type": "string" } } },
+                  "explanation_md":           { "type": "string" }
+                }}
+    },
+    {
+      "if":   { "properties": { "type": { "const": "code_task" } } },
+      "then": { "required": ["prompt_md", "starter_code", "solution_code", "tests"],
+                "properties": {
+                  "prompt_md":     { "type": "string", "minLength": 20 },
+                  "starter_code":  { "type": "string" },
+                  "solution_code": { "type": "string", "minLength": 5 },
+                  "tests":         { "type": "string", "minLength": 20 },
+                  "allowlist":     { "type": "array", "items": { "type": "string" } }
+                }}
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+# --- Secrets / env ---
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage-report/
+.coverage
+.coverage.*
+*.cover
+*.egg-info/
+dist/
+build/
+
+# --- uv ---
+# uv.lock IS committed — reproducibility.
+# Never gitignore uv.lock.
+
+# --- Node / frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/.turbo/
+.pnpm-store/
+.npm/
+.yarn/
+
+# --- Database ---
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+pyprep.db*
+
+# --- IDEs / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Local dev artifacts ---
+docs/STUCK.md
+docs/SESSION_LOG.md
+.claude/
