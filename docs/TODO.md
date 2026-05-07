@@ -28,7 +28,7 @@
 | T0.2 | Configure `ruff.toml` with strict ruleset (`E`, `F`, `B`, `I`, `N`, `UP`, `SIM`, `RUF`). | `ruff check .` returns 0 | ✅ pre-bootstrapped from spec (config inline in `pyproject.toml [tool.ruff]`; verified `ruff check .` = 0) |
 | T0.3 | Create `src/pyprep/__init__.py` with `__version__ = "1.00"`. | importable as `pyprep` | ✅ pre-bootstrapped from spec (`__version__` + `__all__` already present) |
 | T0.4 | Create `src/pyprep/main.py` with a `main()` entry point printing version. | `python -m pyprep` prints version | ✅ |
-| T0.5 | Create `tests/unit/test_smoke.py` with a single `test_version_string()` test. | `pytest` green | ⬜ |
+| T0.5 | Create `tests/unit/test_smoke.py` with a single `test_version_string()` test. | `pytest` green | 🟡 |
 | T0.6 | Configure `pytest` (`pyproject.toml`): coverage settings, fail-under 85% (warn-only initially). | `pytest --cov` runs | ✅ pre-bootstrapped from spec; lowered `--cov-fail-under` 85→0, T2.12 re-raises to 85% (see NOTES N001) |
 | T0.7 | Add `.env-example` with all envs documented; `.gitignore` covers `.env`, `__pycache__`, `.venv`, `*.db`. | Files present | ✅ pre-bootstrapped from spec |
 | T0.8 | Initialize frontend: `pnpm create vite frontend --template react-ts`, install Tailwind, TanStack Query, TanStack Router, Zustand. | `pnpm dev` opens blank app | ⬜ |
