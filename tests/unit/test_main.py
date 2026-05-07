@@ -19,7 +19,7 @@ def test_main_writes_version_to_stdout(capsys: pytest.CaptureFixture[str]) -> No
 
 
 def test_python_dash_m_pyprep_prints_version() -> None:
-    result = subprocess.run(  # noqa: S603 — explicit args, no shell
+    result = subprocess.run(
         [sys.executable, "-m", "pyprep"],
         capture_output=True,
         text=True,
