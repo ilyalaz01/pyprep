@@ -34,7 +34,7 @@
 | T0.8 | Initialize frontend: `pnpm create vite frontend --template react-ts`, install Tailwind, TanStack Query, TanStack Router, Zustand. | `pnpm dev` opens blank app | ⬜ |
 | T0.9 | Add `docker-compose.yml` (dev) starting backend + frontend hot-reloaded. | `docker compose up` shows both running | ✅ pre-bootstrapped from spec |
 | T0.10 | Add CI: GitHub Actions running lint, type-check, tests on PR. | Workflow file present, green on push | ⬜ |
-| T0.11 | Write 150-LOC enforcement script `scripts/check_file_size.py`. | Hooked into CI | ⬜ |
+| T0.11 | Write 150-LOC enforcement script `scripts/check_file_size.py`. | Hooked into CI | 🟡 |
 
 **Phase 0 exit gate:** `uv sync && ruff check . && pytest && pnpm --dir frontend build && python scripts/check_file_size.py` all pass.
 
