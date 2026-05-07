@@ -67,6 +67,25 @@ enough that future readers can confirm against the schema directly.
 
 ---
 
+## N007 — Sphere 1 distractor polish (post-MVP)
+
+**Phase:** 1 (T1.5 follow-up) · **Date:** 2026-05-07 · **Priority:** low
+
+Owner spot-check on T1.5 flagged two distractors as too-weak / not
+plausible-junior-misconceptions:
+
+- `m1-s1-c2` option 4 currently: "Prints None". Replace with
+  something like: "Prints 'hi' but with a DeprecationWarning".
+- `m1-s1-c3` option 4 currently: "`__new__` runs only on subclasses;
+  `__init__` runs only on the base class". Replace with: "`__init__`
+  returns the new instance; `__new__` returns the type".
+
+Per `PRD_content_authoring.md` §6 distractor rule, ≥ 2 of 4 options
+must be plausible-wrong-for-an-interesting-reason. These two cards
+are still 3/4 strong; the polish is post-MVP.
+
+---
+
 ## N006 — Validator enforces min-cards per *sphere*, not per sub-task
 
 **Phase:** 1 (T1.10) · **Date:** 2026-05-07
