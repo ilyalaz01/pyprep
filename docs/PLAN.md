@@ -221,12 +221,12 @@ erDiagram
 
 **Context:** Spaced repetition algorithm choice. SM-2 (used by Anki classic) is well-known; FSRS (Free Spaced Repetition Scheduler) is a modern ML-fit replacement now also used by Anki.
 
-**Decision:** FSRS via the `py-fsrs` library.
+**Decision:** FSRS via the `fsrs` library (PyPI; GitHub repo: open-spaced-repetition/py-fsrs).
 
 **Rationale:**
 - FSRS is more accurate per published benchmarks; produces fewer wasted reviews.
 - It is the current default in modern Anki, so users with prior Anki habits map cleanly.
-- `py-fsrs` is small, well-tested, and pure Python.
+- `fsrs` is small, well-tested, and pure Python.
 
 **Trade-offs:**
 - Slightly more state per review (stability + difficulty floats). Acceptable.

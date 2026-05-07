@@ -186,7 +186,7 @@ PyPrep is **shippable** when **all** of the following hold:
 - `uv` as the only package manager (Segal §16.4).
 - Node 20+ for frontend build.
 - Pyodide CDN for code execution.
-- FSRS-rs or `py-fsrs` for spaced repetition algorithm.
+- `fsrs` (PyPI; GitHub repo: open-spaced-repetition/py-fsrs) for spaced repetition algorithm.
 
 ### 6.3 Constraints
 
