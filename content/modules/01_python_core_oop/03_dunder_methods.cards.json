@@ -1,0 +1,204 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s3",
+  "cards": [
+    {
+      "id": "m1-s3-c1",
+      "type": "flip",
+      "topic": "`__str__` vs `__repr__` — purpose and audience",
+      "topic_ru": "`__str__` vs `__repr__` — назначение и аудитория",
+      "difficulty": 1,
+      "tags": ["dunder", "str", "repr", "interview-warmup"],
+      "question": "What is the difference between `__str__` and `__repr__`, and which one does each call site use?",
+      "answer": "`__str__` is for humans — `print(obj)`, `str(obj)`, and f-strings call it. `__repr__` is for developers and tools — `repr(obj)`, the REPL view, and the default form in containers (`[obj1, obj2]`) call it. If only `__repr__` is defined, `__str__` falls back to it; if only `__str__` is defined, `repr()` and the REPL still see the default `<object at 0x...>`.",
+      "answer_explanation_md": "Rule of thumb: define `__repr__` first on every value-like class. It costs nothing and makes debugging dramatically nicer (lists of your objects print readably). Define `__str__` only when humans need a *different* format from developers."
+    },
+
+    {
+      "id": "m1-s3-c2",
+      "type": "code_trap",
+      "topic": "Only `__repr__` defined — what does `print` and `str` show?",
+      "topic_ru": "Определён только `__repr__` — что покажет `print` и `str`",
+      "difficulty": 2,
+      "tags": ["dunder", "str", "repr", "fallback"],
+      "code_snippet": "class P:\n    def __repr__(self):\n        return 'P()'\n\np = P()\nprint(p)\nprint(str(p))",
+      "question": "What does this print?",
+      "options": [
+        "<P object at 0x...> twice",
+        "P() twice",
+        "P() once, then <P object at 0x...>",
+        "AttributeError: __str__"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`__str__` is not defined, so Python falls back to `__repr__`. `print(p)` uses `__str__` (which falls back to `__repr__` → `'P()'`), and `str(p)` does the same. Both print `P()`.\n\nThe asymmetry to remember: `__repr__` falls back to `<class at addr>`, but `__str__` falls back to `__repr__`. Defining `__repr__` therefore covers both surfaces; defining only `__str__` leaves the REPL ugly."
+    },
+
+    {
+      "id": "m1-s3-c3",
+      "type": "multiple_choice",
+      "topic": "Which dunder does the REPL call?",
+      "topic_ru": "Какой dunder вызывает REPL?",
+      "difficulty": 2,
+      "tags": ["dunder", "repr", "repl", "interview-classic"],
+      "question": "When you type a bare expression at a Python REPL and press Enter, which dunder is used to render the result?",
+      "options": [
+        "`__str__` — it's the human-facing one.",
+        "`__repr__` — the REPL is a developer tool, so it uses the developer-facing form.",
+        "`__display__` — a special REPL-only dunder.",
+        "Whichever one is defined; if both, `__str__` wins."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Reasonable guess but wrong — `__str__` is what `print()` calls. The REPL is for developers.",
+        "Correct. The REPL prints `repr(value)` for any non-`None` result. That's why a class with no `__repr__` (only `__str__`) shows `<MyClass object at 0x...>` at the REPL even though `print(obj)` looks fine.",
+        "There is no `__display__` dunder.",
+        "Wrong — `__repr__` is always preferred at the REPL."
+      ]
+    },
+
+    {
+      "id": "m1-s3-c4",
+      "type": "fill_in",
+      "topic": "Write a clean, eval-able `__repr__`",
+      "topic_ru": "Написать чистый, eval-able `__repr__`",
+      "difficulty": 2,
+      "tags": ["dunder", "repr", "patterns"],
+      "code_snippet_with_blanks": "class Point:\n    def __init__(self, x, y):\n        self.x, self.y = x, y\n\n    def __repr__(self):\n        return ___\n\nprint(repr(Point(1, 2)))   # should print: Point(x=1, y=2)",
+      "accepted_answers": [
+        ["f[\"']Point\\(x=\\{self\\.x!r\\}, y=\\{self\\.y!r\\}\\)[\"']", "f[\"']Point\\(x=\\{self\\.x\\}, y=\\{self\\.y\\}\\)[\"']"]
+      ],
+      "explanation_md": "An f-string referencing `self.x` and `self.y` is the canonical pattern. The `!r` conversion formats each field through `repr()` — important for strings, where you want `Point(x='a', y='b')` rather than `Point(x=a, y=b)`. Without `!r` the form looks fine for ints but is broken for strings."
+    },
+
+    {
+      "id": "m1-s3-c5",
+      "type": "flip",
+      "topic": "How `__len__` affects truthiness",
+      "topic_ru": "Как `__len__` влияет на truthiness",
+      "difficulty": 2,
+      "tags": ["dunder", "len", "bool", "truthiness"],
+      "question": "What does `bool(obj)` do for an object that defines `__len__` but not `__bool__`?",
+      "answer": "Python falls back: it calls `obj.__len__()` and treats the result as falsy if zero, truthy otherwise. That's why empty lists, dicts, and strings are falsy without anyone explicitly making them so — they all define `__len__`, and `__len__` returning 0 is the truthiness signal.",
+      "answer_explanation_md": "If a class is truthy by some criterion *other* than length, override `__bool__` directly:\n\n```python\nclass Connection:\n    def __bool__(self):\n        return self._socket is not None\n```\n\nIf neither `__bool__` nor `__len__` is defined, every instance is truthy by default."
+    },
+
+    {
+      "id": "m1-s3-c6",
+      "type": "code_trap",
+      "topic": "`__getitem__` enables iteration even without `__iter__`",
+      "topic_ru": "`__getitem__` включает итерацию без `__iter__`",
+      "difficulty": 3,
+      "tags": ["dunder", "getitem", "iteration", "tricky"],
+      "code_snippet": "class Tape:\n    def __init__(self, data):\n        self.data = list(data)\n    def __getitem__(self, i):\n        return self.data[i]\n\nt = Tape('abc')\nfor c in t:\n    print(c)",
+      "question": "What does this print?",
+      "options": [
+        "Three lines: a, b, c",
+        "TypeError — Tape is not iterable",
+        "Infinite loop",
+        "AttributeError: __iter__"
+      ],
+      "correct_index": 0,
+      "explanation_md": "When `iter(obj)` is called, Python first checks `__iter__`. If it's missing, Python falls back to the legacy iteration protocol: it repeatedly calls `obj[0]`, `obj[1]`, …, stopping when `IndexError` is raised. Lists raise `IndexError` past their end, so `Tape('abc')` yields `'a'`, `'b'`, `'c'` and stops.\n\nThis is sometimes useful (it's why old code without `__iter__` still iterates) and sometimes a footgun: defining `__getitem__` for a non-indexable concept silently makes the object iterable. The modern way is to define `__iter__` (returning a fresh iterator) intentionally."
+    },
+
+    {
+      "id": "m1-s3-c7",
+      "type": "code_task",
+      "topic": "Implement a tiny indexable container with `__len__` / `__getitem__` / `__setitem__`",
+      "topic_ru": "Реализовать индексируемый контейнер с `__len__` / `__getitem__` / `__setitem__`",
+      "difficulty": 3,
+      "tags": ["dunder", "len", "getitem", "setitem", "container"],
+      "prompt_md": "Implement `Tape`, a thin wrapper around an internal list, with:\n\n- `__init__(self, data: list)` — store a *copy* of `data` as `self._data`.\n- `__len__(self)` — return the length of the internal list.\n- `__getitem__(self, i)` — return `self._data[i]`.\n- `__setitem__(self, i, value)` — assign `value` at position `i`.\n\nNo other methods needed.",
+      "starter_code": "class Tape:\n    def __init__(self, data):\n        ...\n",
+      "solution_code": "class Tape:\n    def __init__(self, data):\n        self._data = list(data)\n\n    def __len__(self):\n        return len(self._data)\n\n    def __getitem__(self, i):\n        return self._data[i]\n\n    def __setitem__(self, i, value):\n        self._data[i] = value\n",
+      "tests": "import pytest\nfrom solution import Tape\n\ndef test_init_takes_a_copy():\n    src = [1, 2, 3]\n    t = Tape(src)\n    src.append(99)\n    assert len(t) == 3   # outer mutation must not leak in\n\ndef test_len_matches_underlying():\n    assert len(Tape([1, 2, 3, 4])) == 4\n\ndef test_getitem_indexing():\n    t = Tape(['a', 'b', 'c'])\n    assert t[0] == 'a'\n    assert t[-1] == 'c'\n\ndef test_setitem_replaces_value():\n    t = Tape([1, 2, 3])\n    t[1] = 99\n    assert t[1] == 99\n\ndef test_iter_works_via_getitem_fallback():\n    t = Tape([10, 20, 30])\n    assert list(t) == [10, 20, 30]\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m1-s3-c8",
+      "type": "flip",
+      "topic": "When `__getitem__`-only iteration is the wrong tool",
+      "topic_ru": "Когда итерация только через `__getitem__` — неподходящий инструмент",
+      "difficulty": 3,
+      "tags": ["dunder", "iteration", "iter", "design"],
+      "question": "When should you define `__iter__` instead of relying on `__getitem__`-fallback iteration?",
+      "answer": "Whenever the object is not naturally index-addressable, or when iteration shouldn't be order-stable across calls (graphs, sets, streaming data, generators of derived values). Defining `__iter__` returning a fresh iterator (or making the class itself an iterator with `__iter__` + `__next__`) is the explicit, modern protocol. The `__getitem__` fallback is a legacy convenience.",
+      "answer_explanation_md": "Concrete tells that `__iter__` is the right call:\n\n- The class wraps a generator or stream — there is no `obj[5]` semantics.\n- Iteration order is implementation-defined (sets, dicts pre-3.7).\n- You want iteration to be safely repeatable (each `iter(obj)` should yield from the start).\n\nIf you find yourself defining `__getitem__` *only* to make `for x in obj` work — that's the smell."
+    },
+
+    {
+      "id": "m1-s3-c9",
+      "type": "code_trap",
+      "topic": "Defining `__eq__` makes the class unhashable",
+      "topic_ru": "Определение `__eq__` делает класс нехешируемым",
+      "difficulty": 3,
+      "tags": ["dunder", "eq", "hash", "interview-classic"],
+      "code_snippet": "class P:\n    def __init__(self, x):\n        self.x = x\n    def __eq__(self, other):\n        return isinstance(other, P) and self.x == other.x\n\ns = {P(1), P(2)}",
+      "question": "What happens when this runs?",
+      "options": [
+        "Builds a 2-element set successfully.",
+        "Builds a 1-element set (P(1) and P(2) are considered equal).",
+        "TypeError: unhashable type: 'P'",
+        "AttributeError: P has no __hash__"
+      ],
+      "correct_index": 2,
+      "explanation_md": "When you override `__eq__`, Python automatically sets `__hash__ = None` on your class — making instances unhashable. Sets and dict keys both require hashability, so `{P(1), P(2)}` raises `TypeError: unhashable type: 'P'`.\n\nThe fix depends on the class:\n\n```python\n# value-like → define __hash__ consistent with __eq__\ndef __hash__(self):\n    return hash(self.x)\n```\n\nThe golden rule: equal objects must hash equal. If you can't satisfy that (because the class is mutable), accept unhashability."
+    },
+
+    {
+      "id": "m1-s3-c10",
+      "type": "multiple_choice",
+      "topic": "Minimum dunders to make `sorted([...])` work",
+      "topic_ru": "Минимум dunder-ов, чтобы заработал `sorted([...])`",
+      "difficulty": 3,
+      "tags": ["dunder", "lt", "sort", "total-ordering"],
+      "question": "What is the minimum a class needs to be sortable by `sorted(items)`?",
+      "options": [
+        "All of `__lt__`, `__le__`, `__gt__`, `__ge__`, `__eq__`.",
+        "Just `__lt__` (or `__gt__`). `sorted` and `list.sort` use a single comparison; the others are needed only if you use those operators directly. Add `@functools.total_ordering` if you want all six from one definition.",
+        "Just `__eq__`.",
+        "`__cmp__` — a single three-way compare method."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Overkill — `sorted` only needs one comparison.",
+        "Correct. `__lt__` is enough for `sorted`. `@total_ordering` from `functools` derives the rest from `__eq__` + one ordering method.",
+        "`__eq__` alone gives no ordering — `sorted` would not know which way to sort.",
+        "`__cmp__` was Python 2. Removed in Python 3 — use the rich-comparison methods instead."
+      ]
+    },
+
+    {
+      "id": "m1-s3-c11",
+      "type": "code_trap",
+      "topic": "Returning `False` from `__eq__` for the wrong type",
+      "topic_ru": "Возврат `False` из `__eq__` для несоответствующего типа",
+      "difficulty": 4,
+      "tags": ["dunder", "eq", "notimplemented", "tricky"],
+      "code_snippet": "class P:\n    def __init__(self, x):\n        self.x = x\n    def __eq__(self, other):\n        return self.x == other.x   # no isinstance check, no NotImplemented\n\np = P(5)\nprint(p == 5)\nprint(5 == p)",
+      "question": "What happens?",
+      "options": [
+        "Both print True",
+        "First prints True, second prints False",
+        "AttributeError on the first comparison: int has no .x",
+        "Both print False"
+      ],
+      "correct_index": 2,
+      "explanation_md": "`p == 5` calls `P.__eq__(p, 5)`. Inside, `other.x` is `5.x` — and `int` has no attribute `x`, so it raises `AttributeError`. The comparison was supposed to gracefully return 'not equal,' but the unguarded code crashes instead.\n\nThe correct pattern: check the type, and return `NotImplemented` (not `False`!) for unrelated types so Python can ask the *other* object's `__eq__`:\n\n```python\ndef __eq__(self, other):\n    if not isinstance(other, P):\n        return NotImplemented\n    return self.x == other.x\n```\n\n`NotImplemented` is the protocol-level signal — `False` would mark the values as definitely-unequal and prevent fallback."
+    },
+
+    {
+      "id": "m1-s3-c12",
+      "type": "flip",
+      "topic": "Why `__eq__` should return `NotImplemented` for unrelated types",
+      "topic_ru": "Почему `__eq__` должен возвращать `NotImplemented` для несовместимых типов",
+      "difficulty": 2,
+      "tags": ["dunder", "eq", "notimplemented", "best-practice"],
+      "question": "When `__eq__` is called with an object of an unrelated type, why should it return `NotImplemented` rather than `False`?",
+      "answer": "`NotImplemented` is the protocol-level signal that says 'I can't compare to this; try the other side.' Python then calls the other object's `__eq__` and only falls back to identity (`is`) if both return `NotImplemented`. Returning `False` short-circuits this — if the other side has a sensible cross-type comparison, you've blocked it.",
+      "answer_explanation_md": "Concrete example: a `Decimal` knows how to compare to an `int`. If you wrote `class P: def __eq__(self, other): return False if not isinstance(other, P) else ...` and someone wrote `decimal_value == p_instance`, Python would call `Decimal.__eq__(p)` first — fine. But if it called your `P.__eq__(decimal_value)` first and you returned `False`, the cross-type machinery short-circuits and the answer is wrong. Always `NotImplemented` for 'I don't know how to compare to this.'"
+    }
+  ]
+}
