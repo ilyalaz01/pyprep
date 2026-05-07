@@ -1,0 +1,204 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 1,
+  "sphere_id": "m1-s5",
+  "cards": [
+    {
+      "id": "m1-s5-c1",
+      "type": "flip",
+      "topic": "What `yield` does to a function",
+      "topic_ru": "Что `yield` делает с функцией",
+      "difficulty": 2,
+      "tags": ["generators", "yield", "interview-classic"],
+      "question": "What does the presence of `yield` do to a function definition?",
+      "answer": "It turns the function into a *generator function*. Calling it does **not** run the body — it returns a generator object. The body runs incrementally: each `next(gen)` resumes the function until the next `yield`, then pauses. Local variables are preserved between resumes. When the function returns (or runs off the end), the generator raises `StopIteration`.",
+      "answer_explanation_md": "Concrete demo:\n\n```python\ndef gen():\n    print('before')\n    yield 1\n    print('between')\n    yield 2\n    print('after')\n\ng = gen()       # nothing printed yet — body hasn't started\nnext(g)         # prints 'before', returns 1\nnext(g)         # prints 'between', returns 2\nnext(g)         # prints 'after', raises StopIteration\n```\n\nThe lazy execution model is what makes generators useful for streaming data, infinite sequences, and pipelines that don't materialize intermediate values."
+    },
+
+    {
+      "id": "m1-s5-c2",
+      "type": "code_trap",
+      "topic": "Generator function called but not iterated",
+      "topic_ru": "Функция-генератор вызвана, но не итерирована",
+      "difficulty": 3,
+      "tags": ["generators", "yield", "lazy", "tricky"],
+      "code_snippet": "def emit():\n    print('starting')\n    yield 1\n    print('done')\n\nemit()\nprint('end')",
+      "question": "What does this print?",
+      "options": [
+        "starting\\ndone\\nend",
+        "starting\\nend",
+        "end",
+        "starting\\nend\\ndone"
+      ],
+      "correct_index": 2,
+      "explanation_md": "`emit()` returns a generator object — the body has not started running. The result is discarded immediately. `print('end')` runs, then the generator object is garbage-collected without ever being iterated. So only `'end'` is printed.\n\nTo actually run the body, you have to iterate: `next(emit())`, `list(emit())`, `for x in emit():`, etc. This is the most common 'where did my print go?' trap when learning generators — and it's exactly the laziness that makes them useful in real pipelines."
+    },
+
+    {
+      "id": "m1-s5-c3",
+      "type": "multiple_choice",
+      "topic": "`yield` vs `return` in a function",
+      "topic_ru": "`yield` vs `return` в функции",
+      "difficulty": 2,
+      "tags": ["generators", "yield", "return"],
+      "question": "What is the practical difference between `yield` and `return`?",
+      "options": [
+        "They are aliases — Python converts one to the other internally.",
+        "`return value` exits the function and gives `value` to the caller. `yield value` pauses the function, gives `value` to the consumer of the generator, and resumes from the same point on the next `next()` call.",
+        "`yield` only works inside `for` loops; `return` works anywhere.",
+        "`yield` returns a list of every value yielded; `return` returns one value."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — they have completely different runtime behavior.",
+        "Correct. The 'pause and resume' is the heart of generators. A function can have both `yield` and `return` (the `return` ends iteration, optionally with a value attached to the `StopIteration`).",
+        "Wrong — `yield` works anywhere in a function body that turns it into a generator function.",
+        "Wrong — `yield` produces *one* value per call, lazily. The list shape comes from collecting yields with `list(gen)`."
+      ]
+    },
+
+    {
+      "id": "m1-s5-c4",
+      "type": "code_trap",
+      "topic": "Generator state preserved across yields",
+      "topic_ru": "Состояние генератора сохраняется между yield",
+      "difficulty": 3,
+      "tags": ["generators", "yield", "state"],
+      "code_snippet": "def running_sum(items):\n    total = 0\n    for x in items:\n        total += x\n        yield total\n\nprint(list(running_sum([1, 2, 3, 4])))",
+      "question": "What does this print?",
+      "options": [
+        "[1, 2, 3, 4]",
+        "[10]",
+        "[1, 3, 6, 10]",
+        "[4, 6, 9, 13]"
+      ],
+      "correct_index": 2,
+      "explanation_md": "The generator pauses at each `yield total`, then resumes with `total` and the loop variable both intact. So the yields are 1, 1+2=3, 3+3=6, 6+4=10 — `[1, 3, 6, 10]`.\n\nThis state-preservation is exactly what makes generators a clean alternative to writing a class with `__init__` + `__iter__` + `__next__`. The function body is the state machine."
+    },
+
+    {
+      "id": "m1-s5-c5",
+      "type": "flip",
+      "topic": "When to choose generator expression over list comprehension",
+      "topic_ru": "Когда выбрать generator expression вместо list comprehension",
+      "difficulty": 2,
+      "tags": ["generators", "comprehensions", "memory"],
+      "question": "When should you reach for `(x for x in ...)` instead of `[x for x in ...]`?",
+      "answer": "When you only need to iterate once and the source is large (or unbounded). Gen expr holds only the current value, list comp materializes everything. Also when the gen expr feeds straight into a consumer like `sum(...)`, `any(...)`, `max(...)` — those iterate once and benefit from streaming.",
+      "answer_explanation_md": "Reach for the list when you need length, indexing, or repeated iteration:\n\n```python\nresults = [parse(line) for line in lines]\nlen(results)              # OK\nresults[0]                # OK\nfor r in results:         # OK to iterate again\n    ...\n```\n\nFor small sources (~hundreds), pick the list for ergonomic clarity — the memory difference is irrelevant. The gen expr's value is at the megabyte+ scale."
+    },
+
+    {
+      "id": "m1-s5-c6",
+      "type": "code_trap",
+      "topic": "Generator expression doesn't materialize until iterated",
+      "topic_ru": "Generator expression не материализуется до итерации",
+      "difficulty": 2,
+      "tags": ["generators", "comprehensions", "lazy", "tricky"],
+      "code_snippet": "items = [1, 2, 3]\ngen = (x * 10 for x in items)\nitems.append(99)\nprint(list(gen))",
+      "question": "What does this print?",
+      "options": [
+        "[10, 20, 30]",
+        "[10, 20, 30, 990]",
+        "[10, 20, 30, 99]",
+        "TypeError"
+      ],
+      "correct_index": 1,
+      "explanation_md": "The gen expr captures `items` *by reference*, not by value. When `list(gen)` finally iterates, the loop sees the current contents of `items` — including the appended `99`.\n\nNote the partial difference from a list comprehension: `[x * 10 for x in items]` would have materialized at definition time, before `append`, and produced `[10, 20, 30]`. The gen expr's laziness extends all the way to *which collection it's iterating*. This is occasionally a useful feature; more often it's a 'why is this giving the wrong numbers?' bug."
+    },
+
+    {
+      "id": "m1-s5-c7",
+      "type": "fill_in",
+      "topic": "Sum of squares via generator expression",
+      "topic_ru": "Сумма квадратов через generator expression",
+      "difficulty": 2,
+      "tags": ["generators", "comprehensions", "patterns"],
+      "code_snippet_with_blanks": "# Sum the squares of 1..100 without materializing the squares as a list:\ntotal = sum(___)",
+      "accepted_answers": [
+        ["x \\* x for x in range\\(1, 101\\)", "x\\*\\*2 for x in range\\(1, 101\\)", "i \\* i for i in range\\(1, 101\\)", "i\\*\\*2 for i in range\\(1, 101\\)"]
+      ],
+      "explanation_md": "When a gen expr is the *only* argument to a function call, the parentheses around it are implicit — `sum(x*x for x in range(1, 101))` is legal. Use that idiom for `sum`, `any`, `all`, `max`, `min`, `next`, etc. when you don't need the intermediate list."
+    },
+
+    {
+      "id": "m1-s5-c8",
+      "type": "multiple_choice",
+      "topic": "Memory profile: list vs gen expr over a large source",
+      "topic_ru": "Профиль памяти: список vs gen expr на больших данных",
+      "difficulty": 3,
+      "tags": ["generators", "comprehensions", "memory"],
+      "question": "Given a 10-million-row CSV that you want to filter then sum a column, which approach is appropriate?",
+      "options": [
+        "Read into a list with `[parse(line) for line in f]`, then filter and sum.",
+        "Stream with `(parse(line) for line in f)` chained into the filter and `sum(...)` so only one row's worth lives in memory at a time.",
+        "Use `pandas.read_csv` always — generators are obsolete for large data.",
+        "It doesn't matter — Python optimizes both to the same bytecode."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Materializes ~10M rows in memory; this is exactly what you want to avoid.",
+        "Correct. The gen expr (or generator function) chain processes one row at a time. `sum(x for x in stream if predicate(x))` runs in O(1) memory.",
+        "Pandas is great when you need DataFrames, joins, etc.; for a one-pass sum a generator is the simplest and lightest tool. 'Always pandas' is wrong.",
+        "Lists and gen exprs compile to different bytecode (LIST_APPEND vs YIELD_VALUE). They behave differently."
+      ]
+    },
+
+    {
+      "id": "m1-s5-c9",
+      "type": "flip",
+      "topic": "What `__enter__` and `__exit__` are for",
+      "topic_ru": "Зачем нужны `__enter__` и `__exit__`",
+      "difficulty": 2,
+      "tags": ["context-managers", "with", "interview-classic"],
+      "question": "What does `with obj as x:` actually call on `obj`, and when?",
+      "answer": "Before the body: `x = obj.__enter__()`. After the body — whether it finished normally or an exception was raised — `obj.__exit__(exc_type, exc_val, traceback)`. The triple is `(None, None, None)` on normal exit. Context managers are essentially a reusable shape for the `try / finally` pattern from Sphere 2.",
+      "answer_explanation_md": "If `__exit__` returns a truthy value, the exception (if any) is *suppressed*. Usually you return `False` (or nothing) so exceptions propagate normally. Suppressing exceptions silently is rarely what you want — `contextlib.suppress(ValueError)` is the explicit way to ask for it.\n\nThe `with` statement's superpower is that the cleanup block can't be skipped, even by `return` from inside the body or by an exception three frames deep — same guarantee as `finally`."
+    },
+
+    {
+      "id": "m1-s5-c10",
+      "type": "code_task",
+      "topic": "Implement a `Timer` context manager",
+      "topic_ru": "Реализовать контекстный менеджер `Timer`",
+      "difficulty": 3,
+      "tags": ["context-managers", "with", "patterns"],
+      "prompt_md": "Implement `Timer`, a context manager class that times the body of a `with` block:\n\n- `__enter__(self)` — record the start time using `time.perf_counter()` and return `self`.\n- `__exit__(self, exc_type, exc_val, tb)` — record `self.elapsed = time.perf_counter() - start`. Return `False` (do **not** suppress exceptions).\n- After the `with` block, `t.elapsed` must be a non-negative `float`.\n- The timer must record `elapsed` even if the body raises an exception.",
+      "starter_code": "import time\n\nclass Timer:\n    ...\n",
+      "solution_code": "import time\n\nclass Timer:\n    def __enter__(self):\n        self._start = time.perf_counter()\n        return self\n\n    def __exit__(self, exc_type, exc_val, tb):\n        self.elapsed = time.perf_counter() - self._start\n        return False\n",
+      "tests": "import time\nimport pytest\nfrom solution import Timer\n\ndef test_records_elapsed_on_normal_exit():\n    with Timer() as t:\n        pass\n    assert isinstance(t.elapsed, float)\n    assert t.elapsed >= 0\n\ndef test_records_elapsed_on_exception():\n    t = Timer()\n    with pytest.raises(ValueError):\n        with t:\n            raise ValueError('boom')\n    assert hasattr(t, 'elapsed')\n    assert t.elapsed >= 0\n\ndef test_does_not_suppress_exceptions():\n    with pytest.raises(RuntimeError):\n        with Timer():\n            raise RuntimeError('oops')\n",
+      "allowlist": ["pytest", "time"]
+    },
+
+    {
+      "id": "m1-s5-c11",
+      "type": "code_trap",
+      "topic": "`__exit__` returning truthy swallows the exception",
+      "topic_ru": "`__exit__` возвращает truthy и глотает исключение",
+      "difficulty": 4,
+      "tags": ["context-managers", "exit", "exceptions", "tricky"],
+      "code_snippet": "class Quiet:\n    def __enter__(self):\n        return self\n    def __exit__(self, exc_type, exc_val, tb):\n        return True       # <-- truthy\n\nwith Quiet():\n    raise ValueError('boom')\n\nprint('after')",
+      "question": "What happens when this runs?",
+      "options": [
+        "ValueError propagates; 'after' is not printed.",
+        "Prints 'after' — the True from __exit__ suppressed the exception.",
+        "RuntimeError: cannot suppress exceptions in a context manager.",
+        "Prints 'after' but with a warning about the suppressed exception."
+      ],
+      "correct_index": 1,
+      "explanation_md": "A truthy return from `__exit__` tells Python 'I handled the exception, do not re-raise.' Control continues past the `with` block as if nothing happened. So `'after'` prints.\n\nThis is *occasionally* useful (`contextlib.suppress(ValueError)` is the stdlib's intentional version), but doing it accidentally — or returning the wrong type from `__exit__` — silently eats real errors. Default to `return False` (or `return None`, which is falsy) unless you specifically want to suppress."
+    },
+
+    {
+      "id": "m1-s5-c12",
+      "type": "flip",
+      "topic": "`@contextlib.contextmanager` — when to use the generator form",
+      "topic_ru": "`@contextlib.contextmanager` — когда использовать форму через генератор",
+      "difficulty": 2,
+      "tags": ["context-managers", "contextlib", "patterns"],
+      "question": "What does `@contextlib.contextmanager` give you, and when is it the right choice over a class with `__enter__` / `__exit__`?",
+      "answer": "It lets you write a context manager as a generator: code before `yield` is the setup (`__enter__`), code after `yield` is the teardown (`__exit__`). It's the right choice for one-shot, simple bracketed setup/teardown where there's no state worth storing on `self`. Use the class form when you need persistent attributes (like `t.elapsed` on a Timer) or when the lifecycle is more involved.",
+      "answer_explanation_md": "Canonical pattern:\n\n```python\nfrom contextlib import contextmanager\n\n@contextmanager\ndef changed_dir(target):\n    prev = os.getcwd()\n    os.chdir(target)\n    try:\n        yield\n    finally:\n        os.chdir(prev)\n```\n\nWrap the `yield` in `try/finally` if the teardown must run on exception (which is almost always). Without the `finally`, an exception inside the `with` body skips the teardown — exactly the bug the context manager protocol exists to prevent."
+    }
+  ]
+}
