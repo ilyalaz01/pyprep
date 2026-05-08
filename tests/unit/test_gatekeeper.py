@@ -71,7 +71,7 @@ def test_request_raises_when_limit_exceeded() -> None:
     gk.request("GET", "https://api.example.com/x")
     gk.request("GET", "https://api.example.com/x")
 
-    with pytest.raises(RateLimitedError, match="api.example.com"):
+    with pytest.raises(RateLimitedError, match=r"api\.example\.com"):
         gk.request("GET", "https://api.example.com/x")
 
     assert len(http.calls) == 2
