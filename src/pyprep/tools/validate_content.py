@@ -1,17 +1,21 @@
 """Validate the content/ tree against locked schemas + curriculum.
 
-Scope (T1.10):
-- JSON schema check on every `*.cards.json`
-- ID uniqueness across the whole content/ tree
-- `sphere_id` referenced in cards exists in `curriculum.md`
-- min cards per sphere ≥ 3 x number-of-sub-tasks (see NOTES N006)
+Scope:
+- JSON schema check on every `*.cards.json` (T1.10)
+- ID uniqueness across the whole content/ tree (T1.10)
+- `sphere_id` referenced in cards exists in `curriculum.md` (T1.10)
+- min cards per sphere ≥ 3 x number-of-sub-tasks (see NOTES N006) (T1.10)
+- code_task solutions actually pass their tests (T2.5.4) — pytest
+  subprocess per card; skip with --skip-execution for dev iteration
 """
 
 from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -23,6 +27,7 @@ CURRICULUM_FILE = "curriculum.md"
 SCHEMA_FILE = "schema/card.schema.json"
 MODULES_DIR = "modules"
 MIN_CARDS_PER_SUBTASK = 3
+CODE_TASK_TIMEOUT_S = 30
 
 _SPHERE_LINE = re.compile(r"^- `(m\d+-s\d+)` —")
 _SUBTASK_LINE = re.compile(r"^  - `(m\d+-s\d+-t\d+)` —")
@@ -54,7 +59,9 @@ def _all_cards(wrappers: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return [c for w in wrappers for c in w.get("cards", [])]
 
 
-def _check_schema(wrappers: list[tuple[Path, dict[str, Any]]], schema: dict) -> list[str]:
+def _check_schema(
+    wrappers: list[tuple[Path, dict[str, Any]]], schema: dict[str, Any]
+) -> list[str]:
     out: list[str] = []
     for path, wrapper in wrappers:
         for i, card in enumerate(wrapper.get("cards", [])):
@@ -98,24 +105,60 @@ def _check_min_cards(
     return out
 
 
-def validate(root: Path) -> list[str]:
+def _run_code_task(card: dict[str, Any]) -> str | None:
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        (td_path / "solution.py").write_text(card["solution_code"], "utf-8")
+        (td_path / "test_solution.py").write_text(card["tests"], "utf-8")
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            [sys.executable, "-m", "pytest", "-q", str(td_path)],
+            capture_output=True,
+            text=True,
+            timeout=CODE_TASK_TIMEOUT_S,
+            check=False,
+        )
+        if proc.returncode == 0:
+            return None
+        tail = (proc.stdout or proc.stderr).strip().splitlines()[-1:] or ["failed"]
+        return tail[0]
+
+
+def _check_code_task_executions(
+    wrappers: list[tuple[Path, dict[str, Any]]],
+) -> list[str]:
+    out: list[str] = []
+    for path, wrapper in wrappers:
+        for card in wrapper.get("cards", []):
+            if card.get("type") != "code_task":
+                continue
+            err = _run_code_task(card)
+            if err is not None:
+                out.append(f"{path.name}:{card['id']}: code_task: {err}")
+    return out
+
+
+def validate(root: Path, *, execute_code_tasks: bool = True) -> list[str]:
     curriculum = parse_curriculum((root / CURRICULUM_FILE).read_text("utf-8"))
     schema = json.loads((root / SCHEMA_FILE).read_text("utf-8"))
     wrappers = _load_wrappers(root)
     cards = _all_cards(w for _, w in wrappers)
 
-    return (
+    errors = (
         _check_schema(wrappers, schema)
         + _check_id_uniqueness(cards)
         + _check_sphere_refs(wrappers, curriculum)
         + _check_min_cards(wrappers, curriculum)
     )
+    if execute_code_tasks:
+        errors += _check_code_task_executions(wrappers)
+    return errors
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    del argv
+    args = list(argv) if argv is not None else sys.argv[1:]
+    execute = "--skip-execution" not in args
     root = Path.cwd() / "content"
-    errors = validate(root)
+    errors = validate(root, execute_code_tasks=execute)
     if errors:
         sys.stderr.write(f"FAIL: {len(errors)} validation error(s)\n")
         for e in errors:
