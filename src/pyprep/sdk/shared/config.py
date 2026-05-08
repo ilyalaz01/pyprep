@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     secret_key: str = Field(min_length=32)
     database_url: str = "sqlite:///./pyprep.db"
     single_user: bool = False
-    single_user_email: str = "owner@local"
+    single_user_email: str = "owner@local.dev"  # EmailStr-compatible (T2.5.1)
     daily_new_card_cap: int = 15
     jwt_ttl_days: int = 7
     password_min_length: int = Field(default=8, ge=4, le=128)
