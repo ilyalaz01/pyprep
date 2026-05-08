@@ -29,7 +29,8 @@ from pyprep.sdk.repos import (
     UserRepository,
 )
 from pyprep.sdk.scheduler import CardState, Rating
-from pyprep.sdk.sessions import Review, Session as DomainSession
+from pyprep.sdk.sessions import Review
+from pyprep.sdk.sessions import Session as DomainSession
 
 T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=dt.UTC)
 
@@ -38,8 +39,8 @@ T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=dt.UTC)
 def session() -> Iterator[Session]:
     engine = create_engine("sqlite://", future=True)
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
-    with SessionLocal() as s:
+    Factory = sessionmaker(bind=engine, expire_on_commit=False)  # noqa: N806
+    with Factory() as s:
         yield s
 
 
@@ -98,6 +99,27 @@ def test_user_email_has_unique_constraint_in_schema(session: Session) -> None:
 
 
 # ------------------------------------------------------------- sessions -----
+
+
+def test_session_get_raises_when_missing(session: Session) -> None:
+    with pytest.raises(KeyError):
+        SessionRepository(session).get("nope")
+
+
+def test_session_update_raises_when_missing(session: Session) -> None:
+    s = DomainSession(
+        id="ghost",
+        user_id="u1",
+        mode="learn",
+        started_at=T0,
+        ended_at=None,
+        queue=(),
+        cards_total=0,
+        cards_correct=0,
+    )
+
+    with pytest.raises(KeyError):
+        SessionRepository(session).update(s)
 
 
 def test_session_create_get_update(session: Session) -> None:
@@ -235,6 +257,46 @@ def test_review_reviewed_card_ids(session: Session) -> None:
 
     assert repo.reviewed_card_ids("u1") == {"c1", "c2"}
     assert repo.reviewed_card_ids("u2") == set()
+
+
+def test_review_due_and_reviewed_filter_by_sphere(session: Session) -> None:
+    repo = ReviewRepository(session)
+    past = CardState(
+        stability=1.0,
+        difficulty=5.0,
+        last_review=T0,
+        due=T0 - dt.timedelta(days=1),
+        reps=1,
+        lapses=0,
+        state="review",
+        step=0,
+    )
+
+    r_a = Review(
+        id="r1",
+        user_id="u1",
+        session_id="s1",
+        card_id="c-a",
+        sphere_id="m1-s0",
+        rating=Rating.Good,
+        response_ms=1,
+        reviewed_at=T0,
+    )
+    r_b = Review(
+        id="r2",
+        user_id="u1",
+        session_id="s1",
+        card_id="c-b",
+        sphere_id="m1-s1",
+        rating=Rating.Good,
+        response_ms=1,
+        reviewed_at=T0,
+    )
+    repo.add(r_a, past)
+    repo.add(r_b, past)
+
+    assert repo.due_card_ids("u1", T0, sphere_id="m1-s0") == ["c-a"]
+    assert repo.reviewed_card_ids("u1", sphere_id="m1-s1") == {"c-b"}
 
 
 def test_review_new_cards_seen_today_count(session: Session) -> None:
