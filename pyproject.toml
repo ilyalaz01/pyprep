@@ -61,7 +61,7 @@ addopts = [
     "--cov=src/pyprep",
     "--cov-report=term-missing",
     "--cov-report=html:coverage-report",
-    "--cov-fail-under=0",
+    "--cov-fail-under=85",
 ]
 asyncio_mode = "auto"
 markers = [
