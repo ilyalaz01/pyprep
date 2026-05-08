@@ -98,7 +98,7 @@
 | T2.5.3 | StatsService orphan-review handling: `_module_of` returns `int \| None`; aggregations filter; `Overview.orphan_review_count` surfaces it. | Stats with deleted-content reviews don't crash | ✅ (3 new tests; orphan count surfaced; per_module filters; per_sphere keeps orphan bucket) |
 | T2.5.4 | Validator runs `code_task` solutions via subprocess pytest; `--skip-execution` flag for dev iteration. | Synthesized broken card fails the validator | ✅ (3 new tests; broken add() fixture trips gate; --skip-execution honored; real content's 7 code_tasks all pass automatically) |
 | T2.5.5 | Pure refactor: split `sessions/service.py` — extract queue logic to `queue_builder.py`. Both files ≤ 120 LOC. | Tests pass unchanged; LOC budget met | ✅ (service.py 117 LOC; queue_builder.py 65 LOC; brought forward from owner-planned order, see chore-start commit) |
-| T2.5.6 | Wire `is_single_user` param on AuthService; SDK plumbing only (Phase 3 wires the Settings call). | Constructor accepts `is_single_user`; `register` propagates | ⬜ |
+| T2.5.6 | Wire `is_single_user` param on AuthService; SDK plumbing only (Phase 3 wires the Settings call). | Constructor accepts `is_single_user`; `register` propagates | 🟡 |
 
 **Phase 2.5 exit gate:** all six tasks ✅; coverage ≥ 85% throughout; push green CI before Phase 3 kickoff.
 
