@@ -65,6 +65,11 @@ def auth(store: _FakeUserStore) -> AuthService:
     )
 
 
+def test_init_rejects_empty_secret(store) -> None:
+    with pytest.raises(ValueError, match="secret"):
+        AuthService(users=store, secret="")
+
+
 def test_register_creates_user_with_hashed_password(auth: AuthService, store) -> None:
     user = auth.register(email="alice@example.com", password="hunter2")
 

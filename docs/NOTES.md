@@ -188,3 +188,33 @@ deterministic byte-identical replay.
 chain to `tests/snapshots/scheduler_canonical.json`, replay-and-
 compare in a snapshot test. Don't import upstream vectors. Backlog,
 not blocking.
+
+---
+
+## N011 — `passlib` broken with `bcrypt` ≥ 5; AuthService uses `bcrypt` directly
+
+**Phase:** 2 (T2.7) · **Date:** 2026-05-08
+
+`pyproject.toml` depends on `passlib[bcrypt]>=1.7,<2` (the originally
+spec'd password library). `passlib` 1.7.x's bcrypt backend reads
+`bcrypt.__about__.__version__`, which `bcrypt` 5.x removed. Calling
+`CryptContext(schemes=["bcrypt"]).hash(...)` raises `ValueError:
+password cannot be longer than 72 bytes` because passlib's startup
+self-check uses a long detection password that bcrypt 5 rejects.
+
+**Resolution:** AuthService uses `bcrypt` directly:
+- `bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())` for
+  hashing.
+- `bcrypt.checkpw(password.encode("utf-8"), hash.encode("utf-8"))`
+  for verification.
+- Anti-enumeration via "same error type for unknown-email and
+  bad-password" (`InvalidCredentialsError`). Timing parity (constant-
+  time bcrypt verify on unknown email) is **deferred to post-MVP**;
+  single-user mode has no enumeration attacker model.
+
+`passlib` stays in deps for now (low-risk dead weight, removed in
+post-MVP cleanup if still unused). PRD §6.2 / NFR-SEC-2 "passwords
+bcrypt-hashed" remains satisfied — only the wrapper library changed.
+
+**Owner-decision flagged at T2.7 checkpoint:** drop `passlib` from
+deps now, or wait for the post-MVP cleanup pass.
