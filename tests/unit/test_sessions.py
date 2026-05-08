@@ -79,6 +79,12 @@ class _FakeSessionStore:
     def update(self, session: Session) -> None:
         self.rows[session.id] = session
 
+    def increment_cards_correct(self, session_id: str) -> None:
+        from dataclasses import replace as _replace
+
+        cur = self.rows[session_id]
+        self.rows[session_id] = _replace(cur, cards_correct=cur.cards_correct + 1)
+
 
 class _FakeReviewStore:
     def __init__(self) -> None:
@@ -108,6 +114,18 @@ class _FakeReviewStore:
     def new_cards_seen_today_count(self, user_id: str, today: dt.date) -> int:
         del user_id, today
         return getattr(self, "new_today", 0)
+
+    def find_by_idempotency_key(
+        self, session_id: str, card_id: str, key: str
+    ) -> tuple[Review, CardState] | None:
+        for r in self.rows:
+            if (
+                r.session_id == session_id
+                and r.card_id == card_id
+                and r.idempotency_key == key
+            ):
+                return r, self.states[(r.user_id, r.card_id)]
+        return None
 
 
 @pytest.fixture
@@ -285,6 +303,40 @@ def test_start_mixed_respects_daily_new_card_cap(service, stores) -> None:
 def test_start_mixed_requires_sphere_id(service) -> None:
     with pytest.raises(ValueError, match="sphere_id"):
         service.start(user_id="u1", mode="mixed", limit=1)
+
+
+def test_submit_same_idempotency_key_returns_original_review(service, stores) -> None:
+    _, reviews = stores
+    s = service.start(user_id="u1", mode="learn", sphere_id="m1-s0", limit=2)
+
+    first = service.submit(s.id, "m1-s0-c1", Rating.Good, 100, idempotency_key="abc")
+    second = service.submit(s.id, "m1-s0-c1", Rating.Again, 100, idempotency_key="abc")
+
+    assert len(reviews.rows) == 1
+    assert second.next_state == first.next_state
+    # cards_correct must NOT be double-incremented:
+    assert stores[0].get(s.id).cards_correct == 1
+
+
+def test_submit_different_idempotency_keys_create_distinct_reviews(service, stores) -> None:
+    _, reviews = stores
+    s = service.start(user_id="u1", mode="learn", sphere_id="m1-s0", limit=2)
+
+    service.submit(s.id, "m1-s0-c1", Rating.Good, 100, idempotency_key="k1")
+    service.submit(s.id, "m1-s0-c1", Rating.Good, 100, idempotency_key="k2")
+
+    assert len(reviews.rows) == 2
+
+
+def test_submit_no_idempotency_key_does_not_dedupe(service, stores) -> None:
+    """Without a key, every submit is a new event — no implicit dedupe."""
+    _, reviews = stores
+    s = service.start(user_id="u1", mode="learn", sphere_id="m1-s0", limit=2)
+
+    service.submit(s.id, "m1-s0-c1", Rating.Good, 100)
+    service.submit(s.id, "m1-s0-c1", Rating.Good, 100)
+
+    assert len(reviews.rows) == 2
 
 
 def test_start_mixed_backfills_with_new_when_due_short(service, stores) -> None:
