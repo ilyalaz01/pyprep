@@ -42,3 +42,17 @@ class InvalidTokenError(AuthError):
 
 class ExpiredTokenError(AuthError):
     """Raised when a JWT is structurally valid but past its `exp`."""
+
+
+class PasswordTooShortError(AuthError):
+    """Raised when a password is shorter than the configured min length."""
+
+
+class PasswordTooLongError(AuthError):
+    """Raised when a password's UTF-8 encoding exceeds 72 bytes — the bcrypt
+    block limit. Without this guard, bcrypt silently truncates and the
+    user's "long" password is effectively their first 72 bytes."""
+
+
+class InvalidEmailError(AuthError):
+    """Raised when an email fails `EmailStr` format validation."""

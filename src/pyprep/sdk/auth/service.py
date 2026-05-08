@@ -21,19 +21,45 @@ from typing import Any
 
 import bcrypt
 from jose import JWTError, jwt
+from pydantic import TypeAdapter, ValidationError
+from pydantic.networks import EmailStr
 
 from .models import (
     AccessToken,
     ExpiredTokenError,
     InvalidCredentialsError,
+    InvalidEmailError,
     InvalidTokenError,
+    PasswordTooLongError,
+    PasswordTooShortError,
     User,
 )
 from .protocol import UserStore
 
+_BCRYPT_MAX_BYTES = 72  # bcrypt silently truncates at this length
+_EMAIL_VALIDATOR = TypeAdapter(EmailStr)
+
 
 def _now_utc() -> dt.datetime:
     return dt.datetime.now(dt.UTC)
+
+
+def _validate_email(raw: str) -> str:
+    try:
+        return str(_EMAIL_VALIDATOR.validate_python(raw))
+    except ValidationError as e:
+        raise InvalidEmailError(raw) from e
+
+
+def _validate_password(password: str, min_length: int) -> None:
+    if len(password) < min_length:
+        raise PasswordTooShortError(
+            f"password must be at least {min_length} characters"
+        )
+    if len(password.encode("utf-8")) > _BCRYPT_MAX_BYTES:
+        raise PasswordTooLongError(
+            f"password exceeds {_BCRYPT_MAX_BYTES}-byte bcrypt limit"
+        )
 
 
 class AuthService:
@@ -44,6 +70,7 @@ class AuthService:
         secret: str,
         algorithm: str = "HS256",
         token_ttl: dt.timedelta = dt.timedelta(days=7),
+        password_min_length: int = 8,
         clock: Callable[[], dt.datetime] = _now_utc,
         id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
     ) -> None:
@@ -53,16 +80,19 @@ class AuthService:
         self._secret = secret
         self._algorithm = algorithm
         self._ttl = token_ttl
+        self._password_min_length = password_min_length
         self._clock = clock
         self._new_id = id_factory
 
     def register(self, email: str, password: str) -> User:
+        validated_email = _validate_email(email)
+        _validate_password(password, self._password_min_length)
         password_hash = bcrypt.hashpw(
             password.encode("utf-8"), bcrypt.gensalt()
         ).decode("utf-8")
         user = User(
             id=self._new_id(),
-            email=email,
+            email=validated_email,
             password_hash=password_hash,
             created_at=self._clock(),
             is_single_user=False,

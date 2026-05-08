@@ -6,7 +6,10 @@ from .models import (
     EmailAlreadyExistsError,
     ExpiredTokenError,
     InvalidCredentialsError,
+    InvalidEmailError,
     InvalidTokenError,
+    PasswordTooLongError,
+    PasswordTooShortError,
     User,
 )
 from .protocol import UserStore
@@ -19,7 +22,10 @@ __all__ = [
     "EmailAlreadyExistsError",
     "ExpiredTokenError",
     "InvalidCredentialsError",
+    "InvalidEmailError",
     "InvalidTokenError",
+    "PasswordTooLongError",
+    "PasswordTooShortError",
     "User",
     "UserStore",
 ]

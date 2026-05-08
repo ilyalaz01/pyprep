@@ -51,7 +51,10 @@ EXPECTED = {
     "EmailAlreadyExistsError",
     "ExpiredTokenError",
     "InvalidCredentialsError",
+    "InvalidEmailError",
     "InvalidTokenError",
+    "PasswordTooLongError",
+    "PasswordTooShortError",
     "User",
     "UserStore",
     # shared

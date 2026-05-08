@@ -25,11 +25,12 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    secret_key: str = Field(min_length=1)
+    secret_key: str = Field(min_length=32)
     database_url: str = "sqlite:///./pyprep.db"
     single_user: bool = False
     single_user_email: str = "owner@local"
     daily_new_card_cap: int = 15
     jwt_ttl_days: int = 7
+    password_min_length: int = Field(default=8, ge=4, le=128)
     log_level: LogLevel = "INFO"
     content_root: Path = Path("content")
