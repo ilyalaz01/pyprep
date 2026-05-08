@@ -105,6 +105,10 @@ class _FakeReviewStore:
         del sphere_id
         return {cid for (uid, cid) in self.states if uid == user_id}
 
+    def new_cards_seen_today_count(self, user_id: str, today: dt.date) -> int:
+        del user_id, today
+        return getattr(self, "new_today", 0)
+
 
 @pytest.fixture
 def stores() -> tuple[_FakeSessionStore, _FakeReviewStore]:
@@ -247,7 +251,53 @@ def test_start_learn_without_sphere_id_raises(service) -> None:
 
 def test_start_unsupported_mode_raises(service) -> None:
     with pytest.raises(ValueError, match="unsupported"):
-        service.start(user_id="u1", mode="mixed", limit=1)  # type: ignore[arg-type]
+        service.start(user_id="u1", mode="bogus", limit=1)  # type: ignore[arg-type]
+
+
+def test_start_mixed_combines_new_and_due(service, stores) -> None:
+    _, reviews = stores
+    reviews.due["u1"] = ["m1-s0-c4", "m1-s0-c5"]
+    # m1-s0 has cards c1..c5; none reviewed yet, all "new".
+
+    s = service.start(
+        user_id="u1", mode="mixed", sphere_id="m1-s0", limit=4, daily_new_card_cap=15
+    )
+
+    assert len(s.queue) == 4
+    assert "m1-s0-c4" in s.queue or "m1-s0-c5" in s.queue
+    assert any(cid in s.queue for cid in ("m1-s0-c1", "m1-s0-c2", "m1-s0-c3"))
+
+
+def test_start_mixed_respects_daily_new_card_cap(service, stores) -> None:
+    _, reviews = stores
+    reviews.new_today = 15  # already at cap
+    reviews.due["u1"] = ["m1-s0-c4", "m1-s0-c5"]
+
+    s = service.start(
+        user_id="u1", mode="mixed", sphere_id="m1-s0", limit=10, daily_new_card_cap=15
+    )
+
+    new_in_queue = [cid for cid in s.queue if cid in {"m1-s0-c1", "m1-s0-c2", "m1-s0-c3"}]
+    assert new_in_queue == []  # cap reached, no new cards
+    assert set(s.queue) == {"m1-s0-c4", "m1-s0-c5"}
+
+
+def test_start_mixed_requires_sphere_id(service) -> None:
+    with pytest.raises(ValueError, match="sphere_id"):
+        service.start(user_id="u1", mode="mixed", limit=1)
+
+
+def test_start_mixed_backfills_with_new_when_due_short(service, stores) -> None:
+    _, reviews = stores
+    reviews.due["u1"] = ["m1-s0-c5"]  # only 1 due card
+
+    s = service.start(
+        user_id="u1", mode="mixed", sphere_id="m1-s0", limit=4, daily_new_card_cap=15
+    )
+
+    # 1 due + 3 new (backfilled into the unused due half)
+    assert len(s.queue) == 4
+    assert "m1-s0-c5" in s.queue
 
 
 def test_finish_marks_ended_at_and_returns_summary(service, stores) -> None:
