@@ -131,6 +131,29 @@ def test_register_creates_user_with_hashed_password(auth: AuthService, store) ->
     assert store.get("user-1") == user
 
 
+def test_register_propagates_is_single_user_when_configured(store) -> None:
+    """T2.5.6 — when AuthService is constructed with is_single_user=True
+    (Phase 3 wires this from Settings.single_user), the registered User
+    carries that flag. SDK plumbing only — actual single-user mode flow
+    lives in the API layer."""
+    auth = AuthService(
+        users=store,
+        secret=SECRET,
+        is_single_user=True,
+        clock=lambda: T0,
+        id_factory=lambda: "owner",
+    )
+
+    user = auth.register(email="owner@local", password="owner-pw")
+
+    assert user.is_single_user is True
+
+
+def test_register_default_is_single_user_is_false(auth: AuthService) -> None:
+    user = auth.register(email="alice@example.com", password="hunter2!")
+    assert user.is_single_user is False
+
+
 def test_register_duplicate_email_raises(auth: AuthService) -> None:
     auth.register(email="alice@example.com", password="hunter2!")
 
