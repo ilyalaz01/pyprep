@@ -15,7 +15,6 @@ land in T2.10.
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import Callable
 
 import pytest
 
@@ -118,15 +117,22 @@ def service(
     stores: tuple[_FakeSessionStore, _FakeReviewStore],
 ) -> SessionService:
     sessions, reviews = stores
-    clock: Callable[[], dt.datetime] = lambda: T0
+
+    def clock() -> dt.datetime:
+        return T0
+
     ids = iter(f"sess-{i}" for i in range(1, 100))
+
+    def next_id() -> str:
+        return next(ids)
+
     return SessionService(
         cards=cards,
         scheduler=FSRSScheduler(),
         sessions=sessions,
         reviews=reviews,
         clock=clock,
-        id_factory=lambda: next(ids),
+        id_factory=next_id,
     )
 
 
@@ -212,7 +218,6 @@ def test_submit_chains_prior_state_into_scheduler(service, stores) -> None:
     s = service.start(user_id="u1", mode="learn", sphere_id="m1-s0", limit=1)
     service.submit(s.id, "m1-s0-c1", Rating.Good, 500)
 
-    s2 = service.start(user_id="u1", mode="review", limit=1)
     reviews.due["u1"] = ["m1-s0-c1"]
     s2 = service.start(user_id="u1", mode="review", limit=1)
 
@@ -233,6 +238,16 @@ def test_submit_raises_when_session_finished(service) -> None:
 
     with pytest.raises(SessionFinishedError):
         service.submit(s.id, "m1-s0-c1", Rating.Good, 100)
+
+
+def test_start_learn_without_sphere_id_raises(service) -> None:
+    with pytest.raises(ValueError, match="sphere_id"):
+        service.start(user_id="u1", mode="learn", limit=1)
+
+
+def test_start_unsupported_mode_raises(service) -> None:
+    with pytest.raises(ValueError, match="unsupported"):
+        service.start(user_id="u1", mode="mixed", limit=1)  # type: ignore[arg-type]
 
 
 def test_finish_marks_ended_at_and_returns_summary(service, stores) -> None:
