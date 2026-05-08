@@ -12,7 +12,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
-from pyprep.sdk.cards import CardService
+from pyprep.sdk.cards import CardNotFoundError, CardService
 from pyprep.sdk.scheduler import Rating
 from pyprep.sdk.sessions import Review
 
@@ -47,20 +47,29 @@ class StatsService:
 
     def overview(self, user_id: str) -> Overview:
         rows = self._reviews.list_reviews(user_id)
-        xp = sum(
-            self._cards.get(r.card_id).difficulty * _XP_MULT[r.rating] for r in rows
-        )
+        xp = 0.0
+        orphans = 0
+        for r in rows:
+            difficulty = self._card_difficulty(r.card_id)
+            if difficulty is None:
+                orphans += 1
+                continue
+            xp += difficulty * _XP_MULT[r.rating]
         return Overview(
             reviews_total=len(rows),
             retention=_retention(rows),
             streak=self.streak(user_id),
             xp=xp,
+            orphan_review_count=orphans,
         )
 
     def per_module(self, user_id: str) -> list[ModuleStats]:
         groups: dict[int, list[Review]] = defaultdict(list)
         for r in self._reviews.list_reviews(user_id):
-            groups[self._module_of(r.sphere_id)].append(r)
+            module_id = self._module_of(r.sphere_id)
+            if module_id is None:
+                continue  # orphan — can't bucket without a live module
+            groups[module_id].append(r)
         return [
             ModuleStats(module_id=m, reviews_total=len(g), retention=_retention(g))
             for m, g in groups.items()
@@ -133,11 +142,17 @@ class StatsService:
             d -= dt.timedelta(days=1)
         return count
 
-    def _module_of(self, sphere_id: str) -> int:
+    def _module_of(self, sphere_id: str) -> int | None:
+        """Return module_id for a sphere, or None if the sphere is no longer
+        in the live content index (orphan review). T2.5.3."""
         cards = self._cards.by_sphere(sphere_id)
-        if not cards:
-            raise KeyError(f"sphere {sphere_id} not in content index")
-        return cards[0].module_id
+        return cards[0].module_id if cards else None
+
+    def _card_difficulty(self, card_id: str) -> int | None:
+        try:
+            return self._cards.get(card_id).difficulty
+        except CardNotFoundError:
+            return None
 
 
 def _retention(rows: list[Review]) -> float:

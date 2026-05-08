@@ -12,6 +12,7 @@ class Overview:
     retention: float
     streak: int
     xp: float
+    orphan_review_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
