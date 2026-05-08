@@ -95,8 +95,8 @@
         "Hangs forever",
         "RuntimeError: cannot join a thread that hasn't started"
       ],
-      "correct_index": 1,
-      "explanation_md": "`Thread(...)` only constructs the thread; nothing runs until `t.start()` is called. `t.join()` on an unstarted thread is a no-op (it returns immediately because the thread is already 'not running'). So the body never executes and `results` stays empty.\n\nThis is the most common 'why is my thread not doing anything?' bug. The two-step (construct → start → join) is non-negotiable. The `concurrent.futures.ThreadPoolExecutor` API exists partly to remove the foot-gun by collapsing construct + start into one call."
+      "correct_index": 3,
+      "explanation_md": "`t.join()` on an unstarted thread raises `RuntimeError: cannot join thread before it is started`. CPython's `Thread.join()` explicitly checks `self._started.is_set()` and refuses to proceed without it — Python helps you catch the missing `start()` rather than silently doing nothing.\n\nThe two-step (construct → start → join) is non-negotiable. Even better: `concurrent.futures.ThreadPoolExecutor.submit(task)` collapses construct + start into one call, eliminating this footgun entirely."
     },
 
     {

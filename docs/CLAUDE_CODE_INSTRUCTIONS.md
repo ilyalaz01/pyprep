@@ -101,8 +101,9 @@ When generating cards for Modules 2–4 in Phase 9:
 2. Open `content/modules/01_python_core_oop/00_fundamentals.cards.json`. This is the **gold sample**. Match its tone, structure, and difficulty distribution.
 3. Generate **one sphere at a time**, not a whole module in one shot.
 4. After generation, run `scripts/validate_content.py` immediately. Fix violations before writing the next sphere.
-5. Spot-check 5 random cards: does each one mirror real interview wording? If not, regenerate that card.
-6. Commit: `content(p9): T9.X module N sphere M cards`.
+5. **Verify each `code_trap` snippet's actual output before committing.** Schema validation does not catch factual errors in the answer key — only execution does. For every `code_trap` card, run the snippet (a quick `python -c "..."` is fine) and confirm the real output matches `correct_index`. Lesson learned the hard way: m1-s6-c5 shipped with the wrong `correct_index` because the answer was reasoned, not run. `Thread.join()` on an unstarted thread raises `RuntimeError`, it does not silently no-op.
+6. Spot-check 5 random cards: does each one mirror real interview wording? If not, regenerate that card.
+7. Commit: `content(p9): T9.X module N sphere M cards`.
 
 ---
 

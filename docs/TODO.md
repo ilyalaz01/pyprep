@@ -57,7 +57,7 @@
 | T1.9 | Author Sphere 5 lesson + ~10 cards (Generators, context managers). | Validation green | ✅ |
 | T1.10 | Build content validator: `scripts/validate_content.py` — schema, ID uniqueness, sphere refs, min-cards-per-task ≥ 3. | Run via `uv run validate-content` | ✅ (per-sphere counts; strict per-sub-task deferred — NOTES N006) |
 | T1.11 | Write ≥ 5 `code_task` cards for Module 1 with hidden pytest harness. | Each runs and passes when correct | ✅ (7 code_tasks, one per sphere s0–s6, every solution verified against its tests) |
-| T1.12 | (NEW) Author Sphere 6 lesson + ~12 cards (Concurrency & GIL — m1-s6, curriculum (ADDED) item). | Validation green | ✅ |
+| T1.12 | (NEW) Author Sphere 6 lesson + ~12 cards (Concurrency & GIL — m1-s6, curriculum (ADDED) item). | Validation green | ✅ (factual fix on s6-c5 logged: `Thread.join()` on unstarted thread raises `RuntimeError`, not no-op; `correct_index` 1→3, explanation rewritten) |
 | T1.13 | (NEW) Lock pack JSON schema in `content/schema/pack.schema.json` (referenced by PRD §2 but not yet present). | `jsonschema` validates `content/interview_packs/packs.json` | ⬜ (deferred to Phase 8 — pack schema is for `MockPromptService`/interview-pack feature) |
 
 **Phase 1 exit gate:** Validator green, ≥ 75 cards, ≥ 5 `code_task` cards, all 7 spheres covered (m1-s0…m1-s6).
