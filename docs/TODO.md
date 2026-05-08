@@ -80,7 +80,7 @@
 | T2.8 | `pyprep.sdk.shared.gatekeeper.APIGatekeeper` — single egress, rate-limit-aware (no external calls today, but the seam exists). | Unit tested | ✅ (6 tests; 97% coverage; per-host sliding window with injected clock; HTTPClient as Protocol) |
 | T2.9 | `pyprep.sdk.shared.config.Settings` — `pydantic-settings`. | Loads from `.env` correctly | ✅ (6 tests, 100% coverage; required `secret_key`, `LogLevel` Literal validation, env prefix `PYPREP_`) |
 | T2.10 | `pyprep.sdk.repos.*` — SQLAlchemy models + repository classes per aggregate (User, Review, Session, UserStats). | Tests use SQLite-in-memory | ✅ (17 tests; 100% on every repos/* file; UNIQUE email + composite indexes pinned at schema level; UserStats deferred per PRD progress §3.3) |
-| T2.11 | SDK public surface: `src/pyprep/sdk/__init__.py` exports the public classes. | `__all__` defined | ⬜ |
+| T2.11 | SDK public surface: `src/pyprep/sdk/__init__.py` exports the public classes. | `__all__` defined | 🟡 |
 | T2.12 | Coverage gate raised to **fail-under 85%**. | CI enforces | ⬜ |
 
 **Phase 2 exit gate:** SDK is usable from a Python REPL: load content, create user, run a session, get stats, generate a prompt. Coverage ≥ 85% on `src/pyprep/sdk/`.

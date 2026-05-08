@@ -193,6 +193,20 @@ erDiagram
 
 **Card content is NOT stored in the DB.** Cards live in `content/` as files, loaded once at startup and addressed by stable string IDs. This keeps content version-controlled in Git and editable without DB migrations.
 
+**FK ON DELETE behavior** (T2.10): user-rooted aggregates use
+`ON DELETE CASCADE`. Deleting a `User` row cascades through
+`sessions` (where `user_id` FKs to `users.id`) and `reviews` (where
+both `user_id` and `session_id` FK with cascade). This is the
+GDPR-aligned default — full account wipe on user deletion. SQLite
+enforces FKs only when `PRAGMA foreign_keys=ON` is set per-connection;
+Postgres enforces unconditionally. The Phase 3 DB-init code is
+responsible for setting the SQLite pragma.
+
+**`USER_STATS` is intentionally not built.** PRD progress §3.3
+supersedes the `USER_STATS` row in the diagram above: stats are
+computed on-the-fly from `reviews` at MVP. Materialized views are
+post-MVP.
+
 ---
 
 ## 6. Architectural Decision Records (ADRs)

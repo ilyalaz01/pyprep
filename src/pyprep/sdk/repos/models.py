@@ -12,6 +12,11 @@ Schema notes for the T2.10 review:
   is denormalized onto each Review row. The latest review per
   (user_id, card_id) IS the current `CardState`. No separate state
   table — keeps `add()` a single insert and avoids two-table updates.
+- FKs use `ON DELETE CASCADE` for user-rooted aggregates (PLAN §5).
+  Deleting a user wipes their sessions and reviews — the GDPR-aligned
+  default. Note: SQLite enforces FKs only when `PRAGMA foreign_keys=ON`
+  is set per-connection; the metadata is correct, enforcement is the
+  caller's responsibility.
 """
 
 from __future__ import annotations
@@ -39,7 +44,7 @@ class SessionRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), index=True
+        String, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     mode: Mapped[str] = mapped_column(String)
     started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
@@ -55,8 +60,12 @@ class ReviewRow(Base):
     __tablename__ = "reviews"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
-    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"))
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    session_id: Mapped[str] = mapped_column(
+        String, ForeignKey("sessions.id", ondelete="CASCADE")
+    )
     card_id: Mapped[str] = mapped_column(String)
     sphere_id: Mapped[str] = mapped_column(String, index=True)
     rating: Mapped[int] = mapped_column(Integer)
