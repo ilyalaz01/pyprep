@@ -75,7 +75,7 @@
 | T2.3 | `pyprep.sdk.scheduler.FSRSScheduler` — wrap `py-fsrs`; expose `next_due(card_state, rating) -> CardState`. | Tests pass with golden vectors from py-fsrs docs | ✅ (14 tests incl. hypothesis property; 100% on `scheduler/`; FSRS-6, fuzzing OFF for determinism; flagged NOTES N008/N009 for owner) |
 | T2.4 | `pyprep.sdk.sessions.SessionService` — orchestrate a card session lifecycle. | Tests pass | ✅ (12 tests; 100%/98% on sessions models/service; persistence abstracted via `SessionStore`/`ReviewStore` Protocols for T2.10) |
 | T2.5 | `pyprep.sdk.stats.StatsService` — aggregate per-sphere/per-tag retention & weakness ranking. | Tests pass | ✅ (11 tests; 100% models, 97% service; covers overview/per_module/per_sphere/weakness_top_n/daily_chart/streak with tz support) |
-| T2.6 | `pyprep.sdk.prompts.MockPromptService` — generate deterministic mock-interview prompts. | Snapshot tests on prompt output | 🟡 |
+| T2.6 | `pyprep.sdk.prompts.MockPromptService` — generate deterministic mock-interview prompts. | Snapshot tests on prompt output | ✅ (10 tests; 100% coverage on prompts/; Efraimidis-Spirakis weighted sampling for weakness_focus; anti-leak invariant pinned) |
 | T2.7 | `pyprep.sdk.auth.AuthService` — register, login, JWT issuance/verification. | Tests cover happy + edge | ⬜ |
 | T2.8 | `pyprep.sdk.shared.gatekeeper.APIGatekeeper` — single egress, rate-limit-aware (no external calls today, but the seam exists). | Unit tested | ⬜ |
 | T2.9 | `pyprep.sdk.shared.config.Settings` — `pydantic-settings`. | Loads from `.env` correctly | ⬜ |
