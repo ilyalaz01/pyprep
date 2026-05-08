@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import datetime as dt
 import threading
+from pathlib import Path
 
 import pytest
-from sqlalchemy import StaticPool, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from pyprep.sdk.cards import CardService
@@ -43,12 +44,14 @@ def _card(cid: str) -> Card:
 
 
 @pytest.fixture
-def engine_factory():
-    """Shared in-memory SQLite + StaticPool so all threads see the same db."""
+def engine_factory(tmp_path: Path):
+    """Tmp-file SQLite so each thread gets its own connection from the pool;
+    StaticPool would share a single connection and SQLite would refuse
+    nested transactions."""
+    db_path = tmp_path / "concurrency.db"
     engine = create_engine(
-        "sqlite://",
+        f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
@@ -110,7 +113,7 @@ def test_concurrent_submits_dont_double_count_cards_correct(
                 barrier.wait()
                 svc.submit(session_id, card_id, Rating.Good, 100)
                 worker_session.commit()
-        except BaseException as e:  # noqa: BLE001
+        except BaseException as e:
             errors.append(e)
 
     threads = [threading.Thread(target=thread_submit, args=(cid,)) for cid in cards_to_submit]

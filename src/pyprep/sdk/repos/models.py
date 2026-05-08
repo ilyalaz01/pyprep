@@ -23,7 +23,16 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -71,6 +80,7 @@ class ReviewRow(Base):
     rating: Mapped[int] = mapped_column(Integer)
     response_ms: Mapped[int] = mapped_column(Integer)
     reviewed_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # FSRS post-review state (the latest row per (user_id, card_id) IS
     # the current CardState — see module docstring):
@@ -85,4 +95,11 @@ class ReviewRow(Base):
     __table_args__ = (
         Index("ix_reviews_user_due", "user_id", "due_at"),
         Index("ix_reviews_user_card_reviewed", "user_id", "card_id", "reviewed_at"),
+        # Idempotency: when key is provided, (session, card, key) is unique.
+        # NULL keys are not subject to the constraint per SQL NULL semantics
+        # (NULL ≠ NULL), so non-idempotent submits remain free.
+        UniqueConstraint(
+            "session_id", "card_id", "idempotency_key",
+            name="uq_reviews_idempotency",
+        ),
     )

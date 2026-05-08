@@ -33,6 +33,7 @@ class Review:
     rating: Rating
     response_ms: int
     reviewed_at: dt.datetime
+    idempotency_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

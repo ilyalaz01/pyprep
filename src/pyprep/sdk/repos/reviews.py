@@ -36,6 +36,7 @@ class ReviewRepository:
                 rating=int(review.rating.value),
                 response_ms=review.response_ms,
                 reviewed_at=review.reviewed_at,
+                idempotency_key=review.idempotency_key,
                 due_at=state.due,
                 stability=state.stability,
                 difficulty=state.difficulty,
@@ -46,6 +47,18 @@ class ReviewRepository:
             )
         )
         self._s.flush()
+
+    def find_by_idempotency_key(
+        self, session_id: str, card_id: str, key: str
+    ) -> tuple[Review, CardState] | None:
+        row = self._s.scalar(
+            select(ReviewRow).where(
+                ReviewRow.session_id == session_id,
+                ReviewRow.card_id == card_id,
+                ReviewRow.idempotency_key == key,
+            )
+        )
+        return (_to_review(row), _to_state(row)) if row else None
 
     def latest_state(self, user_id: str, card_id: str) -> CardState | None:
         row = self._s.scalar(
@@ -125,4 +138,5 @@ def _to_review(row: ReviewRow) -> Review:
         rating=Rating(row.rating),
         response_ms=row.response_ms,
         reviewed_at=ensure_utc(row.reviewed_at),
+        idempotency_key=row.idempotency_key,
     )

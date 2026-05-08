@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from pyprep.sdk.sessions import Session as DomainSession
@@ -37,6 +38,15 @@ class SessionRepository:
         row.queue = list(dom.queue)
         row.cards_total = dom.cards_total
         row.cards_correct = dom.cards_correct
+        self._s.flush()
+
+    def increment_cards_correct(self, session_id: str) -> None:
+        """Atomic UPDATE — race-safe across concurrent submits."""
+        self._s.execute(
+            update(SessionRow)
+            .where(SessionRow.id == session_id)
+            .values(cards_correct=SessionRow.cards_correct + 1)
+        )
         self._s.flush()
 
 

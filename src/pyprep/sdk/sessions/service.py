@@ -84,10 +84,18 @@ class SessionService:
         card_id: str,
         rating: Rating,
         response_ms: int,
+        *,
+        idempotency_key: str | None = None,
     ) -> SubmitResult:
         session = self._sessions.get(session_id)
         if session.ended_at is not None:
             raise SessionFinishedError(session_id)
+        if idempotency_key is not None and (
+            existing := self._reviews.find_by_idempotency_key(
+                session_id, card_id, idempotency_key
+            )
+        ):
+            return SubmitResult(next_state=existing[1])
         card = self._cards.get(card_id)
         now = self._clock()
         prior = self._reviews.latest_state(session.user_id, card_id)
@@ -103,12 +111,11 @@ class SessionService:
             rating=rating,
             response_ms=response_ms,
             reviewed_at=now,
+            idempotency_key=idempotency_key,
         )
         self._reviews.add(review, next_state)
-        delta = 1 if rating in _CORRECT else 0
-        self._sessions.update(
-            replace(session, cards_correct=session.cards_correct + delta)
-        )
+        if rating in _CORRECT:
+            self._sessions.increment_cards_correct(session.id)
         return SubmitResult(next_state=next_state)
 
     def finish(self, session_id: str) -> SessionSummary:
