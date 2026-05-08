@@ -93,6 +93,13 @@ def test_load_raises_when_wrapper_missing_sphere_id(tmp_path: Path) -> None:
         ContentLoader(tmp_path, schema_path=SCHEMA_PATH).load()
 
 
+def test_load_raises_when_wrapper_missing_module_id(tmp_path: Path) -> None:
+    _seed(tmp_path, {"sphere_id": "m1-s0", "cards": [GOOD_CARD]})
+
+    with pytest.raises(ContentLoaderError, match="module_id"):
+        ContentLoader(tmp_path, schema_path=SCHEMA_PATH).load()
+
+
 def test_load_real_content_tree() -> None:
     """The real `content/` tree must load cleanly via the SDK loader."""
     index = ContentLoader(REPO_ROOT / "content").load()
