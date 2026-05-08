@@ -46,7 +46,13 @@ class CardState:
     reps: int                 # cumulative review count
     lapses: int               # cumulative AGAIN count
     state: Literal["new", "learning", "review", "relearning"]
+    step: int                 # FSRS learning/relearning-step index
 ```
+
+`step` indexes the position in `learning_steps` / `relearning_steps`.
+It must round-trip through persistence; without it, a card mid-way
+through learning would restart the sequence on every load. Surface
+it on the dataclass — the REST API and UI never expose it directly.
 
 The scheduler is a pure function: `(prior_state, rating, reviewed_at) -> new_state`. No side effects. Persistence is the caller's responsibility.
 
@@ -58,7 +64,7 @@ Configurable via `Settings`:
 |---|---|---|
 | `request_retention` | `0.9` | Target retrievability at next review |
 | `maximum_interval` | `36500` (days, ~100 years) | Cap |
-| `weights` | FSRS-5 default | The 17 model weights |
+| `weights` | FSRS-6 library defaults | Underlying FSRS model parameters; pass through `fsrs.Scheduler`'s built-in defaults rather than constructing a literal vector |
 | `learning_steps` | `[1m, 10m]` | Steps for "new" cards before graduation |
 | `relearning_steps` | `[10m]` | Steps after a lapse |
 

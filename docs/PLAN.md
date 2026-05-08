@@ -321,6 +321,22 @@ erDiagram
 - UI kits add weight and constrain custom card animations (flip).
 - Tailwind + a small in-house component library is sufficient.
 
+### ADR-009: FSRS fuzzing disabled for output determinism
+
+**Status:** Accepted
+
+**Context:** `fsrs.Scheduler` defaults to `enable_fuzzing=True`, which jitters the next due-date by a small random offset. PRD `PRD_spaced_repetition.md` §2.5 requires byte-identical output for identical input — golden vectors and snapshot tests depend on it.
+
+**Decision:** `FSRSScheduler` instantiates the underlying scheduler with `enable_fuzzing=False`. The choice is hard-coded in the wrapper, not configurable.
+
+**Rationale:**
+- Determinism is a stronger property than load-spreading at our scale (single-digit users in MVP).
+- Snapshot/golden tests (PRD §4.3) require byte-identical replay.
+- Stability/difficulty trajectories are still produced by FSRS-6's actual algorithm — only the per-due jitter is suppressed.
+
+**Trade-offs:**
+- At high scale (many users × thousands of cards), unjittered due-dates may cluster review load on the same UTC days. Mitigation if/when that becomes real: re-enable fuzzing with a deterministic per-user seed (pass a seed into the scheduler so identical-user-identical-card replay still matches snapshots).
+
 ---
 
 ## 7. API Surface (preview)

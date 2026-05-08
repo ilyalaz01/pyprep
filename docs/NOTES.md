@@ -134,50 +134,57 @@ per sub-task across all 7 spheres.
 
 ---
 
-## N008 — `PRD_spaced_repetition.md` weights count (17) is FSRS-5; installed library is FSRS-6 (21 params)
+## N008 — `PRD_spaced_repetition.md` weights count (17) is FSRS-5; installed library is FSRS-6 (21 params) [CLOSED]
 
-**Phase:** 2 (T2.3 prep) · **Date:** 2026-05-08
+**Phase:** 2 (T2.3) · **Opened:** 2026-05-08 · **Closed:** 2026-05-08
 
-`PRD_spaced_repetition.md` §2.3 lists `weights` as "FSRS-5 default — the 17
-model weights". The pinned dependency in `pyproject.toml` is `fsrs>=6,<7`
-(FSRS-6), which exposes **21** parameters and a different `Parameters` /
-`Card` / `Rating` API shape than FSRS-5.
+`PRD_spaced_repetition.md` §2.3 said "FSRS-5 default — the 17 model
+weights". The pinned `fsrs>=6,<7` is FSRS-6 with 21 parameters.
 
-**Why it matters:** if the FSRSScheduler wrapper hard-codes a 17-element
-default vector or re-exports FSRS-5 weight types, the `fsrs` 6.x adapter
-will fail at construction.
-
-**Resolution (deferred to T2.3):** when implementing the wrapper, default to
-the library's own `fsrs.Parameters()` / equivalent (whatever FSRS-6 ships
-as its baseline) rather than constructing a literal weight vector ourselves.
-At T2.3 time, decide with owner whether to:
-- (a) keep `fsrs>=6,<7` and update `PRD_spaced_repetition.md` §2.3 to
-  reflect FSRS-6 (21 weights, current shape), or
-- (b) pin to a final FSRS-5 release of the library and leave PRD copy.
-
-Owner-decision flag at the T2.3 checkpoint.
+**Resolution (owner verdict, T2.3 checkpoint, option a):** keep
+`fsrs>=6,<7` and update PRD §2.3 to reflect FSRS-6. The wrapper passes
+through `fsrs.Scheduler`'s built-in defaults rather than constructing
+a literal weight vector. PRD §2.3 wording now says "FSRS-6 library
+defaults" without specifying parameter count — keeps the doc future-
+proof if FSRS-7 ships with a different shape. Closed.
 
 ---
 
-## N009 — `CardState.step` is required for round-trip fidelity (not in PRD §2.2)
+## N009 — `CardState.step` is required for round-trip fidelity (not in PRD §2.2) [CLOSED]
 
-**Phase:** 2 (T2.3) · **Date:** 2026-05-08
+**Phase:** 2 (T2.3) · **Opened:** 2026-05-08 · **Closed:** 2026-05-08
 
-`PRD_spaced_repetition.md` §2.2 lists `CardState` with 7 fields:
-`stability, difficulty, last_review, due, reps, lapses, state`. The
-`fsrs` library's `Card` carries an additional `step: int` field that
-indexes the position inside `learning_steps` (and `relearning_steps`)
-sequences. Without persisting `step`, a round-trip `CardState →
-fsrs.Card → review_card → fsrs.Card → CardState` loses information:
-e.g., a card mid-way through `learning_steps=[1m, 10m]` would always
-restart at step 0 on the next review, doubling the learning sequence.
+PRD §2.2 listed `CardState` with 7 fields. The `fsrs` library's `Card`
+carries an additional `step: int` indexing position in
+`learning_steps`/`relearning_steps`; without persisting it, a card
+mid-way through learning would restart the sequence on every load.
 
-**Resolution:** added `step: int = 0` to our `CardState`. It is an
-algorithmic implementation detail (FSRS state machine internals), not
-a user-facing field — the REST API `/sessions/.../answer` will accept
-the prior state opaquely, not show `step` in any UI.
+**Resolution (owner verdict, T2.3 checkpoint, option a):** ratify by
+amending PRD §2.2 to list 8 fields including `step`. We committed to
+`fsrs` via ADR-002; hiding `step` in a nested algo blob would be
+premature abstraction for a single-implementation project. Public
+surface stays on the dataclass. Closed.
 
-**Owner-decision at T2.3 checkpoint:** ratify the field by amending
-PRD §2.2, or rename to `_step` / move into a nested `algo_state` blob
-to preserve the PRD's 7-field public surface. Code currently keeps it
-public on the dataclass for ergonomic reasons (frozen + slots).
+---
+
+## N010 — FSRS golden vectors deferred; property tests in place
+
+**Phase:** 2 (T2.3) · **Date:** 2026-05-08 · **Status:** open (backlog)
+
+PRD `PRD_spaced_repetition.md` §4.1 mentions "Golden vectors imported
+from `py-fsrs` reference tests." Published FSRS reference vectors are
+calibrated to specific parameter sets (FSRS-5 weights), and FSRS-6
+defaults differ — direct import would not match.
+
+**Resolution:** for MVP, behavioral property tests + 100% coverage on
+`scheduler/` are sufficient. The 14 T2.3 tests pin: round-trip
+fidelity, validation rules, monotonic stability on repeated GOOD,
+eventual graduation to "review", AGAIN-after-review → "relearning",
+deterministic byte-identical replay.
+
+**If golden vectors become useful later:** generate our own. Run a
+20-step canonical history (PRD §4.3) with fixed `enable_fuzzing=False`
+(ADR-009) and `desired_retention=0.9`, snapshot the resulting state
+chain to `tests/snapshots/scheduler_canonical.json`, replay-and-
+compare in a snapshot test. Don't import upstream vectors. Backlog,
+not blocking.
