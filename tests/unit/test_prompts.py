@@ -189,11 +189,11 @@ def test_weakness_focus_skews_toward_low_retention_sphere(cards: CardService) ->
     """When weakness_focus=true with a stats source where m1-s1 has 0%
     retention and m1-s0 has 100%, the sample of count=2 from a candidate
     pool of 3+2 cards should pull predominantly from m1-s1."""
+    import datetime as dt
+
     from pyprep.sdk.scheduler import Rating
     from pyprep.sdk.sessions import Review
     from pyprep.sdk.stats import StatsService
-
-    import datetime as dt
 
     rows = [
         Review(
