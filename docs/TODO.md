@@ -72,7 +72,7 @@
 |---|---|---|---|
 | T2.1 | `pyprep.sdk.content_loader.ContentLoader` — reads `content/`, validates, builds in-memory index. | Tests cover loader, ≥ 90% coverage on this file | ✅ (8 tests, 100% coverage on `content_loader/`; loader.py 60 LOC, index.py 24 LOC) |
 | T2.2 | `pyprep.sdk.cards.CardService` — query by sphere, type, difficulty, tags. | Tests pass | ✅ (12 tests, 100% on cards.py; AND semantics on multi-tag query) |
-| T2.3 | `pyprep.sdk.scheduler.FSRSScheduler` — wrap `py-fsrs`; expose `next_due(card_state, rating) -> CardState`. | Tests pass with golden vectors from py-fsrs docs | 🟡 |
+| T2.3 | `pyprep.sdk.scheduler.FSRSScheduler` — wrap `py-fsrs`; expose `next_due(card_state, rating) -> CardState`. | Tests pass with golden vectors from py-fsrs docs | ✅ (14 tests incl. hypothesis property; 100% on `scheduler/`; FSRS-6, fuzzing OFF for determinism; flagged NOTES N008/N009 for owner) |
 | T2.4 | `pyprep.sdk.sessions.SessionService` — orchestrate a card session lifecycle. | Tests pass | ⬜ |
 | T2.5 | `pyprep.sdk.stats.StatsService` — aggregate per-sphere/per-tag retention & weakness ranking. | Tests pass | ⬜ |
 | T2.6 | `pyprep.sdk.prompts.MockPromptService` — generate deterministic mock-interview prompts. | Snapshot tests on prompt output | ⬜ |
