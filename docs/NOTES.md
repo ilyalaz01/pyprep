@@ -191,30 +191,73 @@ not blocking.
 
 ---
 
-## N011 — `passlib` broken with `bcrypt` ≥ 5; AuthService uses `bcrypt` directly
+## N011 — `passlib` broken with `bcrypt` ≥ 5; AuthService uses `bcrypt` directly [CLOSED]
 
-**Phase:** 2 (T2.7) · **Date:** 2026-05-08
+**Phase:** 2 (T2.7) · **Opened:** 2026-05-08 · **Closed:** 2026-05-08
 
-`pyproject.toml` depends on `passlib[bcrypt]>=1.7,<2` (the originally
-spec'd password library). `passlib` 1.7.x's bcrypt backend reads
-`bcrypt.__about__.__version__`, which `bcrypt` 5.x removed. Calling
-`CryptContext(schemes=["bcrypt"]).hash(...)` raises `ValueError:
-password cannot be longer than 72 bytes` because passlib's startup
-self-check uses a long detection password that bcrypt 5 rejects.
+`passlib` 1.7.x's bcrypt backend reads `bcrypt.__about__.__version__`,
+which `bcrypt` 5.x removed. AuthService uses `bcrypt` directly.
 
-**Resolution:** AuthService uses `bcrypt` directly:
-- `bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())` for
-  hashing.
-- `bcrypt.checkpw(password.encode("utf-8"), hash.encode("utf-8"))`
-  for verification.
-- Anti-enumeration via "same error type for unknown-email and
-  bad-password" (`InvalidCredentialsError`). Timing parity (constant-
-  time bcrypt verify on unknown email) is **deferred to post-MVP**;
-  single-user mode has no enumeration attacker model.
+**Resolution (owner verdict, T2.7 checkpoint):** dropped
+`passlib[bcrypt]` from `pyproject.toml`; replaced with `bcrypt>=4,<6`
+explicit dep. Verified no `passlib` import remains in source or tests.
+PRD §6.2 / NFR-SEC-2 "passwords bcrypt-hashed" still satisfied —
+wrapper library changed, primitive unchanged. Closed.
 
-`passlib` stays in deps for now (low-risk dead weight, removed in
-post-MVP cleanup if still unused). PRD §6.2 / NFR-SEC-2 "passwords
-bcrypt-hashed" remains satisfied — only the wrapper library changed.
+Anti-enumeration timing-parity follow-up tracked in N012.
 
-**Owner-decision flagged at T2.7 checkpoint:** drop `passlib` from
-deps now, or wait for the post-MVP cleanup pass.
+---
+
+## N012 — AuthService polish nits (Phase 10 backlog)
+
+**Phase:** 2 (T2.7 review) · **Date:** 2026-05-08 · **Status:** open
+(do NOT fix in Phase 2 per owner directive — Phase 10 polish)
+
+Three nits raised at the T2.7 owner review of `auth/service.py`. All
+three are contract-tightening, not security holes. Fix in the Phase 10
+polish pass.
+
+### N012.1 — Pin `bcrypt.gensalt(rounds=12)` explicitly
+
+`auth/service.py:61` uses `bcrypt.gensalt()` with library defaults.
+Make explicit to protect against silent default drift across `bcrypt`
+versions.
+
+```python
+# Option A: hard-code
+password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
+
+# Option B: expose a knob
+def __init__(self, *, ..., bcrypt_rounds: int = 12) -> None:
+    self._bcrypt_rounds = bcrypt_rounds
+```
+
+### N012.2 — Tighten `_decode` exp-claim handling
+
+`auth/service.py:_decode` falls through silently when `exp` is missing
+or non-int (defensively unreachable today since we always set it in
+`_issue`, but the contract should reject malformed payloads, not
+accept them).
+
+```python
+exp = payload.get("exp")
+if not isinstance(exp, int):
+    raise InvalidTokenError()
+if self._clock().timestamp() >= exp:
+    raise ExpiredTokenError()
+```
+
+### N012.3 — Surface deferred timing-parity at the call site
+
+Add an inline TODO comment in `login()` body so the deferred N011
+decision is visible at the right place in the code:
+
+```python
+def login(self, email: str, password: str) -> AccessToken:
+    user = self._users.get_by_email(email)
+    # TODO(public-mode): add dummy bcrypt.checkpw on unknown-email
+    # branch for timing parity (anti-enumeration). See NOTES N011.
+    if user is None or not bcrypt.checkpw(...):
+        raise InvalidCredentialsError()
+    return self._issue(user.id)
+```
