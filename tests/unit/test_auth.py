@@ -144,7 +144,7 @@ def test_register_propagates_is_single_user_when_configured(store) -> None:
         id_factory=lambda: "owner",
     )
 
-    user = auth.register(email="owner@local", password="owner-pw")
+    user = auth.register(email="owner@local.dev", password="owner-pw")
 
     assert user.is_single_user is True
 

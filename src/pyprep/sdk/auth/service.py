@@ -71,6 +71,7 @@ class AuthService:
         algorithm: str = "HS256",
         token_ttl: dt.timedelta = dt.timedelta(days=7),
         password_min_length: int = 8,
+        is_single_user: bool = False,
         clock: Callable[[], dt.datetime] = _now_utc,
         id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
     ) -> None:
@@ -81,6 +82,7 @@ class AuthService:
         self._algorithm = algorithm
         self._ttl = token_ttl
         self._password_min_length = password_min_length
+        self._is_single_user = is_single_user
         self._clock = clock
         self._new_id = id_factory
 
@@ -95,7 +97,7 @@ class AuthService:
             email=validated_email,
             password_hash=password_hash,
             created_at=self._clock(),
-            is_single_user=False,
+            is_single_user=self._is_single_user,
         )
         self._users.create(user)  # raises EmailAlreadyExistsError on duplicate
         return user
