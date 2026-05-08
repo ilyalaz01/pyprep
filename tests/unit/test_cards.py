@@ -124,6 +124,14 @@ def test_query_with_no_filters_returns_all(index: ContentIndex) -> None:
     assert len(svc.query()) == 5
 
 
+def test_query_max_difficulty(index: ContentIndex) -> None:
+    svc = CardService(index)
+
+    ids = sorted(c.id for c in svc.query(max_difficulty=2))
+
+    assert ids == ["m1-s0-c1", "m1-s1-c1"]
+
+
 def test_query_multiple_tags_requires_all(index: ContentIndex) -> None:
     svc = CardService(index)
 
