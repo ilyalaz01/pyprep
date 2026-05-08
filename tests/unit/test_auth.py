@@ -20,11 +20,14 @@ from pyprep.sdk.auth import (
     EmailAlreadyExistsError,
     ExpiredTokenError,
     InvalidCredentialsError,
+    InvalidEmailError,
     InvalidTokenError,
+    PasswordTooLongError,
+    PasswordTooShortError,
     User,
 )
 
-SECRET = "test-secret-do-not-use-in-prod"
+SECRET = "test-secret-do-not-use-in-prod" + "x" * 8  # ≥ 32 chars per T2.5.1
 T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=dt.UTC)
 
 
@@ -70,8 +73,54 @@ def test_init_rejects_empty_secret(store) -> None:
         AuthService(users=store, secret="")
 
 
+def test_register_rejects_password_below_min_length(auth: AuthService) -> None:
+    with pytest.raises(PasswordTooShortError):
+        auth.register(email="alice@example.com", password="short")
+
+
+def test_register_accepts_password_exactly_72_bytes(auth: AuthService) -> None:
+    pw_72 = "a" * 72
+    user = auth.register(email="alice@example.com", password=pw_72)
+    assert user.email == "alice@example.com"
+
+
+def test_register_rejects_password_above_72_bytes(auth: AuthService) -> None:
+    """72 is the bcrypt block limit; longer passwords are silently
+    truncated. Reject explicitly so the user sees an error instead."""
+    with pytest.raises(PasswordTooLongError):
+        auth.register(email="alice@example.com", password="a" * 73)
+
+
+def test_register_rejects_password_above_72_bytes_when_utf8_multibyte(auth: AuthService) -> None:
+    """Each emoji is 4 bytes; 19 emoji = 76 bytes > 72."""
+    long_emoji_pw = "🦄" * 19
+    with pytest.raises(PasswordTooLongError):
+        auth.register(email="alice@example.com", password=long_emoji_pw)
+
+
+def test_register_rejects_invalid_email(auth: AuthService) -> None:
+    with pytest.raises(InvalidEmailError):
+        auth.register(email="not-an-email", password="hunter2hunter2")
+
+
+def test_register_min_length_is_configurable(store) -> None:
+    auth = AuthService(
+        users=store,
+        secret=SECRET,
+        password_min_length=12,
+        clock=lambda: T0,
+        id_factory=lambda: "user-1",
+    )
+
+    with pytest.raises(PasswordTooShortError):
+        auth.register(email="alice@example.com", password="hunter2hunt")  # 11 chars
+
+    user = auth.register(email="alice@example.com", password="hunter2hunter")  # 13
+    assert user.id == "user-1"
+
+
 def test_register_creates_user_with_hashed_password(auth: AuthService, store) -> None:
-    user = auth.register(email="alice@example.com", password="hunter2")
+    user = auth.register(email="alice@example.com", password="hunter2!")
 
     assert user.id == "user-1"
     assert user.email == "alice@example.com"
@@ -83,16 +132,16 @@ def test_register_creates_user_with_hashed_password(auth: AuthService, store) ->
 
 
 def test_register_duplicate_email_raises(auth: AuthService) -> None:
-    auth.register(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
 
     with pytest.raises(EmailAlreadyExistsError, match="alice"):
         auth.register(email="alice@example.com", password="other-pw")
 
 
 def test_login_returns_access_token(auth: AuthService) -> None:
-    user = auth.register(email="alice@example.com", password="hunter2")
+    user = auth.register(email="alice@example.com", password="hunter2!")
 
-    token = auth.login(email="alice@example.com", password="hunter2")
+    token = auth.login(email="alice@example.com", password="hunter2!")
 
     assert isinstance(token, AccessToken)
     assert token.user_id == user.id
@@ -102,7 +151,7 @@ def test_login_returns_access_token(auth: AuthService) -> None:
 
 
 def test_login_wrong_password_raises_invalid_credentials(auth: AuthService) -> None:
-    auth.register(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
 
     with pytest.raises(InvalidCredentialsError):
         auth.login(email="alice@example.com", password="WRONG")
@@ -116,8 +165,8 @@ def test_login_unknown_email_raises_same_error(auth: AuthService) -> None:
 
 
 def test_verify_token_returns_user_id(auth: AuthService) -> None:
-    auth.register(email="alice@example.com", password="hunter2")
-    token = auth.login(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
+    token = auth.login(email="alice@example.com", password="hunter2!")
 
     user_id = auth.verify_token(token.token)
 
@@ -125,8 +174,8 @@ def test_verify_token_returns_user_id(auth: AuthService) -> None:
 
 
 def test_verify_token_rejects_bad_signature(auth: AuthService) -> None:
-    auth.register(email="alice@example.com", password="hunter2")
-    token = auth.login(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
+    token = auth.login(email="alice@example.com", password="hunter2!")
 
     forged = token.token + "x"
 
@@ -141,7 +190,7 @@ def test_verify_token_rejects_token_signed_with_different_secret(store) -> None:
         clock=lambda: T0,
         id_factory=lambda: "user-1",
     )
-    auth.register(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
     foreign_token = jwt.encode(
         {"sub": "user-1", "exp": int((T0 + dt.timedelta(days=1)).timestamp())},
         "DIFFERENT-SECRET",
@@ -161,8 +210,8 @@ def test_verify_token_distinguishes_expired_from_invalid(store) -> None:
         clock=lambda: issued_clock[0],
         id_factory=lambda: "user-1",
     )
-    auth.register(email="alice@example.com", password="hunter2")
-    token = auth.login(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
+    token = auth.login(email="alice@example.com", password="hunter2!")
 
     issued_clock[0] = T0 + dt.timedelta(hours=1)  # advance past TTL
 
@@ -184,8 +233,8 @@ def test_refresh_token_extends_expiry(store) -> None:
         clock=lambda: issued_clock[0],
         id_factory=lambda: "user-1",
     )
-    auth.register(email="alice@example.com", password="hunter2")
-    original = auth.login(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
+    original = auth.login(email="alice@example.com", password="hunter2!")
 
     issued_clock[0] = T0 + dt.timedelta(days=2)
     refreshed = auth.refresh_token(original.token)
@@ -204,8 +253,8 @@ def test_refresh_expired_token_raises(store) -> None:
         clock=lambda: issued_clock[0],
         id_factory=lambda: "user-1",
     )
-    auth.register(email="alice@example.com", password="hunter2")
-    token = auth.login(email="alice@example.com", password="hunter2")
+    auth.register(email="alice@example.com", password="hunter2!")
+    token = auth.login(email="alice@example.com", password="hunter2!")
 
     issued_clock[0] = T0 + dt.timedelta(hours=1)
 
