@@ -175,7 +175,8 @@ def test_weakness_top_n_ranks_by_score_descending(cards: CardService) -> None:
 
     top = StatsService(reviews=repo, cards=cards).weakness_top_n("u1", n=3)
 
-    assert [s.sphere_id for s in top] == ["m1-s1", "m1-s0", "m1-s2"]
+    # s0: (1-0)*ln(6) ≈ 1.79; s1: (1-0.4)*ln(11) ≈ 1.44; s2: 0
+    assert [s.sphere_id for s in top] == ["m1-s0", "m1-s1", "m1-s2"]
 
 
 def test_weakness_property_more_easy_lowers_score(cards: CardService) -> None:
@@ -197,7 +198,8 @@ def test_daily_chart_buckets_by_utc_date(cards: CardService) -> None:
         ]
     )
 
-    chart = StatsService(reviews=repo, cards=cards).daily_chart("u1", days=3, today=T0 + dt.timedelta(days=2))
+    today = T0 + dt.timedelta(days=2)
+    chart = StatsService(reviews=repo, cards=cards).daily_chart("u1", days=3, today=today)
 
     by_date = {row.date: row for row in chart}
     assert by_date[T0.date()].reviews_total == 2
