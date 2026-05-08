@@ -96,6 +96,49 @@ def test_overview_with_no_reviews(cards: CardService) -> None:
     assert o.retention == 0.0
     assert o.streak == 0
     assert o.xp == 0.0
+    assert o.orphan_review_count == 0
+
+
+def test_stats_with_orphan_review_does_not_crash(cards: CardService) -> None:
+    """A review whose card_id no longer exists in content (sphere deleted
+    or card removed) must not crash aggregation. T2.5.3."""
+    repo = _FakeStatsRepo(
+        [
+            _review("m1-s0-c1", "m1-s0", Rating.Good),
+            _review("ghost-card", "m9-s9", Rating.Good),  # sphere not in content
+        ]
+    )
+    svc = StatsService(reviews=repo, cards=cards)
+
+    # All these methods must complete without KeyError.
+    o = svc.overview("u1")
+    pm = svc.per_module("u1")
+    ps = svc.per_sphere("u1")
+    chart = svc.daily_chart("u1", days=1, today=T0)
+
+    assert o.reviews_total == 2  # raw count is honest
+    assert o.orphan_review_count == 1
+    # per_module excludes the orphan because we can't bucket it:
+    assert sum(m.reviews_total for m in pm) == 1
+    # per_sphere keeps the orphan-sphere bucket; it's still a sphere_id
+    # the user reviewed, even if content has since dropped it:
+    assert {s.sphere_id for s in ps} == {"m1-s0", "m9-s9"}
+    # daily_chart uses raw counts — no module lookup needed:
+    assert sum(d.reviews_total for d in chart) == 2
+
+
+def test_orphan_review_count_surfaced(cards: CardService) -> None:
+    repo = _FakeStatsRepo(
+        [
+            _review("m1-s0-c1", "m1-s0", Rating.Good),
+            _review("ghost-1", "m9-s9", Rating.Good),
+            _review("ghost-2", "m8-s8", Rating.Again),
+        ]
+    )
+
+    o = StatsService(reviews=repo, cards=cards).overview("u1")
+
+    assert o.orphan_review_count == 2
 
 
 def test_overview_aggregates_correctly(cards: CardService) -> None:
