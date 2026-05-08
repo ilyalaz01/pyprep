@@ -131,3 +131,28 @@ inconsistency.
 **Resolution:** Added a `(NEW)` task to TODO.md Phase 1 covering
 m1-s6. Phase 1 is not "done" until the validator confirms ≥ 3 cards
 per sub-task across all 7 spheres.
+
+---
+
+## N008 — `PRD_spaced_repetition.md` weights count (17) is FSRS-5; installed library is FSRS-6 (21 params)
+
+**Phase:** 2 (T2.3 prep) · **Date:** 2026-05-08
+
+`PRD_spaced_repetition.md` §2.3 lists `weights` as "FSRS-5 default — the 17
+model weights". The pinned dependency in `pyproject.toml` is `fsrs>=6,<7`
+(FSRS-6), which exposes **21** parameters and a different `Parameters` /
+`Card` / `Rating` API shape than FSRS-5.
+
+**Why it matters:** if the FSRSScheduler wrapper hard-codes a 17-element
+default vector or re-exports FSRS-5 weight types, the `fsrs` 6.x adapter
+will fail at construction.
+
+**Resolution (deferred to T2.3):** when implementing the wrapper, default to
+the library's own `fsrs.Parameters()` / equivalent (whatever FSRS-6 ships
+as its baseline) rather than constructing a literal weight vector ourselves.
+At T2.3 time, decide with owner whether to:
+- (a) keep `fsrs>=6,<7` and update `PRD_spaced_repetition.md` §2.3 to
+  reflect FSRS-6 (21 weights, current shape), or
+- (b) pin to a final FSRS-5 release of the library and leave PRD copy.
+
+Owner-decision flag at the T2.3 checkpoint.
