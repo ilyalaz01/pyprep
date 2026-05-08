@@ -93,7 +93,7 @@
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T2.5.1 | Auth hardening: tighten `secret_key` to ≥32 chars; `password_min_length` setting; reject passwords > 72 bytes (silent bcrypt truncation); `EmailStr` validation. | Tests cover too-short / too-long / boundary password, short secret, bad email | 🟡 |
+| T2.5.1 | Auth hardening: tighten `secret_key` to ≥32 chars; `password_min_length` setting; reject passwords > 72 bytes (silent bcrypt truncation); `EmailStr` validation. | Tests cover too-short / too-long / boundary password, short secret, bad email | ✅ (11 new tests; emoji 19×4=76 byte case included; .env-example updated) |
 | T2.5.2 | Session submit idempotency + transactional `cards_correct` (UNIQUE on (session_id, card_id, idempotency_key); atomic UPDATE not read-modify-write). | Same idempotency_key returns original Review; concurrent threads don't double-count | ⬜ |
 | T2.5.3 | StatsService orphan-review handling: `_module_of` returns `int \| None`; aggregations filter; `Overview.orphan_review_count` surfaces it. | Stats with deleted-content reviews don't crash | ⬜ |
 | T2.5.4 | Validator runs `code_task` solutions via subprocess pytest; `--skip-execution` flag for dev iteration. | Synthesized broken card fails the validator | ⬜ |
