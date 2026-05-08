@@ -140,3 +140,61 @@ def test_main_returns_one_when_violations(
     bad.write_text(json.dumps(data), "utf-8")
     monkeypatch.chdir(tmp_path)
     assert main() == 1
+
+
+# ---------- T2.5.4 — code_task execution gate ----------------------------
+
+_CT_SOLUTION_OK = "def add(a, b):\n    return a + b\n"
+_CT_SOLUTION_BROKEN = "def add(a, b):\n    return a - b  # bug\n"
+_CT_TESTS = (
+    "from solution import add\n\n"
+    "def test_add_basic():\n    assert add(2, 3) == 5\n"
+)
+
+
+def _seed_with_code_task(tmp_path: Path, *, solution: str) -> Path:
+    """Build a minimal valid content/ tree containing one passing flip
+    card AND one code_task card (whose solution we control)."""
+    _seed_fake_content(tmp_path)
+    cards_path = tmp_path / "modules" / "09_test" / "00_test.cards.json"
+    data = json.loads(cards_path.read_text("utf-8"))
+    data["cards"].append(
+        {
+            "id": "m9-s0-c99",
+            "type": "code_task",
+            "topic": "Add two numbers",
+            "difficulty": 1,
+            "tags": ["t"],
+            "prompt_md": "Implement `add(a, b)` returning `a + b`. Twenty chars+.",
+            "starter_code": "def add(a, b):\n    ...\n",
+            "solution_code": solution,
+            "tests": _CT_TESTS,
+        }
+    )
+    cards_path.write_text(json.dumps(data), "utf-8")
+    return tmp_path
+
+
+def test_validator_fails_when_solution_does_not_pass_its_tests(
+    tmp_path: Path,
+) -> None:
+    _seed_with_code_task(tmp_path, solution=_CT_SOLUTION_BROKEN)
+
+    errors = validate(tmp_path)
+
+    assert any(
+        "code_task" in e and "m9-s0-c99" in e for e in errors
+    ), f"expected code_task failure for m9-s0-c99 in {errors!r}"
+
+
+def test_validator_passes_when_solution_passes_its_tests(tmp_path: Path) -> None:
+    _seed_with_code_task(tmp_path, solution=_CT_SOLUTION_OK)
+    assert validate(tmp_path) == []
+
+
+def test_validator_skip_execution_does_not_run_solutions(tmp_path: Path) -> None:
+    """The --skip-execution flag lets dev iteration skip the slow pytest
+    subprocesses. A broken solution must NOT trip the schema gate alone."""
+    _seed_with_code_task(tmp_path, solution=_CT_SOLUTION_BROKEN)
+
+    assert validate(tmp_path, execute_code_tasks=False) == []
