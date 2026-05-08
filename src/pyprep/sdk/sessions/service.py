@@ -19,6 +19,7 @@ from .models import (
     SubmitResult,
 )
 from .protocols import ReviewStore, SessionStore
+from .queue_builder import build_queue
 
 _CORRECT = {Rating.Good, Rating.Easy}
 
@@ -54,7 +55,16 @@ class SessionService:
         limit: int = 20,
         daily_new_card_cap: int = 15,
     ) -> Session:
-        queue = self._build_queue(user_id, mode, sphere_id, limit, daily_new_card_cap)
+        queue = build_queue(
+            cards=self._cards,
+            reviews=self._reviews,
+            user_id=user_id,
+            mode=mode,
+            sphere_id=sphere_id,
+            limit=limit,
+            daily_new_card_cap=daily_new_card_cap,
+            now=self._clock(),
+        )
         session = Session(
             id=self._new_id(),
             user_id=user_id,
@@ -115,49 +125,3 @@ class SessionService:
             cards_correct=session.cards_correct,
             retention=retention,
         )
-
-    def _build_queue(
-        self,
-        user_id: str,
-        mode: SessionMode,
-        sphere_id: str | None,
-        limit: int,
-        daily_new_card_cap: int,
-    ) -> tuple[str, ...]:
-        if mode == "learn":
-            if sphere_id is None:
-                raise ValueError("learn mode requires sphere_id")
-            return tuple(self._new_in_sphere(user_id, sphere_id)[:limit])
-        if mode == "review":
-            ids = self._reviews.due_card_ids(user_id, self._clock(), sphere_id=sphere_id)
-            return tuple(ids[:limit])
-        if mode == "mixed":
-            if sphere_id is None:
-                raise ValueError("mixed mode requires sphere_id")
-            return self._mixed_queue(user_id, sphere_id, limit, daily_new_card_cap)
-        raise ValueError(f"unsupported session mode: {mode}")
-
-    def _new_in_sphere(self, user_id: str, sphere_id: str) -> list[str]:
-        seen = self._reviews.reviewed_card_ids(user_id, sphere_id=sphere_id)
-        return [c.id for c in self._cards.by_sphere(sphere_id) if c.id not in seen]
-
-    def _mixed_queue(
-        self,
-        user_id: str,
-        sphere_id: str,
-        limit: int,
-        daily_new_card_cap: int,
-    ) -> tuple[str, ...]:
-        now = self._clock()
-        new_today = self._reviews.new_cards_seen_today_count(user_id, now.date())
-        new_remaining = max(0, daily_new_card_cap - new_today)
-        new_pool = self._new_in_sphere(user_id, sphere_id)
-        due_pool = self._reviews.due_card_ids(user_id, now, sphere_id=sphere_id)
-        new_take = min(limit // 2, len(new_pool), new_remaining)
-        due_take = min(limit - new_take, len(due_pool))
-        # backfill from the other pool if budget remains
-        remaining = limit - new_take - due_take
-        if remaining and len(new_pool) > new_take and new_remaining > new_take:
-            extra = min(remaining, len(new_pool) - new_take, new_remaining - new_take)
-            new_take += extra
-        return tuple(due_pool[:due_take] + new_pool[:new_take])
