@@ -156,3 +156,28 @@ At T2.3 time, decide with owner whether to:
 - (b) pin to a final FSRS-5 release of the library and leave PRD copy.
 
 Owner-decision flag at the T2.3 checkpoint.
+
+---
+
+## N009 — `CardState.step` is required for round-trip fidelity (not in PRD §2.2)
+
+**Phase:** 2 (T2.3) · **Date:** 2026-05-08
+
+`PRD_spaced_repetition.md` §2.2 lists `CardState` with 7 fields:
+`stability, difficulty, last_review, due, reps, lapses, state`. The
+`fsrs` library's `Card` carries an additional `step: int` field that
+indexes the position inside `learning_steps` (and `relearning_steps`)
+sequences. Without persisting `step`, a round-trip `CardState →
+fsrs.Card → review_card → fsrs.Card → CardState` loses information:
+e.g., a card mid-way through `learning_steps=[1m, 10m]` would always
+restart at step 0 on the next review, doubling the learning sequence.
+
+**Resolution:** added `step: int = 0` to our `CardState`. It is an
+algorithmic implementation detail (FSRS state machine internals), not
+a user-facing field — the REST API `/sessions/.../answer` will accept
+the prior state opaquely, not show `step` in any UI.
+
+**Owner-decision at T2.3 checkpoint:** ratify the field by amending
+PRD §2.2, or rename to `_step` / move into a nested `algo_state` blob
+to preserve the PRD's 7-field public surface. Code currently keeps it
+public on the dataclass for ergonomic reasons (frozen + slots).

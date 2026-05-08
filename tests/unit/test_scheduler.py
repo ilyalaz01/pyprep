@@ -15,8 +15,7 @@ from hypothesis import strategies as st
 
 from pyprep.sdk.scheduler import CardState, FSRSScheduler, Rating
 
-UTC = dt.timezone.utc
-T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=UTC)
+T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=dt.UTC)
 
 
 def test_first_review_produces_card_state(scheduler: FSRSScheduler) -> None:
@@ -144,8 +143,8 @@ def test_again_after_review_transitions_to_relearning(scheduler: FSRSScheduler) 
 
 @given(rating=st.sampled_from(list(Rating)))
 @settings(max_examples=20)
-def test_property_due_after_reviewed_at(scheduler: FSRSScheduler, rating: Rating) -> None:
-    state = scheduler.next_due(prior_state=None, rating=rating, reviewed_at=T0)
+def test_property_due_after_reviewed_at(rating: Rating) -> None:
+    state = FSRSScheduler().next_due(prior_state=None, rating=rating, reviewed_at=T0)
 
     assert state.due > T0
     assert state.reps == 1
