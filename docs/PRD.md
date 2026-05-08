@@ -110,7 +110,7 @@ PyPrep is **shippable** when **all** of the following hold:
 
 - **FR-REVIEW-1:** Daily review queue assembled by FSRS — due cards prioritized by retrievability, then difficulty, then sphere weakness.
 - **FR-REVIEW-2:** "Review now" home action surfaces today's queue size.
-- **FR-REVIEW-3:** Cards rated `Again` re-enter queue at end of session.
+- **FR-REVIEW-3:** Cards rated `Again` re-enter queue at end of session. **Client-side responsibility** (per PLAN ADR-010): the server records each rating event independently as a `Review` row; the SPA owns queue ordering and the re-insertion of AGAIN-rated cards.
 - **FR-REVIEW-4:** New cards introduced gradually — daily new-card cap configurable, default 15.
 
 ### 3.5 Stats & Weakness Detection (FR-STATS)

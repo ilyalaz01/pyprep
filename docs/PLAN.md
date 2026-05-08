@@ -321,6 +321,33 @@ erDiagram
 - UI kits add weight and constrain custom card animations (flip).
 - Tailwind + a small in-house component library is sufficient.
 
+### ADR-010: Stateless session server; client owns queue progression
+
+**Status:** Accepted
+
+**Context:** During a card session, *something* has to track which card the user is currently on, the order of remaining cards, and the FR-REVIEW-3 rule that AGAIN-rated cards re-enter the queue at end of session. Two designs are viable: (a) server-authoritative — `SessionService` owns a mutable in-memory queue per session, every `submit` advances it, every refresh re-fetches the next card; (b) stateless — the server picks the initial queue at `start`, records each `Review` event independently, and the SPA owns progression and re-Again ordering.
+
+**Decision:** Stateless. The server is an event-sink for `Review` rows. The SPA owns queue ordering and the AGAIN-reinsertion loop.
+
+**Rationale:**
+- **Hard Rule 2 thin handlers.** Server-authoritative queues would push handlers past the ~10-LOC budget once you add session-locking, queue-snapshot persistence, and stale-cursor guards.
+- **Single-user MVP.** No adversarial attacker model — there is no incentive for the user to deviate from their assigned queue, and no leaderboard or competitive context where deviation would be cheating.
+- **Trivial crash recovery.** A page refresh re-requests `/api/review/queue` (or re-runs `start`) — no server-side cursor to reconcile.
+- **FR-REVIEW-3 is a "what to show next" concern, not a business invariant.** The truth-of-record is the `Review` row's rating; queue ordering is a UX concern.
+
+**Trade-offs (accepted explicitly):**
+- Clients **can** deviate from the picked-at-start `Session.queue` — submit a card not in the queue, skip cards, etc. Server validates the card_id exists and the session is open; that's it.
+- `mixed` mode (FR-REVIEW-4 daily-new-card cap + FR-STATS-2 weakness-rank input) is the one place this approximation might bite, because the cap should be an authoritative invariant, not a suggestion. Flagged for re-examination once StatsService lands at T2.5 and queue assembly hits real complexity.
+
+**Revisit when:**
+- (a) Multi-user public mode ships and an adversarial attacker model exists.
+- (b) Competitive / leaderboard features need anti-cheat invariants.
+- (c) Audit-trail requirements force "what cards did the user see and in what order".
+
+Until any of these triggers, stateless stays.
+
+---
+
 ### ADR-009: FSRS fuzzing disabled for output determinism
 
 **Status:** Accepted
