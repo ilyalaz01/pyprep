@@ -87,6 +87,23 @@
 
 ---
 
+## Phase 2.5 — Security & Integrity Fixes (post-audit)
+
+**Goal:** address the 5 critical-tier issues + 1 small fix surfaced by the fresh-eyes audit before Phase 3 starts. Each task is TDD per usual; commit-per-step.
+
+| ID | Task | DoD | Status |
+|---|---|---|---|
+| T2.5.1 | Auth hardening: tighten `secret_key` to ≥32 chars; `password_min_length` setting; reject passwords > 72 bytes (silent bcrypt truncation); `EmailStr` validation. | Tests cover too-short / too-long / boundary password, short secret, bad email | ⬜ |
+| T2.5.2 | Session submit idempotency + transactional `cards_correct` (UNIQUE on (session_id, card_id, idempotency_key); atomic UPDATE not read-modify-write). | Same idempotency_key returns original Review; concurrent threads don't double-count | ⬜ |
+| T2.5.3 | StatsService orphan-review handling: `_module_of` returns `int \| None`; aggregations filter; `Overview.orphan_review_count` surfaces it. | Stats with deleted-content reviews don't crash | ⬜ |
+| T2.5.4 | Validator runs `code_task` solutions via subprocess pytest; `--skip-execution` flag for dev iteration. | Synthesized broken card fails the validator | ⬜ |
+| T2.5.5 | Pure refactor: split `sessions/service.py` — extract queue logic to `queue_builder.py`. Both files ≤ 120 LOC. | Tests pass unchanged; LOC budget met | ⬜ |
+| T2.5.6 | Wire `is_single_user` param on AuthService; SDK plumbing only (Phase 3 wires the Settings call). | Constructor accepts `is_single_user`; `register` propagates | ⬜ |
+
+**Phase 2.5 exit gate:** all six tasks ✅; coverage ≥ 85% throughout; push green CI before Phase 3 kickoff.
+
+---
+
 ## Phase 3 — REST API
 
 **Goal:** FastAPI exposes the SDK. OpenAPI docs auto-generated.

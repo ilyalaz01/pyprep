@@ -247,6 +247,84 @@ if self._clock().timestamp() >= exp:
     raise ExpiredTokenError()
 ```
 
+### N013 — NFR-OBS-1 (structured logs) is API-layer, not SDK [Phase 3]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+NFR-OBS-1 says "Structured JSON logs, log levels configurable via env."
+Today this lives nowhere — SDK services have no logging, and there is
+no API layer yet. The audit flagged it as missing. Resolution: clarify
+in PRD when Phase 3 starts that this is an API-layer concern (FastAPI
+middleware + structlog config), not SDK; the SDK is a pure-function
+library and should not log on hot paths. Update PRD §4 NFRs accordingly
+at Phase 3 kickoff.
+
+---
+
+### N014 — `due_card_ids` Python aggregation, switch to SQL window function [Phase 3]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+`ReviewRepository.due_card_ids` loads all of a user's reviews and
+aggregates in Python ("first hit per card_id newest-first"). Acceptable
+for ≤ 5K reviews per user (PRD §3.3); on Postgres, a `ROW_NUMBER() OVER
+(PARTITION BY card_id ORDER BY reviewed_at DESC)` query is the right
+form once we move off SQLite-in-memory tests. The `(user_id, due_at)`
+and `(user_id, card_id, reviewed_at)` indexes are already in place.
+
+**Resolution at Phase 3:** when the FastAPI app first hits a real
+Postgres dev DB, replace the Python aggregation with a window-function
+query. Keep the SQLite path as a fallback for owner local dev mode.
+
+---
+
+### N015 — `User.timezone` field + tz-aware streak() default [Phase 7]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+`StatsService.streak()` accepts `user_tz: str = "UTC"`. The auth `User`
+entity does not carry timezone; callers must pass it explicitly. The
+audit flagged that the streak UI should default to the user's stored
+tz, not UTC. Phase 7 (stats UI) is the natural home — add `timezone:
+str = "UTC"` to `User`, plumb through to streak() default.
+
+---
+
+### N016 — FR-STATS-1 per-tag aggregation [Phase 7]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+PRD progress §3.1 FR-STATS-1 says "Compute per-card, per-task,
+per-sphere, per-module, **per-tag** retention and volume." StatsService
+covers per-card (implicitly), per-sphere, per-module. Per-tag
+aggregation is missing. Phase 7 dashboard work will need it for tag
+filters.
+
+---
+
+### N017 — FR-STATS-3 time-spent aggregation from response_ms [Phase 7]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+`Review.response_ms` is captured per submit but never summed. PRD
+progress §3.1 FR-STATS-3 says "Daily stats: cards reviewed today, time
+spent, accuracy." `time_spent_today_ms` is missing from `DailyStat`.
+Phase 7 stats UI is where this lands.
+
+---
+
+### N018 — FR-CONTENT-5 hot-reload [post-MVP]
+
+**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+
+PRD §3.1 FR-CONTENT-5 says "Content is loaded at server start from
+`content/` directory, cached in memory, **reloaded on file change in
+dev mode**." ContentLoader supports `load()` once; the watcher /
+inotify wiring is post-MVP. Dev workflow is fine via API restart for
+now. Track for the polish pass.
+
+---
+
 ### N012.3 — Surface deferred timing-parity at the call site
 
 Add an inline TODO comment in `login()` body so the deferred N011
