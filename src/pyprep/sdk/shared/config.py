@@ -39,7 +39,12 @@ class Settings(BaseSettings):
     # API layer (T3.1). Comma-separated env (`PYPREP_CORS_ORIGINS=a,b,c`) is
     # split via the validator below — easier than pydantic-settings JSON or
     # `__`-delim list parsing for a small, human-edited list.
-    cors_origins: list[str] = ["http://localhost:5173"]
+    #
+    # Default covers Vite (5173) AND CRA-style (3000) dev ports so an
+    # out-of-the-box `pyprep-api` + `pnpm dev` works with no env wiring.
+    # Production deploys override via PYPREP_CORS_ORIGINS — and per ADR-012
+    # (FastAPI StaticFiles same-origin) CORS is a no-op there anyway.
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 
     @field_validator("cors_origins", mode="before")
     @classmethod

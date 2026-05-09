@@ -89,3 +89,35 @@ def test_password_min_length_must_be_4_to_128() -> None:
         Settings(secret_key="a" * 32, password_min_length=2)  # type: ignore[call-arg]
     with pytest.raises(ValidationError):
         Settings(secret_key="a" * 32, password_min_length=200)  # type: ignore[call-arg]
+
+
+# --- T4.2 unblock: cors_origins default-tightness regression guards ----
+
+
+def test_cors_default_includes_vite_dev_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With no PYPREP_CORS_ORIGINS env var set, an out-of-the-box dev
+    boot must allow the Vite dev server origin. Without this default
+    the SPA can't talk to the API on first launch."""
+    monkeypatch.delenv("PYPREP_CORS_ORIGINS", raising=False)
+    s = Settings(secret_key="a" * 32)  # type: ignore[call-arg]
+    assert "http://localhost:5173" in s.cors_origins
+
+
+def test_cors_origins_never_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Defends against a future 'clean up the default' edit that
+    accidentally turns CORS into a deny-all on dev startup."""
+    monkeypatch.delenv("PYPREP_CORS_ORIGINS", raising=False)
+    s = Settings(secret_key="a" * 32)  # type: ignore[call-arg]
+    assert len(s.cors_origins) >= 1
+
+
+def test_cors_default_includes_cra_dev_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover the CRA-style 3000 port too — the broader 'works out of the
+    box' contract isn't Vite-specific."""
+    monkeypatch.delenv("PYPREP_CORS_ORIGINS", raising=False)
+    s = Settings(secret_key="a" * 32)  # type: ignore[call-arg]
+    assert "http://localhost:3000" in s.cors_origins
