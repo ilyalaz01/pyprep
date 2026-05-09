@@ -106,6 +106,12 @@ PyPrep is **shippable** when **all** of the following hold:
 - **FR-CARD-5:** Code task: editable code editor with Pyodide, hidden `pytest` harness, "Run tests" button, real-time test result feedback.
 - **FR-CARD-6:** All card outcomes feed into FSRS scheduler and per-sphere/per-tag stats.
 
+> **Renderer note:** "Hidden" answer fields (`tests`, `solution_code`,
+> `correct_index`, flip-card backs) are masked by the UI but reach the
+> browser on the wire — see `PRD_code_sandbox.md` §3.1 (Visibility
+> model) for the full architectural trade-off. Renderers MUST mask;
+> they MUST NOT assume server-side redaction.
+
 ### 3.4 Smart Review (FR-REVIEW)
 
 - **FR-REVIEW-1:** Daily review queue assembled by FSRS — due cards prioritized by retrievability, then difficulty, then sphere weakness.

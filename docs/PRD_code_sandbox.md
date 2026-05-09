@@ -31,8 +31,15 @@ PyPrep takes approach **2**. See `PLAN.md` ADR-001 for rationale: zero attack su
 
 - **NFR-SBX-1:** Initial Pyodide load ≤ 6 seconds on a 50 Mbps connection.
 - **NFR-SBX-2:** Subsequent test runs ≤ 1 second each.
-- **NFR-SBX-3:** Memory footprint of Pyodide alone < 80 MB.
-- **NFR-SBX-4:** Pyodide assets served from CDN with version pinned (no auto-upgrade).
+- **NFR-SBX-3:** Initial download (compressed) ≤ 80 MB. In-memory
+  footprint of a loaded Pyodide instance with `pytest` is
+  ~150–250 MB RSS — acceptable on desktop browsers; mobile is out of
+  scope (see PRD §5 Out of Scope).
+- **NFR-SBX-4:** Pyodide assets served from CDN with version pinned
+  (no auto-upgrade). Self-hosted fallback is **post-MVP**; CDN
+  outages will visibly fail code-task cards in MVP-1. Pinned-version
+  source of truth: `VITE_PYODIDE_VERSION` in `.env-example`
+  (currently `0.26.4`).
 
 ### 2.3 Security
 
@@ -61,7 +68,24 @@ A `code_task` card includes:
 }
 ```
 
-The `tests` field is **not shown** to the user.
+The `tests` field is **not shown** to the user (see §3.1 below for the
+full visibility model).
+
+### 3.1 Visibility model
+
+The fields `tests`, `solution_code`, `correct_index`, and flip-card
+answers are **not shown by the SPA renderer to the user**. This is a
+**UI convention, NOT a server-side security boundary.** ADR-001
+(Pyodide client-side execution) requires `hidden_tests` to reach the
+browser — which means a DevTools-equipped user can read them off the
+wire. This is an explicit, accepted trade-off of the architecture: the
+platform optimizes for low operational cost over leak-proofing card
+answers.
+
+Renderers MUST mask these fields in the rendered UI (so the lazy 95 %
+don't see them); they MUST NOT assume the server redacted them. The
+`/api/sessions/{id}/next` and `/api/modules/{id}/lesson/{sphere_id}`
+endpoints serve `card.raw` (full JSON) by design.
 
 ---
 
@@ -92,11 +116,16 @@ export interface RunResult {
 export async function runCodeTask(
   user_code: string,
   hidden_tests: string,
+  allowlist: string[],
   options?: { timeout_ms?: number }
 ): Promise<RunResult>;
 ```
 
-The runner is the only export the rest of the frontend uses. Pyodide details are encapsulated.
+The runner is the only export the rest of the frontend uses. Pyodide
+details are encapsulated. `(user_code, hidden_tests, allowlist)` are
+treated as orthogonal inputs — the worker MUST NOT reach into card
+metadata or fetch them itself. The SPA's `CodeTaskCard` component is
+responsible for reading `card.raw.allowlist` and passing it through.
 
 ---
 
@@ -129,6 +158,13 @@ postMessage({result})
        v
 Main thread renders TestResult[]
 ```
+
+**Worker lifecycle (binding):** The worker is **reused** across all
+code-task executions in a session; per-task namespace reset is the
+isolation boundary, not worker termination. Termination occurs only on
+timeout (FR-SBX-4) or worker crash. Reuse is required to meet NFR-SBX-2
+(≤ 1 s subsequent runs) — terminating per task would force a fresh
+Pyodide load each time and trip NFR-SBX-1.
 
 ### 5.2 Files
 
@@ -188,10 +224,10 @@ Setup:  PYODIDE_VERSION (semver), PYODIDE_CDN_URL (str), DEFAULT_TIMEOUT_MS (int
 
 | Risk | Mitigation |
 |---|---|
-| Pyodide CDN outage | Self-host the version pinned to a static asset, fall back automatically. |
+| Pyodide CDN outage | Self-host the version pinned to a static asset, fall back automatically. **[post-MVP, Phase 10 polish]** |
 | Pyodide version drift breaks pinned harness | CI runs harness against the pinned version on every PR. |
 | User pastes 5 MB of code, freezes worker | Input length check before postMessage. |
-| `pytest` fixtures from one task contaminate next | Worker terminated after each task. |
+| `pytest` fixtures from one task contaminate next | Worker namespace reset between tasks; worker terminated only on timeout or unrecoverable error (see §5.1). |
 
 ---
 
