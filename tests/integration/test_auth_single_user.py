@@ -14,17 +14,21 @@ import pytest
 
 from pyprep.sdk.shared.config import Settings
 
+from .conftest import init_schema, with_lifespan
+
 
 def _single_user_settings(tmp_path) -> Settings:
     db_path = tmp_path / "single_user.db"
-    return Settings(
+    settings = Settings(
         secret_key="x" * 48,
         database_url=f"sqlite:///{db_path}",
-        cors_origins_raw="http://localhost:5173",
+        cors_origins=["http://localhost:5173"],
         single_user=True,
         single_user_email="owner@local.dev",
         single_user_password="owner-password-12345",
     )
+    init_schema(settings)
+    return settings
 
 
 @pytest.mark.asyncio
@@ -34,7 +38,9 @@ async def test_register_returns_404_in_single_user_mode(tmp_path) -> None:
     settings = _single_user_settings(tmp_path)
     app = create_app(settings)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+    async with with_lifespan(app), httpx.AsyncClient(
+        transport=transport, base_url="http://t"
+    ) as c:
         r = await c.post(
             "/api/auth/register",
             json={"email": "anyone@example.com", "password": "anything12345"},
@@ -50,7 +56,9 @@ async def test_single_user_owner_is_auto_created_at_startup(tmp_path) -> None:
     settings = _single_user_settings(tmp_path)
     app = create_app(settings)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+    async with with_lifespan(app), httpx.AsyncClient(
+        transport=transport, base_url="http://t"
+    ) as c:
         r = await c.post(
             "/api/auth/login",
             json={
@@ -71,7 +79,9 @@ async def test_single_user_startup_is_idempotent_on_second_boot(tmp_path) -> Non
     settings = _single_user_settings(tmp_path)
     app1 = create_app(settings)
     transport = httpx.ASGITransport(app=app1)
-    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+    async with with_lifespan(app1), httpx.AsyncClient(
+        transport=transport, base_url="http://t"
+    ) as c:
         r1 = await c.post(
             "/api/auth/login",
             json={"email": "owner@local.dev", "password": "owner-password-12345"},
@@ -81,7 +91,9 @@ async def test_single_user_startup_is_idempotent_on_second_boot(tmp_path) -> Non
     # Second boot against the same DB file
     app2 = create_app(settings)
     transport2 = httpx.ASGITransport(app=app2)
-    async with httpx.AsyncClient(transport=transport2, base_url="http://t") as c:
+    async with with_lifespan(app2), httpx.AsyncClient(
+        transport=transport2, base_url="http://t"
+    ) as c:
         r2 = await c.post(
             "/api/auth/login",
             json={"email": "owner@local.dev", "password": "owner-password-12345"},

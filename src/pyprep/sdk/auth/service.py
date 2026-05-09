@@ -37,6 +37,7 @@ from .models import (
 from .protocol import UserStore
 
 _BCRYPT_MAX_BYTES = 72  # bcrypt silently truncates at this length
+_BCRYPT_ROUNDS = 12  # N012.1: pinned cost factor; bcrypt's default may drift
 _EMAIL_VALIDATOR = TypeAdapter(EmailStr)
 
 
@@ -90,7 +91,7 @@ class AuthService:
         validated_email = _validate_email(email)
         _validate_password(password, self._password_min_length)
         password_hash = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt()
+            password.encode("utf-8"), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
         ).decode("utf-8")
         user = User(
             id=self._new_id(),
@@ -104,6 +105,8 @@ class AuthService:
 
     def login(self, email: str, password: str) -> AccessToken:
         user = self._users.get_by_email(email)
+        # TODO(public-mode): add dummy bcrypt.checkpw on the unknown-email
+        # branch for timing parity (anti-enumeration). See NOTES N011.
         if user is None or not bcrypt.checkpw(
             password.encode("utf-8"), user.password_hash.encode("utf-8")
         ):
@@ -139,6 +142,8 @@ class AuthService:
         except JWTError as e:
             raise InvalidTokenError() from e
         exp = payload.get("exp")
-        if isinstance(exp, int) and self._clock().timestamp() >= exp:
+        if not isinstance(exp, int):
+            raise InvalidTokenError()  # N012.2: malformed/missing exp
+        if self._clock().timestamp() >= exp:
             raise ExpiredTokenError()
         return payload

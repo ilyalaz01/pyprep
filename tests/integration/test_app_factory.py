@@ -27,7 +27,7 @@ async def test_health_db_ok_false_when_db_unreachable(tmp_path) -> None:
     bad = Settings(
         secret_key="x" * 48,
         database_url=f"sqlite:////{tmp_path}",  # path is a directory
-        cors_origins_raw="http://localhost:5173",
+        cors_origins=["http://localhost:5173"],
     )
     app = create_app(bad)
     transport = httpx.ASGITransport(app=app)
@@ -77,7 +77,7 @@ def test_sqlite_pragma_foreign_keys_on_per_connection(tmp_path) -> None:
     settings = Settings(
         secret_key="x" * 48,
         database_url=f"sqlite:///{tmp_path / 'fk.db'}",
-        cors_origins_raw="http://localhost:5173",
+        cors_origins=["http://localhost:5173"],
     )
     engine = create_engine_for(settings)
     with engine.connect() as conn1:
@@ -98,7 +98,7 @@ def test_openapi_docs_reachable_at_api_docs() -> None:
     settings = Settings(
         secret_key="x" * 48,
         database_url="sqlite:///:memory:",
-        cors_origins_raw="http://localhost:5173",
+        cors_origins=["http://localhost:5173"],
     )
     with TestClient(create_app(settings)) as c:
         r = c.get("/api/docs")

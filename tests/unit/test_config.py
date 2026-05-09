@@ -36,6 +36,7 @@ def test_missing_secret_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_loads_from_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PYPREP_SECRET_KEY", "from-env-padded-to-thirtytwo-chars!")
     monkeypatch.setenv("PYPREP_SINGLE_USER", "true")
+    monkeypatch.setenv("PYPREP_SINGLE_USER_PASSWORD", "owner-pw-12345")  # T3.2
     monkeypatch.setenv("PYPREP_DAILY_NEW_CARD_CAP", "42")
     monkeypatch.setenv("PYPREP_DATABASE_URL", "postgresql://localhost/pyprep")
     monkeypatch.setenv("PYPREP_LOG_LEVEL", "DEBUG")
@@ -44,6 +45,8 @@ def test_loads_from_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert s.secret_key == "from-env-padded-to-thirtytwo-chars!"
     assert s.single_user is True
+    assert s.single_user_password is not None
+    assert s.single_user_password.get_secret_value() == "owner-pw-12345"
     assert s.daily_new_card_cap == 42
     assert s.database_url == "postgresql://localhost/pyprep"
     assert s.log_level == "DEBUG"
