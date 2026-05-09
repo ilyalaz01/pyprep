@@ -1,109 +1,22 @@
 /**
  * Typed API client — one function per backend route, hand-typed against
- * the OpenAPI surface at `/api/openapi.json`.
+ * the OpenAPI surface at `/api/openapi.json`. Types live in `./types.ts`.
  *
- * Hand-typing > codegen at MVP scale (15 endpoints, small contract):
+ * Hand-typing > codegen at MVP scale (16 endpoints, small contract):
  * compile-time errors fire the moment the backend contract drifts, with
  * no build step in the loop. Re-evaluate at Phase 10 if endpoint count
  * grows past ~30.
  *
  * Auth tags reflect `PLAN.md` §7: PUBLIC = no Authorization header
- * required (modules + health); Bearer = `Authorization: Bearer <jwt>`
- * required (everything else).
+ * required (config, modules, health); Bearer = `Authorization: Bearer
+ * <jwt>` required (everything else).
  */
 import { call } from './http'
-
-// --- Health (PUBLIC) ----------------------------------------------------
-export interface Health {
-  status: string
-  version: string
-  db_ok: boolean
-}
-
-// --- Auth ---------------------------------------------------------------
-export interface User {
-  id: string
-  email: string
-  created_at: string
-}
-export interface AccessToken {
-  access_token: string
-  token_type: 'bearer'
-  expires_at: string
-}
-
-// --- Modules (PUBLIC) ---------------------------------------------------
-export interface ModuleSummary { module_id: number; sphere_ids: string[] }
-export interface ModulesList { modules: ModuleSummary[] }
-export interface SphereSummary {
-  sphere_id: string
-  card_count: number
-  lesson_present: boolean
-}
-export interface ModuleDetail {
-  module_id: number
-  sphere_ids: string[]
-  spheres: SphereSummary[]
-}
-export interface Lesson {
-  sphere_id: string
-  module_id: number
-  lesson_md: string
-  card_count: number
-}
-
-// --- Sessions -----------------------------------------------------------
-export type SessionMode = 'learn' | 'review' | 'mixed'
-export interface Session {
-  id: string
-  user_id: string
-  mode: string
-  queue: string[]
-  started_at: string
-  ended_at: string | null
-  cards_total: number
-  cards_correct: number
-}
-export interface NextCard {
-  card_id: string
-  type: string
-  topic: string
-  difficulty: number
-  sphere_id: string
-  raw: Record<string, unknown>
-}
-export interface AnswerResult { next_due_at: string; new_state: string }
-export interface SessionSummary {
-  cards_total: number
-  cards_correct: number
-  retention: number
-}
-
-// --- Review queue -------------------------------------------------------
-export interface ReviewQueue { card_ids: string[]; sphere_id: string | null }
-
-// --- Stats --------------------------------------------------------------
-export interface Overview {
-  reviews_total: number
-  retention: number
-  streak: number
-  xp: number
-  orphan_review_count: number
-}
-export interface SphereStats {
-  sphere_id: string
-  reviews_total: number
-  retention: number
-  weakness: number
-}
-export interface Weakness { top: SphereStats[] }
-
-// --- Mock prompt --------------------------------------------------------
-export interface MockPrompt {
-  text: string
-  cards_used: string[]
-  estimated_minutes: number
-}
+import type {
+  AccessToken, AnswerResult, Config, Health, Lesson, MockPrompt,
+  ModuleDetail, ModulesList, NextCard, Overview, ReviewQueue, Session,
+  SessionMode, SessionSummary, User, Weakness,
+} from './types'
 
 function qs(params: Record<string, string | number | undefined>): string {
   const u = new URLSearchParams()
@@ -121,6 +34,7 @@ const post = (body?: unknown): RequestInit => ({
 
 export const api = {
   health: () => call<Health>('/api/health'),
+  config: () => call<Config>('/api/config'),
 
   auth: {
     register: (email: string, password: string) =>

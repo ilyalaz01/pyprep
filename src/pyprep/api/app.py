@@ -33,6 +33,7 @@ from .lifespan import lifespan
 from .log_config import configure_logging
 from .middleware import AuthNoStoreMiddleware, RequestLoggingMiddleware
 from .routers import auth as auth_router
+from .routers import config as config_router
 from .routers import health as health_router
 from .routers import mock as mock_router
 from .routers import modules as modules_router
@@ -110,6 +111,7 @@ def create_app(settings: Settings) -> FastAPI:
     install_error_handlers(app, mappings={**AUTH_ERROR_MAPPINGS, **SESSION_ERROR_MAPPINGS})
 
     app.include_router(health_router.router, prefix="/api")
+    app.include_router(config_router.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")
     app.include_router(modules_router.router, prefix="/api")
     app.include_router(review_router.router, prefix="/api")

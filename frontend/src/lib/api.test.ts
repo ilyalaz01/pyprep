@@ -37,6 +37,25 @@ describe('api.health', () => {
   })
 })
 
+describe('api.config', () => {
+  test('GET /api/config → {single_user, version, single_user_email}', async () => {
+    mockJson({
+      single_user: true,
+      version: '1.00',
+      single_user_email: 'owner@local.dev',
+    })
+    const r = await api.config()
+    expect(r.single_user).toBe(true)
+    expect(r.single_user_email).toBe('owner@local.dev')
+  })
+
+  test('multi-user mode returns single_user_email=null', async () => {
+    mockJson({ single_user: false, version: '1.00', single_user_email: null })
+    const r = await api.config()
+    expect(r.single_user_email).toBeNull()
+  })
+})
+
 describe('api.auth', () => {
   test('register POSTs /api/auth/register with body', async () => {
     mockJson({ id: 'u1', email: 'a@b.com', created_at: '2026-05-09T00:00:00Z' }, 201)

@@ -499,9 +499,19 @@ is in single-user mode so it can either skip the login screen entirely
    silently drifts.
 
 **Decision:** Option (1) — add `GET /api/config` as a PUBLIC endpoint
-(no auth required). Returns only `{single_user: bool, version: str}`
-— no other settings leak (in particular no `single_user_email`, since
-that would let a public attacker enumerate the owner's account).
+(no auth required). Response shape:
+
+```
+{ single_user: bool, version: str, single_user_email: str | null }
+```
+
+`single_user_email` is **only** populated when `single_user=true`; it
+is `null` in multi-user deployments. The field is needed because the
+SPA pre-fills (and disables) the email input in single-user mode per
+the T4.2 spec — the owner already knows their own email, and a
+single-user deployment by definition has no enumeration surface
+(there is exactly one possible user, so revealing it tells an
+attacker only what they could guess from the deployment hostname).
 
 **Rationale:**
 - Keeps backend as the source of truth; frontend cannot drift.
@@ -519,11 +529,10 @@ that would let a public attacker enumerate the owner's account).
   Anything in `/api/config` is observable to anonymous callers and
   must stay public-safe forever.
 
-**Single-user-email is NOT exposed.** The SPA's pre-fill in single-user
-mode uses `single_user_email` only when the user already has a token
-(authenticated boot path). For the no-token boot path, the email field
-is shown empty + disabled with a "single-user deployment — contact the
-owner for credentials" hint. The email itself never leaks publicly.
+**Multi-user mode preserves anti-enumeration.** When `single_user=false`,
+`single_user_email` is `null` — the public endpoint exposes only
+`single_user` (false) and `version`. Multi-user enumeration via
+`/api/config` is not possible.
 
 ---
 
@@ -553,6 +562,7 @@ POST   /api/mock/prompt                    # auth: Bearer    body: {modules, sph
                                            #                 returns: {text, cards_used, ...}
 
 GET    /api/health                         # auth: PUBLIC    smoke: {status, version, db_ok}
+GET    /api/config                         # auth: PUBLIC    {single_user, version, single_user_email | null} (ADR-014)
 ```
 
 **Auth-tag legend.** *PUBLIC* = no Authorization header required;
