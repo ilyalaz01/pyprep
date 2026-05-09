@@ -40,8 +40,11 @@ class ModuleDetail(BaseModel):
 class LessonResponse(BaseModel):
     sphere_id: str
     module_id: int
-    lesson_md: str
+    lesson_md: str  # body only; YAML frontmatter parsed into the lesson_* fields below
     card_count: int
+    lesson_title: str | None = None
+    lesson_estimated_minutes: int | None = None
+    lesson_tags: list[str] = []
 
 
 @router.get("", response_model=ModulesResponse)
@@ -78,12 +81,7 @@ def get_lesson(
     sphere = index.spheres.get(sphere_id)
     if sphere is None or sphere.module_id != module_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="lesson not found")
-    return LessonResponse(
-        sphere_id=sphere_id,
-        module_id=module_id,
-        lesson_md=sphere.lesson_md,
-        card_count=len(sphere.cards),
-    )
+    return _to_lesson_response(sphere, module_id, sphere_id)
 
 
 def _to_sphere_summary(index: ContentIndex, sphere_id: str) -> SphereSummary:
@@ -92,4 +90,15 @@ def _to_sphere_summary(index: ContentIndex, sphere_id: str) -> SphereSummary:
         sphere_id=sphere_id,
         card_count=len(sphere.cards),
         lesson_present=bool(sphere.lesson_md),
+    )
+
+
+def _to_lesson_response(sphere, module_id: int, sphere_id: str) -> LessonResponse:  # type: ignore[no-untyped-def]
+    meta = sphere.lesson_meta
+    return LessonResponse(
+        sphere_id=sphere_id, module_id=module_id, lesson_md=sphere.lesson_md,
+        card_count=len(sphere.cards),
+        lesson_title=meta.title if meta else None,
+        lesson_estimated_minutes=meta.estimated_minutes if meta else None,
+        lesson_tags=list(meta.tags) if meta else [],
     )

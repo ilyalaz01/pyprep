@@ -552,3 +552,32 @@ the broader hot-reload requirement (PRD §3.1 FR-CONTENT-5). Both are
 the same Phase-post-MVP item — merged into N018's scope rather than
 tracked separately. The endpoint shape decision (`/admin/reload` vs.
 inotify watcher vs. SIGHUP handler) is left to whoever picks up N018.
+
+---
+
+## N029 — Content emoji lint in `validate-content` [CLOSED, T4.5.3]
+
+**Phase:** 4 (T4.5.3) · **Date:** 2026-05-09 · **Status:** added + closed
+
+The Module 1 lessons shipped with decorative emoji (`⚠️`, `🤯`, `😱`) in
+section headers and code-comment captions. Per PRODUCT.md principle 1
+(honest signaling > motivational theatre) and the T4.5 anti-AI-slop
+spec, these don't belong in PyPrep's tone register.
+
+**Resolution:**
+1. Stripped the emoji from `content/modules/01_python_core_oop/00_fundamentals.md`.
+   Replacements: `# ⚠️ TRAP` → `# TRAP — common interview pitfall`;
+   trailing `😱` after a print result → just the result; section heading
+   `## Concept 2 — ⚠️` → drop the glyph; the heading carries the signal.
+2. Added `_check_no_emoji(root)` to `pyprep.tools.validate_content` —
+   greps every `.md` and `.json` file under `content/modules/` for
+   characters in the Unicode emoji + miscellaneous-symbols ranges
+   (`\U0001F300-\U0001FAFF`, `☀-➿`). Fails the validator with a
+   per-line error citing N029.
+3. 3 regression tests pin: lesson with emoji → fails; clean lesson → passes;
+   emoji in card JSON → fails (the wrappers are content too).
+
+**If a future card legitimately needs an emoji glyph** (e.g. a lesson
+about the `🐍` Unicode codepoint), grant a per-line waiver via a NOTES
+amendment and update `_check_no_emoji` to skip it. Do not relax the
+rule globally.

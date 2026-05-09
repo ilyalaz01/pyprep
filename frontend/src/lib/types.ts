@@ -53,8 +53,11 @@ export interface ModuleDetail {
 export interface Lesson {
   sphere_id: string
   module_id: number
-  lesson_md: string
+  lesson_md: string  // body only — frontmatter parsed into the lesson_* fields
   card_count: number
+  lesson_title: string | null
+  lesson_estimated_minutes: number | null
+  lesson_tags: string[]
 }
 
 // --- Sessions -----------------------------------------------------------

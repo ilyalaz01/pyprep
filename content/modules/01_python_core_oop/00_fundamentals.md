@@ -48,17 +48,17 @@ The tuple-vs-list question is interview gold: *"Why would you choose a tuple ove
 
 ---
 
-## Concept 2 — The Mutable Default Argument Trap ⚠️
+## Concept 2 — The Mutable Default Argument Trap
 
 This is the single most-asked Python interview question.
 
 ```python
-def add_item(item, items=[]):       # ⚠️  TRAP
+def add_item(item, items=[]):       # TRAP — common interview pitfall
     items.append(item)
     return items
 
 print(add_item("a"))    # ['a']
-print(add_item("b"))    # ['a', 'b']    😱
+print(add_item("b"))    # ['a', 'b']
 ```
 
 **Why this happens:** `items=[]` is evaluated *once*, when the function is defined. The same list object becomes the default for every call. Every call that doesn't pass `items` mutates the same shared list.
@@ -79,11 +79,11 @@ This trap also applies to **class attributes that are mutable**:
 
 ```python
 class Cart:
-    items = []          # ⚠️ class-level mutable — shared across ALL Cart instances
+    items = []          # class-level mutable — shared across ALL Cart instances
 
 a = Cart(); a.items.append("apple")
 b = Cart()
-print(b.items)          # ['apple']      😱
+print(b.items)          # ['apple']
 ```
 
 The fix: assign mutable state inside `__init__`, not at class level.

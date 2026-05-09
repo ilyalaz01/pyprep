@@ -36,8 +36,14 @@ function mockLesson(builder: () => Response | Promise<Response>) {
   )
 }
 
-function lessonOk(lesson_md: string, card_count = 5) {
-  return jsonResponse({ sphere_id: 'm1-s0', module_id: 1, lesson_md, card_count })
+function lessonOk(lesson_md: string, card_count = 5, extras: Record<string, unknown> = {}) {
+  return jsonResponse({
+    sphere_id: 'm1-s0', module_id: 1, lesson_md, card_count,
+    lesson_title: 'Foundations & Hidden Python Traps',
+    lesson_estimated_minutes: 12,
+    lesson_tags: ['python-core', 'gotchas'],
+    ...extras,
+  })
 }
 
 beforeEach(() => setToken('eyJ.test.token'))
@@ -68,6 +74,37 @@ describe('LessonPage — happy path', () => {
     expect(await screen.findByRole('heading', { name: /a heading/i })).toBeInTheDocument()
     expect(screen.getByText('inline code')).toBeInTheDocument()
     expect(screen.getByText(/def add\(a, b\):/)).toBeInTheDocument()
+  })
+
+  test('H1 reads from lesson_title (not the technical sphere_id)', async () => {
+    mockLesson(() => lessonOk(SAMPLE_MD))
+    renderAt('/modules/1/lesson/m1-s0')
+    const h1 = await screen.findByRole('heading', {
+      level: 1, name: /Foundations & Hidden Python Traps/,
+    })
+    expect(h1).toBeInTheDocument()
+  })
+
+  test('breadcrumb shows lowercase sphere_id (no uppercase CSS)', async () => {
+    mockLesson(() => lessonOk(SAMPLE_MD))
+    renderAt('/modules/1/lesson/m1-s0')
+    const crumb = await screen.findByText(/Module 1 · m1-s0/)
+    expect(crumb.className).not.toMatch(/uppercase/)
+  })
+
+  test('"N min read" subtitle shows when estimated_minutes is present', async () => {
+    mockLesson(() => lessonOk(SAMPLE_MD))
+    renderAt('/modules/1/lesson/m1-s0')
+    expect(await screen.findByText(/12 min read/)).toBeInTheDocument()
+  })
+
+  test('falls back to sphere_id in H1 when title is missing (defensive)', async () => {
+    mockLesson(() =>
+      lessonOk(SAMPLE_MD, 5, { lesson_title: null, lesson_estimated_minutes: null }),
+    )
+    renderAt('/modules/1/lesson/m1-s0')
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'm1-s0' })
+    expect(h1).toBeInTheDocument()
   })
 
   test('Start review session button renders enabled when card_count > 0', async () => {

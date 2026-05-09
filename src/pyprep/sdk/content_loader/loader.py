@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import jsonschema
+import yaml
 
-from .index import Card, ContentIndex, SphereContent
+from .index import Card, ContentIndex, LessonMeta, SphereContent
+
+_FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n?(.*)$", re.DOTALL)
 
 _DEFAULT_SCHEMA = "schema/card.schema.json"
 _MODULES_DIR = "modules"
@@ -53,11 +57,13 @@ class ContentLoader:
                 _build_card(c, sphere_id, module_id, path, schema)
                 for c in wrapper.get("cards", [])
             )
+            body, meta = _read_lesson(path)
             out[sphere_id] = SphereContent(
                 sphere_id=sphere_id,
                 module_id=module_id,
                 cards=cards,
-                lesson_md=_read_lesson(path),
+                lesson_md=body,
+                lesson_meta=meta,
             )
         return out
 
@@ -86,10 +92,41 @@ def _build_card(
     )
 
 
-def _read_lesson(cards_path: Path) -> str:
+def _read_lesson(cards_path: Path) -> tuple[str, LessonMeta | None]:
+    """Read lesson .md, split off YAML frontmatter, return (body, meta).
+
+    Frontmatter format (Jekyll/Hugo style):
+        ---
+        title: "..."
+        estimated_minutes: 12
+        tags: [a, b]
+        ---
+        # markdown body…
+    """
     stem = cards_path.name.removesuffix(".cards.json")
     lesson_path = cards_path.with_name(f"{stem}.md")
-    return lesson_path.read_text("utf-8") if lesson_path.exists() else ""
+    if not lesson_path.exists():
+        return "", None
+    raw = lesson_path.read_text("utf-8")
+    m = _FRONTMATTER_RE.match(raw)
+    if not m:
+        return raw, None
+    fm_text, body = m.group(1), m.group(2).lstrip("\n")
+    try:
+        fm = yaml.safe_load(fm_text) or {}
+    except yaml.YAMLError:
+        return raw, None  # malformed frontmatter — render as-is
+    if not isinstance(fm, dict):
+        return raw, None
+    meta = LessonMeta(
+        title=fm.get("title") if isinstance(fm.get("title"), str) else None,
+        title_ru=fm.get("title_ru") if isinstance(fm.get("title_ru"), str) else None,
+        estimated_minutes=fm.get("estimated_minutes")
+            if isinstance(fm.get("estimated_minutes"), int) else None,
+        tags=tuple(t for t in fm.get("tags", []) if isinstance(t, str)),
+        prerequisites=tuple(p for p in fm.get("prerequisites", []) if isinstance(p, str)),
+    )
+    return body, meta
 
 
 def _index_cards_unique(spheres: dict[str, SphereContent]) -> dict[str, Card]:

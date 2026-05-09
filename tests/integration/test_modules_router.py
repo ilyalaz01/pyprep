@@ -85,6 +85,35 @@ async def test_get_lesson_returns_markdown(client: httpx.AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_lesson_response_excludes_frontmatter_from_body(
+    client: httpx.AsyncClient,
+) -> None:
+    """T4.5.1 — YAML frontmatter MUST be parsed out of lesson_md and
+    surfaced in dedicated fields. The body the SPA renders shouldn't
+    contain raw `module_id:` / `sphere_id:` / `title:` lines."""
+    r = await client.get("/api/modules/1/lesson/m1-s0")
+    assert r.status_code == 200
+    body = r.json()
+    md = body["lesson_md"]
+    assert "module_id:" not in md, "frontmatter leaked into lesson_md"
+    assert "sphere_id:" not in md
+    assert not md.lstrip().startswith("---")
+
+
+@pytest.mark.asyncio
+async def test_lesson_response_exposes_frontmatter_fields(
+    client: httpx.AsyncClient,
+) -> None:
+    """The H1, "N min read" subtitle, and tag chips read from these."""
+    r = await client.get("/api/modules/1/lesson/m1-s0")
+    body = r.json()
+    assert body["lesson_title"]
+    assert isinstance(body["lesson_estimated_minutes"], int)
+    assert body["lesson_estimated_minutes"] > 0
+    assert isinstance(body["lesson_tags"], list)
+
+
+@pytest.mark.asyncio
 async def test_get_lesson_unknown_sphere_returns_404(client: httpx.AsyncClient) -> None:
     r = await client.get("/api/modules/1/lesson/m1-s999")
     assert r.status_code == 404

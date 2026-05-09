@@ -28,13 +28,24 @@ export function LessonPage() {
     retry: false,
   })
 
+  // T4.5.1: H1 reads from frontmatter title (sphere_id is the technical
+  // address shown in the breadcrumb, NOT the human label).
+  // T4.5.2: breadcrumb keeps natural lowercase case (no `uppercase` CSS).
+  const h1 = lesson.data?.lesson_title ?? sphereId
+  const minutes = lesson.data?.lesson_estimated_minutes ?? null
+
   return (
     <section className="mx-auto max-w-[680px] px-6 py-10">
       <header className="mb-8 space-y-1">
-        <p className="text-xs uppercase tracking-wide text-[color:var(--color-fg-subtle)]">
+        <p className="text-xs tracking-wide text-[color:var(--color-fg-subtle)]">
           Module {id} · {sphereId}
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">{sphereId}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{h1}</h1>
+        {minutes !== null && (
+          <p className="text-sm text-[color:var(--color-fg-subtle)]">
+            {minutes} min read
+          </p>
+        )}
       </header>
 
       {lesson.isLoading && <LessonSkeleton />}

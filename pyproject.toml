@@ -132,3 +132,8 @@ python_version = "3.11"
 strict = true
 files = ["src/pyprep/sdk", "src/pyprep/api"]
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20260508",
+]

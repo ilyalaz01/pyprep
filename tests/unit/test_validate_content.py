@@ -198,3 +198,38 @@ def test_validator_skip_execution_does_not_run_solutions(tmp_path: Path) -> None
     _seed_with_code_task(tmp_path, solution=_CT_SOLUTION_BROKEN)
 
     assert validate(tmp_path, execute_code_tasks=False) == []
+
+
+# --- T4.5.3 / N029: emoji content-lint regression guards ---------------
+
+
+def _seed_with_lesson_text(tmp_path: Path, lesson_text: str) -> Path:
+    """Seed valid content + a lesson .md file with custom body."""
+    _seed_fake_content(tmp_path)
+    sphere_dir = tmp_path / "modules" / "09_test"
+    (sphere_dir / "00_test.md").write_text(lesson_text, "utf-8")
+    return tmp_path
+
+
+def test_emoji_lint_flags_decorative_glyphs_in_lessons(tmp_path: Path) -> None:
+    _seed_with_lesson_text(tmp_path, "## Concept ⚠️\n\nBody with 🚀 launch.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("emoji" in e and "N029" in e for e in errors), errors
+
+
+def test_emoji_lint_passes_clean_lesson(tmp_path: Path) -> None:
+    _seed_with_lesson_text(tmp_path, "## Concept\n\nBody, no decorations.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert all("emoji" not in e for e in errors)
+
+
+def test_emoji_lint_flags_emoji_in_card_json(tmp_path: Path) -> None:
+    """Card JSON wrappers are also content — same rule applies."""
+    _seed_fake_content(tmp_path)
+    cards_path = tmp_path / "modules" / "09_test" / "00_test.cards.json"
+    cards_path.write_text(
+        cards_path.read_text("utf-8").replace('"Topic 1"', '"Topic 1 🚀"'),
+        "utf-8",
+    )
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("emoji" in e for e in errors), errors
