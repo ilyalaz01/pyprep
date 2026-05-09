@@ -145,8 +145,7 @@ async def test_refresh_with_valid_token_returns_new_token(
 async def test_refresh_with_no_token_returns_401(client: httpx.AsyncClient) -> None:
     r = await client.post("/api/auth/refresh")
     assert r.status_code == 401
-    assert "WWW-Authenticate" in {k.title() for k in r.headers.keys()} or \
-        "www-authenticate" in r.headers
+    assert "www-authenticate" in r.headers
 
 
 @pytest.mark.asyncio
