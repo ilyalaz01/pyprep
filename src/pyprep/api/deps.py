@@ -65,6 +65,10 @@ def get_card_service(index: ContentIndex = Depends(get_content_index)) -> CardSe
     return CardService(index)
 
 
+def get_session_store(session: Session = Depends(get_db_session)) -> SessionRepository:
+    return SessionRepository(session)
+
+
 def get_session_service(
     session: Session = Depends(get_db_session),
     cards: CardService = Depends(get_card_service),

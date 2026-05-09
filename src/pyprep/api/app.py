@@ -22,7 +22,9 @@ from pyprep.sdk.auth import (
     PasswordTooLongError,
     PasswordTooShortError,
 )
+from pyprep.sdk.cards import CardNotFoundError
 from pyprep.sdk.content_loader import ContentLoader
+from pyprep.sdk.sessions import SessionFinishedError
 from pyprep.sdk.shared.config import Settings
 
 from .db import create_engine_for, create_sessionmaker
@@ -35,6 +37,7 @@ from .routers import health as health_router
 from .routers import mock as mock_router
 from .routers import modules as modules_router
 from .routers import review as review_router
+from .routers import sessions as sessions_router
 from .routers import stats as stats_router
 
 _BEARER = {"WWW-Authenticate": "Bearer"}
@@ -68,6 +71,11 @@ AUTH_ERROR_MAPPINGS: dict[type[Exception], HTTPMapping] = {
     ExpiredTokenError: HTTPMapping(401, "token_expired", headers=_BEARER),
 }
 
+SESSION_ERROR_MAPPINGS: dict[type[Exception], HTTPMapping] = {
+    CardNotFoundError: HTTPMapping(404, "card_not_found"),
+    SessionFinishedError: HTTPMapping(409, "session_finished"),
+}
+
 
 def create_app(settings: Settings) -> FastAPI:
     configure_logging(settings.log_level)
@@ -98,12 +106,13 @@ def create_app(settings: Settings) -> FastAPI:
     )
     app.add_middleware(RequestLoggingMiddleware)
 
-    install_error_handlers(app, mappings=AUTH_ERROR_MAPPINGS)
+    install_error_handlers(app, mappings={**AUTH_ERROR_MAPPINGS, **SESSION_ERROR_MAPPINGS})
 
     app.include_router(health_router.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")
     app.include_router(modules_router.router, prefix="/api")
     app.include_router(review_router.router, prefix="/api")
+    app.include_router(sessions_router.router, prefix="/api")
     app.include_router(stats_router.router, prefix="/api")
     app.include_router(mock_router.router, prefix="/api")
 
