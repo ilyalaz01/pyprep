@@ -32,11 +32,31 @@ from .log_config import configure_logging
 from .middleware import RequestLoggingMiddleware
 from .routers import auth as auth_router
 from .routers import health as health_router
+from .routers import mock as mock_router
 from .routers import modules as modules_router
 from .routers import review as review_router
 from .routers import stats as stats_router
 
 _BEARER = {"WWW-Authenticate": "Bearer"}
+_TEMPLATE_REL = "interview_packs/template_v1.md"
+
+
+def _load_mock_template(content_root) -> str:  # type: ignore[no-untyped-def]
+    """Extract the first ```text ...``` codeblock from template_v1.md.
+    The wrapping markdown is human documentation; the codeblock is the
+    actual prompt template MockPromptService consumes."""
+    md = (content_root / _TEMPLATE_REL).read_text("utf-8")
+    out: list[str] = []
+    in_block = False
+    for line in md.splitlines():
+        if line.strip() == "```text":
+            in_block = True
+            continue
+        if in_block and line.strip() == "```":
+            break
+        if in_block:
+            out.append(line)
+    return "\n".join(out)
 
 AUTH_ERROR_MAPPINGS: dict[type[Exception], HTTPMapping] = {
     EmailAlreadyExistsError: HTTPMapping(409, "email_exists"),
@@ -66,6 +86,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.state.engine = engine
     app.state.sessionmaker = create_sessionmaker(engine)
     app.state.content_index = ContentLoader(settings.content_root).load()
+    app.state.mock_template = _load_mock_template(settings.content_root)
 
     app.add_middleware(
         CORSMiddleware,
@@ -84,6 +105,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(modules_router.router, prefix="/api")
     app.include_router(review_router.router, prefix="/api")
     app.include_router(stats_router.router, prefix="/api")
+    app.include_router(mock_router.router, prefix="/api")
 
     return app
 
