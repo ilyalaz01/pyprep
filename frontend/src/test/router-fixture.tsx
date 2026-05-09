@@ -17,7 +17,9 @@ import { render } from '@testing-library/react'
 import { AppShell } from '../components/AppShell'
 import { getToken } from '../lib/auth'
 import { HomePage } from '../pages/HomePage'
+import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
+import { ModuleDetailPage } from '../pages/ModuleDetailPage'
 
 interface LoginSearch { from?: string }
 
@@ -53,7 +55,21 @@ export function buildRouter(initialUrl: string) {
     path: '/home',
     component: HomePage,
   })
-  const tree = root.addChildren([indexRoute, login, authed.addChildren([home])])
+  const moduleDetail = createRoute({
+    getParentRoute: () => authed,
+    path: '/modules/$moduleId',
+    component: ModuleDetailPage,
+  })
+  const lesson = createRoute({
+    getParentRoute: () => authed,
+    path: '/modules/$moduleId/lesson/$sphereId',
+    component: LessonPage,
+  })
+  const tree = root.addChildren([
+    indexRoute,
+    login,
+    authed.addChildren([home, moduleDetail, lesson]),
+  ])
   return createRouter({
     routeTree: tree,
     history: createMemoryHistory({ initialEntries: [initialUrl] }),

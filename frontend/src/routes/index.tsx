@@ -22,7 +22,9 @@ import {
 import { AppShell } from '../components/AppShell'
 import { getToken } from '../lib/auth'
 import { HomePage } from '../pages/HomePage'
+import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
+import { ModuleDetailPage } from '../pages/ModuleDetailPage'
 
 interface LoginSearch {
   from?: string
@@ -71,10 +73,22 @@ const homeRoute = createRoute({
   component: HomePage,
 })
 
+const moduleDetailRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/modules/$moduleId',
+  component: ModuleDetailPage,
+})
+
+const lessonRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/modules/$moduleId/lesson/$sphereId',
+  component: LessonPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  authedLayoutRoute.addChildren([homeRoute]),
+  authedLayoutRoute.addChildren([homeRoute, moduleDetailRoute, lessonRoute]),
 ])
 
 export const router = createRouter({ routeTree })

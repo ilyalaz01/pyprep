@@ -10,6 +10,8 @@
  * contract). Backend `/api/modules` only lists modules that have
  * content; the SPA provides the full roll-call.
  */
+import { Link } from '@tanstack/react-router'
+
 import type { ModulesList as ModulesListData } from '../lib/types'
 
 const MODULE_NAMES: Record<number, string> = {
@@ -74,8 +76,9 @@ function ModuleRow({ moduleId, name, spheres, cards, hasContent }: ModuleRowProp
   }
 
   return (
-    <a
-      href={`/modules/${moduleId}`}
+    <Link
+      to="/modules/$moduleId"
+      params={{ moduleId: String(moduleId) }}
       className={[
         'flex items-baseline justify-between py-3 -mx-2 px-2 rounded',
         'text-[color:var(--color-fg)] hover:bg-[color:var(--color-surface-2)]',
@@ -88,6 +91,6 @@ function ModuleRow({ moduleId, name, spheres, cards, hasContent }: ModuleRowProp
       <span className="text-xs text-[color:var(--color-fg-muted)]">
         {meta} <span aria-hidden="true" className="ml-1">→</span>
       </span>
-    </a>
+    </Link>
   )
 }
