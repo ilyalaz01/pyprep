@@ -1,5 +1,11 @@
 """APIGatekeeper — single egress point for any future external HTTP call.
 
+**SCOPE: OUTBOUND traffic only.** This is NOT an inbound rate limiter.
+It throttles calls from PyPrep services TO external APIs (third-party
+LLMs, content sources, etc.). Inbound rate limiting on `/api/*`
+endpoints (audit N024) is a separate concern, deferred to Phase 10
+and implemented at the FastAPI middleware layer — see NOTES N024.
+
 MVP has no external integrations (per ADR-005 mock interviews are local
 prompt-generators). The seam is pre-built so future callers route through
 one rate-limit-aware chokepoint instead of scattering `httpx.request(...)`
