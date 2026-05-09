@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from pyprep.sdk.auth import AuthService, InvalidTokenError, User
 from pyprep.sdk.auth.protocol import UserStore
+from pyprep.sdk.content_loader import ContentIndex
 from pyprep.sdk.repos.users import UserRepository
 from pyprep.sdk.shared.config import Settings
 
@@ -26,6 +27,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings  # type: ignore[no-any-return]
+
+
+def get_content_index(request: Request) -> ContentIndex:
+    return request.app.state.content_index  # type: ignore[no-any-return]
 
 
 def get_db_session(request: Request) -> Iterator[Session]:

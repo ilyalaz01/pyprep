@@ -22,6 +22,7 @@ from pyprep.sdk.auth import (
     PasswordTooLongError,
     PasswordTooShortError,
 )
+from pyprep.sdk.content_loader import ContentLoader
 from pyprep.sdk.shared.config import Settings
 
 from .db import create_engine_for, create_sessionmaker
@@ -31,6 +32,7 @@ from .log_config import configure_logging
 from .middleware import RequestLoggingMiddleware
 from .routers import auth as auth_router
 from .routers import health as health_router
+from .routers import modules as modules_router
 
 _BEARER = {"WWW-Authenticate": "Bearer"}
 
@@ -61,6 +63,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = create_sessionmaker(engine)
+    app.state.content_index = ContentLoader(settings.content_root).load()
 
     app.add_middleware(
         CORSMiddleware,
@@ -76,6 +79,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     app.include_router(health_router.router, prefix="/api")
     app.include_router(auth_router.router, prefix="/api")
+    app.include_router(modules_router.router, prefix="/api")
 
     return app
 
