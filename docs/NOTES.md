@@ -323,3 +323,28 @@ now. Track for the polish pass.
 `get_by_email` and the `checkpw` branch. Test
 `test_login_body_carries_n012_3_todo_comment` greps the source so the
 comment can't be silently deleted by a future refactor.
+
+---
+
+## N019 — `SessionService.preview_queue` SDK addition for /api/review/queue
+
+**Phase:** 3 (T3.5) · **Date:** 2026-05-09 · **Status:** added
+
+PRD §7 / TODO T3.5 expose `GET /api/review/queue` — "today's FSRS queue".
+The pre-T3.5 SDK shape had `SessionService.start(mode='review', ...)`
+which both builds the queue *and* persists a `Session` row. The home-page
+"Review now" widget needs the queue without the side effect (the SPA
+calls `/api/sessions` separately to start the actual session). The
+`build_queue` helper in `sessions/queue_builder.py` is the right pure
+function but was internal — the router cannot reach into it without
+violating Hard Rule 2 (handlers depend on SDK public surface only).
+
+**Resolution:** added `SessionService.preview_queue(*, user_id, mode,
+sphere_id, limit, daily_new_card_cap) -> tuple[str, ...]` — a thin
+wrapper that calls `build_queue` with the service's bound `cards` and
+`reviews`. Side-effect-free. Same parameters as `start()` minus the
+session-creation knobs. Test pins parity: `preview_queue` returns the
+same `card_ids` that `start()` would have populated `session.queue` with.
+
+This is the only Phase 3 SDK addition flagged as a gap fill (per the
+"SDK is sealed" rule — every other router uses existing surface).
