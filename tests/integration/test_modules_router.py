@@ -11,6 +11,31 @@ import pytest
 
 
 @pytest.mark.asyncio
+async def test_modules_listing_is_public_no_auth_required(
+    client: httpx.AsyncClient,
+) -> None:
+    """T3.5.7 — module catalog is non-secret content. Lock the contract:
+    no Authorization header → 200. A future change to require auth would
+    flip this test and force a deliberate decision rather than silent drift."""
+    r = await client.get("/api/modules")
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_module_detail_is_public_no_auth_required(
+    client: httpx.AsyncClient,
+) -> None:
+    r = await client.get("/api/modules/1")
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_lesson_is_public_no_auth_required(client: httpx.AsyncClient) -> None:
+    r = await client.get("/api/modules/1/lesson/m1-s0")
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_list_modules_returns_module_summaries(client: httpx.AsyncClient) -> None:
     r = await client.get("/api/modules")
     assert r.status_code == 200

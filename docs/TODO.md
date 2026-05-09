@@ -137,7 +137,7 @@
 | T3.5.4 | Middleware adds `Cache-Control: no-store` + `Pragma: no-cache` to any `/api/auth/*` response. | Test: login response carries the headers | ✅ (`AuthNoStoreMiddleware` in api/middleware.py; 3 tests: login, register, non-auth-untouched) |
 | T3.5.5 | Log-leak property test (`tests/integration/test_log_hygiene.py`). Captures structlog output; asserts no password / no JWT bytes / no `idempotency_key` value / no `password` key in any field across register→login→sessions→answer flow. | Test green | ✅ (uses `structlog.testing.capture_logs()` to bypass the cached-logger problem; second sanity test pins the helper itself works through cached loggers) |
 | T3.5.6 | Refresh test asserts new token differs byte-for-byte from input. Add `jti` claim if needed to guarantee rotation. | `test_refresh_returns_token_distinct_from_input` green | ✅ (real bug — same-second refresh echoed input bytes; `_issue` now adds `jti=uuid4().hex`; integration + 2 SDK unit tests pin both byte-distinctness and jti presence) |
-| T3.5.7 | Modules endpoints explicitly tagged public in PRD §7; lock with test. | `GET /api/modules` with no Authorization header → 200 | ⬜ |
+| T3.5.7 | Modules endpoints explicitly tagged public in PRD §7; lock with test. | `GET /api/modules` with no Authorization header → 200 | ✅ (3 lock tests: list/detail/lesson all public; PLAN §7 API surface table now carries explicit auth tag per endpoint with PUBLIC vs Bearer legend) |
 
 **Phase 3.5 exit gate:** all 7 tasks ✅; full test suite + ruff + mypy(api/+sdk/) + LOC + handler-LOC audit + integration→routers ≥70% all green. ADRs 011/012/013 added to `PLAN.md`. NOTES N024-N028 added with deferral context. Push, verify CI green.
 

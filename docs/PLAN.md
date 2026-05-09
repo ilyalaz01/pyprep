@@ -385,26 +385,36 @@ Until any of these triggers, stateless stays.
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:
 
 ```
-POST   /api/auth/register
-POST   /api/auth/login
-POST   /api/auth/refresh
+POST   /api/auth/register                  # auth: none (404 in single-user mode)
+POST   /api/auth/login                     # auth: none
+POST   /api/auth/refresh                   # auth: Bearer (rotates jti per call)
 
-GET    /api/modules
-GET    /api/modules/{module_id}
-GET    /api/modules/{module_id}/lesson/{sphere_id}
+GET    /api/modules                        # auth: PUBLIC  (T3.5.7 — locked by test)
+GET    /api/modules/{module_id}            # auth: PUBLIC
+GET    /api/modules/{module_id}/lesson/{sphere_id}   # auth: PUBLIC
 
-POST   /api/sessions                       # start session
-GET    /api/sessions/{session_id}/next     # next card
-POST   /api/sessions/{session_id}/answer   # submit rating + outcome
-POST   /api/sessions/{session_id}/finish
+POST   /api/sessions                       # auth: Bearer    start session
+GET    /api/sessions/{session_id}/next     # auth: Bearer    next card (stateless)
+POST   /api/sessions/{session_id}/answer   # auth: Bearer    submit rating + outcome
+POST   /api/sessions/{session_id}/finish   # auth: Bearer    idempotent
 
-GET    /api/review/queue                   # today's FSRS queue
-GET    /api/stats/me                       # full stats
-GET    /api/stats/me/weakness              # top-3 weakest spheres
+GET    /api/review/queue                   # auth: Bearer    today's FSRS queue
+GET    /api/stats/me                       # auth: Bearer    full stats
+GET    /api/stats/me/weakness              # auth: Bearer    top-N weakest spheres
 
-POST   /api/mock/prompt                    # body: {modules, spheres, difficulty}
-                                           # returns: {prompt: string, ...}
+POST   /api/mock/prompt                    # auth: Bearer    body: {modules, spheres, ...}
+                                           #                 returns: {text, cards_used, ...}
+
+GET    /api/health                         # auth: PUBLIC    smoke: {status, version, db_ok}
 ```
+
+**Auth-tag legend.** *PUBLIC* = no Authorization header required;
+locked by integration test so a future "require auth" change is a
+deliberate test diff, not silent drift. *Bearer* = `Authorization:
+Bearer <jwt>` required; missing/malformed/expired → 401 with
+`WWW-Authenticate: Bearer`. Module catalog and lessons are PUBLIC
+because content is non-secret (also visible in the repo); the per-user
+state behind every other endpoint is Bearer-gated.
 
 ---
 
