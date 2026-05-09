@@ -1,0 +1,47 @@
+# PyPrep pre-commit config — pre-push stage only.
+#
+# Each hook mirrors a CI step exactly. A passing `git push` means CI
+# will pass for the same reasons. CI does NOT run pre-commit; both
+# layers run the same underlying commands directly. See CONTRIBUTING.md.
+#
+# One-time setup per clone:
+#   pre-commit install --hook-type pre-push
+#
+# All hooks use `local` + `language: system` so the binaries come from
+# `uv` / `pnpm` (single source of truth) — no version drift between
+# this file, pyproject.toml, and CI.
+
+default_stages: [pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff (lint)
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+
+      - id: mypy
+        name: mypy (sdk + api strict)
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+
+      - id: file-size
+        name: file-size ceiling (<=150 LOC)
+        entry: uv run python scripts/check_file_size.py
+        language: system
+        pass_filenames: false
+
+      - id: handler-loc-audit
+        name: handler-LOC audit (<=10 logic LOC, NOTES-waivered exceptions only)
+        entry: uv run python scripts/audit_handlers.py
+        language: system
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: frontend ESLint
+        entry: pnpm --dir frontend lint
+        language: system
+        pass_filenames: false

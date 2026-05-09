@@ -46,7 +46,10 @@ cp .env-example .env                 # adjust if needed
 # 3. frontend
 cd frontend && pnpm install && cd ..
 
-# 4. run both
+# 4. one-time per clone: pre-push hook (mirrors CI gates locally)
+uv run pre-commit install --hook-type pre-push
+
+# 5. run both
 docker compose up                    # OR run uv run pyprep-api and pnpm --dir frontend dev separately
 ```
 
