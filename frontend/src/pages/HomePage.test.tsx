@@ -24,6 +24,13 @@ beforeEach(() => {
         return jsonResponse({ single_user: false, version: '1.00', single_user_email: null })
       }
       if (url.includes('/api/auth/me')) return jsonResponse(ME)
+      if (url.includes('/api/modules')) return jsonResponse({ modules: [] })
+      if (url.includes('/api/review/queue'))
+        return jsonResponse({ card_ids: [], sphere_id: null })
+      if (url.includes('/api/stats/me'))
+        return jsonResponse({
+          reviews_total: 0, retention: 0, streak: 0, xp: 0, orphan_review_count: 0,
+        })
       return new Response('not mocked: ' + url, { status: 500 })
     }),
   )
@@ -45,10 +52,8 @@ describe('HomePage', () => {
     expect(matches.length).toBeGreaterThanOrEqual(1)
   })
 
-  test('shows the T4.4 placeholder empty state', async () => {
+  test('shows the modules section heading (real content replaces the T4.3 placeholder)', async () => {
     renderAt('/home')
-    expect(
-      await screen.findByText(/modules and today's review queue will appear here/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/^Modules$/)).toBeInTheDocument()
   })
 })

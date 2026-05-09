@@ -33,7 +33,12 @@ export interface AccessToken {
 }
 
 // --- Modules (PUBLIC) ---------------------------------------------------
-export interface ModuleSummary { module_id: number; sphere_ids: string[] }
+export interface ModuleSummary {
+  module_id: number
+  sphere_ids: string[]
+  /** Sum of cards across all spheres in this module. */
+  card_count: number
+}
 export interface ModulesList { modules: ModuleSummary[] }
 export interface SphereSummary {
   sphere_id: string

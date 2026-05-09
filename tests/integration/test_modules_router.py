@@ -46,6 +46,10 @@ async def test_list_modules_returns_module_summaries(client: httpx.AsyncClient) 
     m1 = next(m for m in mods if m["module_id"] == 1)
     assert isinstance(m1["sphere_ids"], list)
     assert "m1-s0" in m1["sphere_ids"]
+    # T4.4: card_count is the sum across the module's spheres — the home
+    # dashboard's modules list relies on it without a per-module fetch.
+    assert isinstance(m1["card_count"], int)
+    assert m1["card_count"] >= 1
 
 
 @pytest.mark.asyncio

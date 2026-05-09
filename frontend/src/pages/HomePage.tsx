@@ -1,15 +1,24 @@
 /**
- * /home — landing route after login. T4.3 ships the welcome + empty
- * state shell; T4.4 will replace the empty state with the real review
- * queue / streak / weakness widgets.
+ * /home — landing route after login.
+ *
+ * T4.4 ships the real layout: dashboard sections (continue / review queue
+ * / weakness) + modules list (4 entries, dimmed when content unavailable).
+ * Visual weight stays on the data; chrome is intentionally thin.
  */
+import { useQuery } from '@tanstack/react-query'
+
+import { HomeDashboard } from '../components/HomeDashboard'
+import { ModulesList } from '../components/ModulesList'
+import { Section } from '../components/Section'
+import { api } from '../lib/api'
 import { useCurrentUser } from '../lib/use-current-user'
 
 export function HomePage() {
   const user = useCurrentUser()
+  const modules = useQuery({ queryKey: ['modules'], queryFn: api.modules.list })
 
   return (
-    <section className="mx-auto max-w-3xl px-6 py-10 space-y-8">
+    <section className="mx-auto max-w-3xl px-6 py-10 space-y-10">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
         {user && (
@@ -19,11 +28,11 @@ export function HomePage() {
         )}
       </header>
 
-      <div className="rounded border border-dashed border-[color:var(--color-border)] px-6 py-10">
-        <p className="text-sm text-[color:var(--color-fg-muted)]">
-          Modules and today's review queue will appear here once T4.4 lands.
-        </p>
-      </div>
+      <HomeDashboard />
+
+      <Section title="Modules">
+        <ModulesList data={modules.data ?? null} />
+      </Section>
     </section>
   )
 }

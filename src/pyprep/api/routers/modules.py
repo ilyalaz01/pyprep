@@ -18,6 +18,7 @@ router = APIRouter(prefix="/modules", tags=["modules"])
 class ModuleSummary(BaseModel):
     module_id: int
     sphere_ids: list[str]
+    card_count: int
 
 
 class ModulesResponse(BaseModel):
@@ -47,7 +48,11 @@ class LessonResponse(BaseModel):
 def list_modules(index: ContentIndex = Depends(get_content_index)) -> ModulesResponse:
     return ModulesResponse(
         modules=[
-            ModuleSummary(module_id=m, sphere_ids=list(ids))
+            ModuleSummary(
+                module_id=m,
+                sphere_ids=list(ids),
+                card_count=sum(len(index.spheres[sid].cards) for sid in ids),
+            )
             for m, ids in sorted(index.modules.items())
         ]
     )
