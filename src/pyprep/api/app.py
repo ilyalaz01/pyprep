@@ -31,7 +31,7 @@ from .db import create_engine_for, create_sessionmaker
 from .errors import HTTPMapping, install_error_handlers
 from .lifespan import lifespan
 from .log_config import configure_logging
-from .middleware import RequestLoggingMiddleware
+from .middleware import AuthNoStoreMiddleware, RequestLoggingMiddleware
 from .routers import auth as auth_router
 from .routers import health as health_router
 from .routers import mock as mock_router
@@ -105,6 +105,7 @@ def create_app(settings: Settings) -> FastAPI:
         expose_headers=["x-request-id"],
     )
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(AuthNoStoreMiddleware)
 
     install_error_handlers(app, mappings={**AUTH_ERROR_MAPPINGS, **SESSION_ERROR_MAPPINGS})
 

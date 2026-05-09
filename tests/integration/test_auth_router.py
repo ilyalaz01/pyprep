@@ -79,6 +79,49 @@ async def test_register_too_long_password_returns_422(client: httpx.AsyncClient)
 
 
 @pytest.mark.asyncio
+async def test_login_response_carries_no_store_cache_headers(
+    client: httpx.AsyncClient,
+) -> None:
+    """T3.5.4 — JWT-bearing responses MUST NOT be cacheable. Browsers,
+    proxies, and back/forward caches can otherwise replay a logged-out
+    user's token."""
+    await client.post(
+        "/api/auth/register", json={"email": "cc@example.com", "password": PASSWORD}
+    )
+    r = await client.post(
+        "/api/auth/login", json={"email": "cc@example.com", "password": PASSWORD}
+    )
+    assert r.status_code == 200
+    assert r.headers.get("cache-control") == "no-store"
+    assert r.headers.get("pragma") == "no-cache"
+
+
+@pytest.mark.asyncio
+async def test_register_response_carries_no_store_cache_headers(
+    client: httpx.AsyncClient,
+) -> None:
+    """register doesn't return a token but the email-vs-id mapping is
+    still sensitive enough to skip caches."""
+    r = await client.post(
+        "/api/auth/register",
+        json={"email": "ccr@example.com", "password": PASSWORD},
+    )
+    assert r.status_code == 201
+    assert r.headers.get("cache-control") == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_non_auth_response_does_not_set_no_store(
+    client: httpx.AsyncClient,
+) -> None:
+    """Health is a smoke endpoint, not auth — should NOT carry no-store
+    (would defeat any reverse-proxy caching layered on top later)."""
+    r = await client.get("/api/health")
+    assert r.status_code == 200
+    assert "no-store" not in (r.headers.get("cache-control") or "")
+
+
+@pytest.mark.asyncio
 async def test_login_returns_bearer_token_response_shape(
     client: httpx.AsyncClient, test_settings: Settings
 ) -> None:

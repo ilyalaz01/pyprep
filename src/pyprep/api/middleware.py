@@ -1,8 +1,12 @@
-"""Request/response logging middleware.
+"""Request/response logging middleware + auth no-store middleware.
 
-One JSON log line per request — method, path, status, duration_ms,
-request_id. Bound to structlog's contextvars so router-level loggers
-inherit `request_id` automatically (NFR-OBS-1).
+`RequestLoggingMiddleware`: one JSON log line per request — method, path,
+status, duration_ms, request_id. Bound to structlog's contextvars so
+router-level loggers inherit `request_id` automatically (NFR-OBS-1).
+
+`AuthNoStoreMiddleware` (T3.5.4): adds `Cache-Control: no-store` and
+`Pragma: no-cache` to every `/api/auth/*` response. JWT-bearing responses
+must not be cacheable by browsers, proxies, or back/forward caches.
 """
 
 from __future__ import annotations
@@ -16,6 +20,16 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 _log = structlog.get_logger("pyprep.api")
+_AUTH_PREFIX = "/api/auth/"
+
+
+class AuthNoStoreMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
+        response: Response = await call_next(request)
+        if request.url.path.startswith(_AUTH_PREFIX):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
