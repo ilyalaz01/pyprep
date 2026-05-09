@@ -283,3 +283,48 @@ def test_refresh_expired_token_raises(store) -> None:
 
     with pytest.raises(ExpiredTokenError):
         auth.refresh_token(token.token)
+
+
+# --- N012.1 / N012.2 polish nits (T3.2) ----------------------------------
+
+
+def test_register_uses_explicit_bcrypt_rounds_12(auth: AuthService, store) -> None:
+    """N012.1 — pin bcrypt cost factor explicitly so silent default drift in
+    bcrypt versions cannot weaken (or accidentally strengthen) the hash."""
+    user = auth.register(email="alice@example.com", password="hunter2!")
+    stored = store.rows[user.id]
+    # bcrypt hash format: $2b$<cost>$<22-char-salt><31-char-hash>
+    parts = stored.password_hash.split("$")
+    assert parts[1] == "2b"
+    assert parts[2] == "12", f"expected cost=12, got cost={parts[2]}"
+
+
+def test_decode_rejects_token_with_non_int_exp(auth: AuthService) -> None:
+    """N012.2 — `_decode` must reject malformed `exp` (non-int or missing)
+    instead of silently falling through. Today _issue always sets `exp` to
+    an int, so this is contract-tightening, not a behavioral fix."""
+    bad = jwt.encode(
+        {"sub": "user-1", "iat": int(T0.timestamp()), "exp": "tomorrow"},
+        SECRET,
+        algorithm="HS256",
+    )
+    with pytest.raises(InvalidTokenError):
+        auth.verify_token(bad)
+
+
+def test_decode_rejects_token_with_missing_exp(auth: AuthService) -> None:
+    """N012.2 — same contract: a token without `exp` is malformed."""
+    bad = jwt.encode({"sub": "user-1", "iat": int(T0.timestamp())}, SECRET, algorithm="HS256")
+    with pytest.raises(InvalidTokenError):
+        auth.verify_token(bad)
+
+
+def test_login_body_carries_n012_3_todo_comment() -> None:
+    """N012.3 — surface the deferred N011 timing-parity decision at the
+    call site (so a future reader sees it next to the unknown-email branch).
+    Hard test against source so the comment is not deleted by accident."""
+    import inspect
+
+    src = inspect.getsource(AuthService.login)
+    assert "TODO(public-mode)" in src
+    assert "N011" in src
