@@ -7,6 +7,7 @@ no server fallback. Cross-user access returns 404, not 403 (N021.3).
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 from typing import Any, Literal
 
@@ -68,9 +69,7 @@ class NextCardResponse(BaseModel):
 class AnswerRequest(BaseModel):
     card_id: str
     rating: int = Field(ge=1, le=4)
-    # response_ms cap (T3.5.3): 600_000 = 10 minutes. Best-effort client-
-    # reported; not trusted as a stat measure (see PRD §3.3 renderer note).
-    response_ms: int = Field(ge=0, le=600_000)
+    response_ms: int = Field(ge=0, le=600_000)  # T3.5.3 cap (PRD §3.3 trust note)
     idempotency_key: str | None = Field(
         default=None, min_length=16, max_length=128, pattern=_KEY_PATTERN
     )
@@ -172,16 +171,8 @@ def finish(
     sessions: SessionService = Depends(get_session_service),
 ) -> FinishResponse:
     _owned_session(session_id, user, store)
-    summary = sessions.finish(session_id)
-    return FinishResponse(
-        cards_total=summary.cards_total, cards_correct=summary.cards_correct,
-        retention=summary.retention,
-    )
+    return FinishResponse(**dataclasses.asdict(sessions.finish(session_id)))
 
 
 def _to_session_response(s: DomainSession) -> SessionResponse:
-    return SessionResponse(
-        id=s.id, user_id=s.user_id, mode=s.mode, queue=list(s.queue),
-        started_at=s.started_at, ended_at=s.ended_at,
-        cards_total=s.cards_total, cards_correct=s.cards_correct,
-    )
+    return SessionResponse(**dataclasses.asdict(s))
