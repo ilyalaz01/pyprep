@@ -254,6 +254,22 @@ async def test_answer_idempotency_key_bad_chars_returns_422(
 
 
 @pytest.mark.asyncio
+async def test_answer_rating_out_of_range_returns_422(client: httpx.AsyncClient) -> None:
+    """Rating must be 1..4 (Again, Hard, Good, Easy). Anything else is 422
+    at the Pydantic boundary — never reaches the SDK's `Rating(int)` cast,
+    which would raise ValueError → 500 without this guard."""
+    token = await _register_and_login(client, "rating@example.com")
+    s = await _start_session(client, token)
+    for bad in (0, 5, -1, 99):
+        r = await client.post(
+            f"/api/sessions/{s['id']}/answer",
+            json={"card_id": s["queue"][0], "rating": bad, "response_ms": 100},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 422, f"rating={bad} should be 422, got {r.status_code}"
+
+
+@pytest.mark.asyncio
 async def test_answer_after_finish_returns_409(client: httpx.AsyncClient) -> None:
     """SessionFinishedError → 409."""
     token = await _register_and_login(client, "afterfinish@example.com")

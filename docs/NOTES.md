@@ -453,3 +453,24 @@ This keeps the route handler trivial (no try/except for "already
 finished" and no special HTTP status for the second call — both calls
 return 200 with the same body). Per N019/N020 pattern, the SDK addition
 is committed before the route lands.
+
+---
+
+## N023 — Typed card-response models deferred to Phase 4
+
+**Phase:** 3 (T3.4 review) · **Date:** 2026-05-09 · **Status:** deferred
+
+`GET /api/sessions/{id}/next` returns `NextCardResponse.raw: dict[str, Any]`
+— the full card JSON for SPA rendering. A typed discriminated union
+(`FlipCardResponse | CodeTrapResponse | MultipleChoiceResponse | ...`)
+would be more correct, but card-type schemas drive both the wire format
+*and* the SPA card-renderer components. Typing the response without the
+companion TypeScript types + per-type renderer prop shapes means
+designing the contract twice — once now, once in Phase 4 when the SPA
+card components actually consume it.
+
+**Resolution:** keep `dict[str, Any]` for Phase 3. In Phase 4 (frontend
+shell), define the per-card-type Pydantic + TypeScript pair together so
+the wire format and the renderer match. The card content is non-secret
+(also accessible via `/api/modules`), so untyping the response is a
+clarity loss, not a security risk.
