@@ -360,6 +360,20 @@ post-MVP.
 
 Until any of these triggers, stateless stays.
 
+> **ADR-013 amendment (Pyodide trust boundary review trigger):** ADR-010
+> already accepts that the SPA can lie to itself (queue deviation). The
+> Pyodide pass/fail signal for code-task cards is also client-reported;
+> a determined user could submit a fake `RunResult { ok: true }` from
+> the browser console. **When competitive/multi-user features
+> (leaderboards, public sharing of mock-interview results) are
+> introduced, this ADR MUST be revisited.** Two options at that point:
+> server-side re-execution under allowlist (a sandbox that re-runs the
+> hidden harness against the submitted user_code), OR cryptographic
+> attestation of the in-browser run (signed RunResult with a server-
+> side nonce). Until any of ADR-010's triggers fire, we accept that the
+> client is the source of truth for code-task outcomes — same trade-off
+> as queue progression, single-user MVP rationale.
+
 ---
 
 ### ADR-009: FSRS fuzzing disabled for output determinism
@@ -377,6 +391,92 @@ Until any of these triggers, stateless stays.
 
 **Trade-offs:**
 - At high scale (many users × thousands of cards), unjittered due-dates may cluster review load on the same UTC days. Mitigation if/when that becomes real: re-enable fuzzing with a deterministic per-user seed (pass a seed into the scheduler so identical-user-identical-card replay still matches snapshots).
+
+---
+
+### ADR-011: JWT in localStorage for MVP-1 (single-user, self-hosted)
+
+**Status:** Accepted (added Phase 3.5 — owner verdict)
+
+**Context:** The SPA needs to store the bearer token between page loads.
+Two viable strategies:
+1. **localStorage** — synchronous, simple, but XSS-extractable.
+2. **httpOnly cookie + CSRF middleware** — XSS-safe (token not reachable
+   from JS) but requires a full CSRF protection layer (double-submit
+   token, SameSite=strict tuning, OPTIONS-preflight handling).
+
+**Decision:** localStorage for MVP-1.
+
+**Rationale:**
+- Single-user, self-hosted on the owner's laptop. No XSS surface that an
+  attacker could realistically reach.
+- httpOnly+CSRF would add ~1 day of cookie/CSRF middleware work — disproportionate
+  for a single-user app whose only client is the owner.
+- Migration path is well-trodden: switch the token issuance to
+  `Set-Cookie: HttpOnly; Secure; SameSite=Strict`, add CSRF token
+  middleware, change SPA fetch to `credentials: "include"`.
+
+**Trade-offs (accepted explicitly):**
+- An XSS bug anywhere in the SPA can read the token from localStorage
+  and exfil it. Mitigation: keep CSP strict, never `dangerouslySetInnerHTML`,
+  audit dependencies.
+- Going public-multi-user without the migration is a real exposure.
+  This ADR's review trigger guards against drift.
+
+**Review trigger:** going public-multi-user (any deploy where the
+attacker model includes "user A trying to read user B's session").
+At that point, switch to httpOnly cookie + CSRF before merging the
+multi-user feature.
+
+---
+
+### ADR-012: Production static hosting via FastAPI StaticFiles
+
+**Status:** Accepted (added Phase 3.5 — owner verdict)
+
+**Context:** Two ways to serve the SPA in production:
+1. **nginx (or another reverse proxy) serving `frontend/dist`**, FastAPI
+   on a separate port behind a path or subdomain.
+2. **FastAPI itself mounting `frontend/dist` via Starlette `StaticFiles`**.
+
+**Decision:** Single-process FastAPI + StaticFiles in production.
+Vite dev server stays separate (port 5173) in dev.
+
+**Rationale:**
+- Single process, single deployment artifact, single TLS cert. Owner
+  hosts on a $5 VPS — minimal ops surface beats theoretical perf gain.
+- Same-origin in production → CORS becomes a no-op (no preflight, no
+  `Access-Control-*` headers needed). `PYPREP_CORS_ORIGINS` only
+  matters in dev when the SPA runs on a different port.
+- Static-file throughput at PyPrep's traffic levels (single-digit users)
+  is far below where FastAPI/uvicorn becomes a bottleneck.
+
+**Trade-offs:**
+- nginx in front would give better gzip/brotli + cache-header tuning
+  out of the box. Acceptable: Phase 10 deploy guide can layer Caddy or
+  Cloudflare in front if perf becomes a concern.
+- A bug in a FastAPI route could OOM-crash the static-file server too.
+  Acceptable for MVP scale.
+
+**Implementation notes** (Phase 10):
+- `app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="spa")`
+  AFTER all `/api/*` routers are registered (FastAPI matches in order).
+- `index.html` fallthrough for SPA routing: handled by `html=True`.
+- Production CORS config: `cors_origins=[]` or empty → CORSMiddleware
+  no-ops (same-origin requests need no CORS headers).
+- TODO.md Phase 10 (T10.3) updated to call out this StaticFiles mount.
+
+---
+
+### ADR-013: See ADR-010 amendment (Pyodide client-side trust boundary)
+
+**Status:** Accepted (Phase 3.5 amendment to ADR-010)
+
+The full text lives inside ADR-010 above as a quoted amendment block.
+ADR-013 is a stub here for cross-reference: the Pyodide pass/fail signal
+for code-task cards is client-reported and trusted under the same
+single-user MVP rationale as ADR-010's queue progression. Same review
+triggers apply.
 
 ---
 

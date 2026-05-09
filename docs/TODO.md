@@ -139,6 +139,9 @@
 | T3.5.6 | Refresh test asserts new token differs byte-for-byte from input. Add `jti` claim if needed to guarantee rotation. | `test_refresh_returns_token_distinct_from_input` green | ✅ (real bug — same-second refresh echoed input bytes; `_issue` now adds `jti=uuid4().hex`; integration + 2 SDK unit tests pin both byte-distinctness and jti presence) |
 | T3.5.7 | Modules endpoints explicitly tagged public in PRD §7; lock with test. | `GET /api/modules` with no Authorization header → 200 | ✅ (3 lock tests: list/detail/lesson all public; PLAN §7 API surface table now carries explicit auth tag per endpoint with PUBLIC vs Bearer legend) |
 
+**ADRs added:** ADR-011 (JWT in localStorage for MVP-1; review trigger: public-multi-user), ADR-012 (FastAPI StaticFiles for prod static hosting; CORS becomes no-op), ADR-013 (amendment to ADR-010 — Pyodide pass/fail signal is client-reported under same trust model as queue progression).
+**NOTES added:** N024 (inbound rate limiting on /api/auth/* — Phase 10), N025 (two-worker single-user-startup race test — Phase 10), N026 (alembic downgrade test — Phase 10), N027 (body-size limit + 413 — Phase 10), N028 (content hot-reload — merged into N018). APIGatekeeper module docstring updated to clarify it's outbound-only.
+
 **Phase 3.5 exit gate:** all 7 tasks ✅; full test suite + ruff + mypy(api/+sdk/) + LOC + handler-LOC audit + integration→routers ≥70% all green. ADRs 011/012/013 added to `PLAN.md`. NOTES N024-N028 added with deferral context. Push, verify CI green.
 
 ---
@@ -255,7 +258,7 @@
 |---|---|---|---|
 | T10.1 | Finalize `README.md` with screenshots, install, run, deploy. | Reads as a real product README | ⬜ |
 | T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ⬜ |
-| T10.3 | Production `Dockerfile` for backend; static-built frontend served by nginx. | `docker compose -f compose.prod.yml up` works | ⬜ |
+| T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker compose -f compose.prod.yml up` serves SPA + API on one port; CORS is no-op (same origin) | ⬜ |
 | T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ⬜ |
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | Report saved | ⬜ |

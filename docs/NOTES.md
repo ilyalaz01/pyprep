@@ -474,3 +474,81 @@ shell), define the per-card-type Pydantic + TypeScript pair together so
 the wire format and the renderer match. The card content is non-secret
 (also accessible via `/api/modules`), so untyping the response is a
 clarity loss, not a security risk.
+
+---
+
+## N024 — Inbound rate limiting on /api/auth/* [Phase 10]
+
+**Phase:** 3.5 (audit F2) · **Date:** 2026-05-09 · **Status:** deferred
+
+The audit flagged that `/api/auth/login` and `/api/auth/register` have
+no inbound rate limit. A bot could brute-force passwords or enumerate
+emails. For single-user self-hosted MVP-1, this is not a real exposure
+(only the owner hits the endpoint), but **must be addressed before any
+public deploy**.
+
+**Important clarification on `APIGatekeeper`:** `pyprep.sdk.shared.gatekeeper.
+APIGatekeeper` is an **OUTBOUND** rate limiter — sliding-window per
+external host, used by anything in the SDK that would call out to
+external APIs (currently nothing; the seam exists for future LLM /
+content-source integrations). It is **NOT** an inbound limiter and
+should not be confused with one. A docstring clarification is added
+below to the SDK to prevent misreading.
+
+**Resolution at Phase 10:** add Starlette middleware (or use
+`slowapi`/`fastapi-limiter` with Redis when Postgres+Redis become
+available). Per-IP buckets with `Retry-After` header on 429.
+
+---
+
+## N025 — Two-worker single-user-startup race test [Phase 10]
+
+**Phase:** 3.5 (audit Section C #4) · **Date:** 2026-05-09 · **Status:** deferred
+
+The single-user lifespan hook (`api/lifespan.py`) handles
+`EmailAlreadyExistsError` from a race between two simultaneously-
+starting workers. The unit-test coverage is "two app boots against
+the same DB file" (sequential) — not a true two-worker race.
+
+**Why deferred:** MVP-1 runs single-process uvicorn (no worker
+multiplexing). Multi-worker (`uvicorn --workers 4`) lands at Phase 10
+production deploy; the race test gets written then with `multiprocessing`
+or two real worker processes.
+
+---
+
+## N026 — Alembic downgrade test [Phase 10]
+
+**Phase:** 3.5 (audit Section C #5) · **Date:** 2026-05-09 · **Status:** deferred
+
+`tests/integration/test_alembic_migration.py` pins forward (upgrade
+head + drift compare) but does not exercise `alembic downgrade`. Phase
+10 adds a test that goes `upgrade head → downgrade base → upgrade head`
+and asserts schema equality at the start and end. Catches reversibility
+breaks before they bite a prod rollback.
+
+---
+
+## N027 — Body-size limit + 413 [Phase 10]
+
+**Phase:** 3.5 (audit Section C #6) · **Date:** 2026-05-09 · **Status:** deferred
+
+FastAPI / Starlette have no built-in request-body-size limit. A 100 MB
+POST to `/api/auth/register` would consume memory before Pydantic ever
+sees it. Phase 10 adds a `MaxBodySizeMiddleware` (e.g. 256 KB cap on
+`/api/*`, 5 MB on `/api/sessions/{id}/answer` if code-task answers
+ever flow over the wire — but they shouldn't per ADR-001) → 413
+Payload Too Large.
+
+---
+
+## N028 — Content hot-reload via /admin/reload [merged into N018]
+
+**Phase:** 3.5 (audit G5) · **Date:** 2026-05-09 · **Status:** merged
+
+The audit raised content hot-reload as a separate item (`/admin/reload`
+endpoint to re-trigger `ContentLoader.load()`). N018 already tracks
+the broader hot-reload requirement (PRD §3.1 FR-CONTENT-5). Both are
+the same Phase-post-MVP item — merged into N018's scope rather than
+tracked separately. The endpoint shape decision (`/admin/reload` vs.
+inotify watcher vs. SIGHUP handler) is left to whoever picks up N018.
