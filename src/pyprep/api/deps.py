@@ -18,8 +18,13 @@ from sqlalchemy.orm import Session
 
 from pyprep.sdk.auth import AuthService, InvalidTokenError, User
 from pyprep.sdk.auth.protocol import UserStore
+from pyprep.sdk.cards import CardService
 from pyprep.sdk.content_loader import ContentIndex
+from pyprep.sdk.repos.reviews import ReviewRepository
+from pyprep.sdk.repos.sessions import SessionRepository
 from pyprep.sdk.repos.users import UserRepository
+from pyprep.sdk.scheduler import FSRSScheduler
+from pyprep.sdk.sessions import SessionService
 from pyprep.sdk.shared.config import Settings
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -52,6 +57,22 @@ def get_db_session(request: Request) -> Iterator[Session]:
 
 def get_user_store(session: Session = Depends(get_db_session)) -> UserStore:
     return UserRepository(session)
+
+
+def get_card_service(index: ContentIndex = Depends(get_content_index)) -> CardService:
+    return CardService(index)
+
+
+def get_session_service(
+    session: Session = Depends(get_db_session),
+    cards: CardService = Depends(get_card_service),
+) -> SessionService:
+    return SessionService(
+        cards=cards,
+        scheduler=FSRSScheduler(),
+        sessions=SessionRepository(session),
+        reviews=ReviewRepository(session),
+    )
 
 
 def get_auth_service(
