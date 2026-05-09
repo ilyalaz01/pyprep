@@ -34,6 +34,7 @@ from .routers import auth as auth_router
 from .routers import health as health_router
 from .routers import modules as modules_router
 from .routers import review as review_router
+from .routers import stats as stats_router
 
 _BEARER = {"WWW-Authenticate": "Bearer"}
 
@@ -82,6 +83,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(auth_router.router, prefix="/api")
     app.include_router(modules_router.router, prefix="/api")
     app.include_router(review_router.router, prefix="/api")
+    app.include_router(stats_router.router, prefix="/api")
 
     return app
 
