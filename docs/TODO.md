@@ -153,7 +153,7 @@
 | ID | Task | DoD | Status |
 |---|---|---|---|
 | T4.1 | `frontend/src/lib/api.ts` — hand-typed API client + auth.ts JWT helpers + fetch wrapper (401 clears token + redirects). | All 15 endpoints typed; boot hits /api/health | ✅ (5 lib files: auth.ts/errors.ts/http.ts/api.ts/boot.ts; 26 vitest tests; APIError typed; 401 clears token + window.location.assign('/login') with redirect-loop guard; api groups for auth/modules/sessions/review/stats/mock/health all hand-typed against PLAN §7) |
-| T4.2 | Auth flow: login page, JWT in localStorage, protected route wrapper. | Login → redirect to home | ⬜ |
+| T4.2 | Auth flow: login page, JWT in localStorage, protected route wrapper. Public `/api/config` for single-user detection (ADR-014). | Login → redirect to home; single-user mode auto-detects and pre-fills | 🟡 |
 | T4.3 | Layout shell: sidebar nav, header with streak/XP widget, content area. | Lighthouse a11y ≥ 95 | ⬜ |
 | T4.4 | `/home` route: greeting, "Review now" widget, top-3-weakness widget, recent activity. | Renders with stub data, then real | ⬜ |
 | T4.5 | `/modules` and `/modules/:id` routes: module listing, sphere list, lesson reader. | Markdown renders with code highlighting | ⬜ |

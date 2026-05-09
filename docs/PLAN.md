@@ -480,6 +480,53 @@ triggers apply.
 
 ---
 
+### ADR-014: Public /api/config for SPA boot-time deployment-mode detection
+
+**Status:** Accepted (added Phase 4 — owner verdict)
+
+**Context:** The SPA needs to know at boot time whether the deployment
+is in single-user mode so it can either skip the login screen entirely
+(token present) or pre-fill the login email and disable the field
+(token absent). Three options:
+
+1. **Public `GET /api/config`** returning `{single_user: bool, version: str}`.
+   Clean, small surface, explicitly public.
+2. **Probe via `GET /api/auth/me` without token.** Conflates auth-check
+   with config-read; awkward error semantics (401 means "no token" or
+   "config probe failed"?).
+3. **Bake `VITE_SINGLE_USER=true` into the frontend build.** Frontend
+   and backend must be deployed in lockstep; a misconfigured deploy
+   silently drifts.
+
+**Decision:** Option (1) — add `GET /api/config` as a PUBLIC endpoint
+(no auth required). Returns only `{single_user: bool, version: str}`
+— no other settings leak (in particular no `single_user_email`, since
+that would let a public attacker enumerate the owner's account).
+
+**Rationale:**
+- Keeps backend as the source of truth; frontend cannot drift.
+- Tiny surface area — single new endpoint, single new Pydantic response,
+  no SDK additions needed (reads `Settings.single_user` directly).
+- Public is correct: `single_user` is not a secret (it's observable
+  from `/api/auth/register` returning 404), and `version` is already
+  in `/api/health`.
+
+**Trade-offs (accepted):**
+- One extra HTTP round-trip on app boot (parallelizable with
+  `/api/health` smoke). Negligible.
+- A future "config gets per-user fields" temptation must be resisted.
+  Per-user config goes through `/api/auth/me` (auth-gated), not here.
+  Anything in `/api/config` is observable to anonymous callers and
+  must stay public-safe forever.
+
+**Single-user-email is NOT exposed.** The SPA's pre-fill in single-user
+mode uses `single_user_email` only when the user already has a token
+(authenticated boot path). For the no-token boot path, the email field
+is shown empty + disabled with a "single-user deployment — contact the
+owner for credentials" hint. The email itself never leaks publicly.
+
+---
+
 ## 7. API Surface (preview)
 
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:
