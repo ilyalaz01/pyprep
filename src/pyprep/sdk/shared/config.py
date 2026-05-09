@@ -34,3 +34,12 @@ class Settings(BaseSettings):
     password_min_length: int = Field(default=8, ge=4, le=128)
     log_level: LogLevel = "INFO"
     content_root: Path = Path("content")
+
+    # API layer (T3.1). `cors_origins_raw` is comma-separated to keep env-var
+    # parsing simple — pydantic-settings list[str] needs JSON or `__` delim,
+    # both ergonomically worse for a CORS list. Use `cors_origins` to consume.
+    cors_origins_raw: str = "http://localhost:5173"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
