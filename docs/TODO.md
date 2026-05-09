@@ -125,6 +125,24 @@
 
 ---
 
+## Phase 3.5 — Audit fixes (post-Phase-3 fresh-eyes review)
+
+**Goal:** address the 7 audit findings (1 real bug + 6 hardening items) before Phase 4 starts. ADRs 011/012/013 added; NOTES N024-N028 deferred-list documented.
+
+| ID | Task | DoD | Status |
+|---|---|---|---|
+| T3.5.1 | Restore mypy gate on `src/pyprep/api/` (errors.py:_handler_for missing return annotation) + wire CI to run it. | `uv run mypy src/pyprep/api/` clean; CI fails if a return annotation goes missing | ⬜ |
+| T3.5.2 | Fix `/api/sessions/{id}/next` 500 on unknown `?after=` — extract `_resolve_next_index` helper, raise 404. | Test: `?after=NOT_A_REAL_CARD` returns 404, not 500 | ⬜ |
+| T3.5.3 | Clamp `AnswerRequest.response_ms` to `le=600_000` (10 min cap). Doc in PRD §3.3 that it's best-effort client-reported. | Test for >600_000 → 422; PRD §3.3 amended | ⬜ |
+| T3.5.4 | Middleware adds `Cache-Control: no-store` + `Pragma: no-cache` to any `/api/auth/*` response. | Test: login response carries the headers | ⬜ |
+| T3.5.5 | Log-leak property test (`tests/integration/test_log_hygiene.py`). Captures structlog output; asserts no password / no JWT bytes / no `idempotency_key` value / no `password` key in any field across register→login→sessions→answer flow. | Test green | ⬜ |
+| T3.5.6 | Refresh test asserts new token differs byte-for-byte from input. Add `jti` claim if needed to guarantee rotation. | `test_refresh_returns_token_distinct_from_input` green | ⬜ |
+| T3.5.7 | Modules endpoints explicitly tagged public in PRD §7; lock with test. | `GET /api/modules` with no Authorization header → 200 | ⬜ |
+
+**Phase 3.5 exit gate:** all 7 tasks ✅; full test suite + ruff + mypy(api/+sdk/) + LOC + handler-LOC audit + integration→routers ≥70% all green. ADRs 011/012/013 added to `PLAN.md`. NOTES N024-N028 added with deferral context. Push, verify CI green.
+
+---
+
 ## Phase 4 — Frontend Shell
 
 **Goal:** React app with routing, login, and module/lesson reading. No card sessions yet.
