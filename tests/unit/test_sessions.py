@@ -366,6 +366,46 @@ def test_finish_marks_ended_at_and_returns_summary(service, stores) -> None:
     assert sessions.get(s.id).ended_at == T0
 
 
+def test_finish_is_idempotent_returns_same_summary_on_second_call(cards, stores) -> None:
+    """N022 — `/api/sessions/{id}/finish` must be safe to retry. SDK contract:
+    second `finish` returns a byte-equal SessionSummary and does NOT advance
+    `ended_at` even though the clock has moved between the two calls."""
+    from pyprep.sdk.scheduler import FSRSScheduler
+    from pyprep.sdk.sessions import SessionService
+
+    sessions, reviews = stores
+
+    now = [T0]
+
+    def tick() -> dt.datetime:
+        out = now[0]
+        now[0] = out + dt.timedelta(seconds=1)
+        return out
+
+    ids = iter(f"id-{i}" for i in range(100))
+
+    svc = SessionService(
+        cards=cards,
+        scheduler=FSRSScheduler(),
+        sessions=sessions,
+        reviews=reviews,
+        clock=tick,
+        id_factory=lambda: next(ids),
+    )
+
+    s = svc.start(user_id="u1", mode="learn", sphere_id="m1-s0", limit=1)
+    svc.submit(s.id, "m1-s0-c1", Rating.Good, 100)
+
+    first = svc.finish(s.id)
+    ended_at_after_first = sessions.get(s.id).ended_at
+
+    second = svc.finish(s.id)
+    ended_at_after_second = sessions.get(s.id).ended_at
+
+    assert first == second
+    assert ended_at_after_first == ended_at_after_second  # second call did NOT bump ended_at
+
+
 def test_preview_queue_returns_same_card_ids_as_start_review(service, stores) -> None:
     """N019 — preview_queue is the side-effect-free twin of start(). Same
     inputs → same queue, but no Session row is persisted."""

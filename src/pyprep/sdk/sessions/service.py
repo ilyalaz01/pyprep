@@ -142,8 +142,9 @@ class SessionService:
 
     def finish(self, session_id: str) -> SessionSummary:
         session = self._sessions.get(session_id)
-        ended = replace(session, ended_at=self._clock())
-        self._sessions.update(ended)
+        if session.ended_at is None:  # N022: only stamp + write on first call
+            session = replace(session, ended_at=self._clock())
+            self._sessions.update(session)
         retention = (
             session.cards_correct / session.cards_total
             if session.cards_total
