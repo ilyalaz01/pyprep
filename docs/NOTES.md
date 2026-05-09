@@ -346,5 +346,110 @@ wrapper that calls `build_queue` with the service's bound `cards` and
 session-creation knobs. Test pins parity: `preview_queue` returns the
 same `card_ids` that `start()` would have populated `session.queue` with.
 
-This is the only Phase 3 SDK addition flagged as a gap fill (per the
-"SDK is sealed" rule — every other router uses existing surface).
+---
+
+## N020 — `/api/mock/prompt` `generate` handler exceeds the ≤10 LOC budget (deliberate)
+
+**Phase:** 3 (T3.7) · **Date:** 2026-05-09 · **Status:** accepted exception
+
+`routers/mock.py:generate` is 14 LOC of logic — over the Hard Rule 2
+≤10-LOC ceiling. The body of the handler is a field-by-field construction
+of `MockPromptRequest` from `MockPromptBody`. The owner approved the
+exception with this rationale:
+
+The point of the ≤10 LOC rule is "handler is auditable at a glance" —
+a security reviewer must be able to see the whole HTTP→SDK mapping
+without chasing helpers. An explicit `field=body.field` assignment is
+exactly that: the reviewer can verify each Pydantic field flows to the
+right SDK dataclass field at a glance. Hiding the construction in a
+`_to_request(body)` helper would shrink the handler but spread the
+mapping across two locations, making "is field X mapped correctly?"
+harder to answer. **Spirit > letter.**
+
+If a future contributor sees the 14 LOC and tries to "fix" it by
+extracting a helper or splatting via `**body.model_dump()`, leave this
+note as the reason not to.
+
+---
+
+## N021 — Sessions router HTTP design: idempotency, /next, authz
+
+**Phase:** 3 (T3.4) · **Date:** 2026-05-09 · **Status:** decided
+
+Three contract decisions made before T3.4 code lands so future readers
+see the *why* next to the *what*.
+
+### N021.1 — `idempotency_key` is body-only, optional, no fallback (Option C)
+
+`POST /api/sessions/{id}/answer` body field:
+```python
+idempotency_key: str | None = Field(
+    default=None, min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$"
+)
+```
+
+- **Body, not URL/query.** URLs leak through access logs and Referer
+  headers; idempotency keys can leak the action context (which card,
+  which user activity). Body keeps them payload-scoped.
+- **Optional, no server fallback.** Clients that care about double-click
+  protection generate a UUID per submission and pass it. Clients that
+  don't accept the risk of a duplicate review row on retry. The T2.5.2
+  fix was for *true* duplicates (same key, same card, same session); a
+  server-side fallback (e.g., `hash(card_id+minute_bucket)`) would
+  collapse legitimate re-rates and is worse than no protection.
+- **Length floor 16, ceiling 128, alnum+`_-`.** Prevents trivially-short
+  keys (`"1"`) that would silently collide; matches UUID (36 chars) and
+  ULID (26 chars) shapes plus a margin for prefixed schemes.
+
+Dedup semantics (inherited from T2.5.2):
+- Same key + same `(session_id, card_id)` → returns the original review's
+  resulting `next_state`. Silent dedup. New rating is **ignored** (the
+  first write wins; honest semantics for "you already submitted this").
+- Same key + different `card_id` → not deduped. The key is scoped per
+  `(session, card)`, not globally per session.
+- Same key + different `session_id` → not deduped. Sessions are isolated.
+
+The HTTP response shape is identical for dedup hits and fresh writes
+(200 + `{next_due_at, new_state}`). The route does **not** expose an
+`is_duplicate` flag — clients should treat `/answer` as idempotent and
+not branch on it; surfacing it would invite UX coupling to server
+internals.
+
+### N021.2 — `GET /{id}/next` is a stateless lookup, not a cursor
+
+ADR-010 says the client owns queue progression. The `/next` endpoint is
+a server convenience that returns `queue[0]` (or `queue[index_of(after)+1]`
+if `?after=card_id` is supplied) plus the card's full `raw` content for
+rendering. No server-side cursor is stored. If the client deviates from
+the queue, the server returns whatever the client asks about; deviation
+is an accepted tradeoff per ADR-010.
+
+### N021.3 — Cross-user session access is 404, not 403
+
+If a user sends a `session_id` that exists but belongs to another user,
+the route returns 404 (not 403). 403 leaks the existence of other users'
+sessions; 404 doesn't distinguish "doesn't exist" from "not yours". This
+is the standard anti-enumeration default (same family as the auth
+unknown-email→`InvalidCredentialsError` decision).
+
+---
+
+## N022 — `SessionService.finish` made idempotent for HTTP retries [SDK addition]
+
+**Phase:** 3 (T3.4) · **Date:** 2026-05-09 · **Status:** added
+
+The pre-T3.4 `finish` always overwrites `ended_at` with `self._clock()`,
+so a flaky-network retry from the SPA would (a) write a new `ended_at`
+to the DB and (b) return a `SessionSummary` whose `ended_at` differs
+from the first response. The HTTP `/api/sessions/{id}/finish` endpoint
+needs to be idempotent so retries are safe.
+
+**Resolution:** if `session.ended_at is not None`, `finish` returns the
+existing summary without touching the DB. Same `cards_total`,
+`cards_correct`, `retention` as the first call. Test pins byte-equality
+of two consecutive `finish` calls.
+
+This keeps the route handler trivial (no try/except for "already
+finished" and no special HTTP status for the second call — both calls
+return 200 with the same body). Per N019/N020 pattern, the SDK addition
+is committed before the route lands.

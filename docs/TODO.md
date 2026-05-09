@@ -113,7 +113,7 @@
 | T3.1 | `src/pyprep/api/app.py` — FastAPI app factory, middleware (CORS, logging, error handler). | Boots, `/api/docs` reachable | ✅ (8 api/ files all ≤150 LOC; 8 integration tests; structlog JSON logging closes N013; HTTPMapping registry stub for T3.2 routers; alembic baseline + drift test; SQLite FK PRAGMA per-connection) |
 | T3.2 | `src/pyprep/api/routers/auth.py` — register, login, refresh endpoints. | Postman happy paths green | ✅ (15 router + 5 deps + 4 single-user tests; closes N012; AUTH_ERROR_MAPPINGS centralized; token_type=bearer; single-user → 404 register + auto-create owner via lifespan; bcrypt rounds=12 explicit) |
 | T3.3 | `src/pyprep/api/routers/modules.py` — list modules, get lesson. | Tests green | ✅ (6 tests; ContentIndex eager-loaded into app.state in create_app; 3 endpoints — list / detail / lesson; sphere-in-wrong-module → 404) |
-| T3.4 | `src/pyprep/api/routers/sessions.py` — create, next-card, answer, finish. | Tests green | ⬜ |
+| T3.4 | `src/pyprep/api/routers/sessions.py` — create, next-card, answer, finish. | Tests green | 🟡 |
 | T3.5 | `src/pyprep/api/routers/review.py` — daily queue. | Tests green | ✅ (4 tests; auth-gated; SDK addition `SessionService.preview_queue` documented in NOTES N019; sphere_id+limit query params) |
 | T3.6 | `src/pyprep/api/routers/stats.py` — me, weakness. | Tests green | ✅ (4 tests; auth-gated; /me returns Overview, /me/weakness returns top-N SphereStats with n=Query(1..20)) |
 | T3.7 | `src/pyprep/api/routers/mock.py` — generate mock-interview prompt. | Tests green | ✅ (5 tests; auth-gated; deterministic same-seed; FR-MOCK-4 invariant pinned at HTTP boundary; template loaded from `content/interview_packs/template_v1.md` codeblock at app boot) |
