@@ -68,7 +68,9 @@ class NextCardResponse(BaseModel):
 class AnswerRequest(BaseModel):
     card_id: str
     rating: int = Field(ge=1, le=4)
-    response_ms: int = Field(ge=0)
+    # response_ms cap (T3.5.3): 600_000 = 10 minutes. Best-effort client-
+    # reported; not trusted as a stat measure (see PRD §3.3 renderer note).
+    response_ms: int = Field(ge=0, le=600_000)
     idempotency_key: str | None = Field(
         default=None, min_length=16, max_length=128, pattern=_KEY_PATTERN
     )

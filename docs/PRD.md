@@ -111,6 +111,13 @@ PyPrep is **shippable** when **all** of the following hold:
 > browser on the wire — see `PRD_code_sandbox.md` §3.1 (Visibility
 > model) for the full architectural trade-off. Renderers MUST mask;
 > they MUST NOT assume server-side redaction.
+>
+> **`response_ms` trust note:** The per-answer `response_ms` field is
+> client-reported and clamped server-side at 0–600_000 ms (10 min cap;
+> rejected at the Pydantic boundary). Treat it as best-effort — clock
+> skew, paused tabs, and client tampering all corrupt it. Suitable for
+> "rough latency" displays; NOT suitable as a primary stat or as input
+> to scheduler weighting. (T3.5.3.)
 
 ### 3.4 Smart Review (FR-REVIEW)
 

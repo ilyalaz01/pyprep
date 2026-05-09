@@ -270,6 +270,42 @@ async def test_answer_idempotency_key_bad_chars_returns_422(
 
 
 @pytest.mark.asyncio
+async def test_answer_response_ms_above_cap_returns_422(
+    client: httpx.AsyncClient,
+) -> None:
+    """T3.5.3 — response_ms is best-effort client-reported and must be clamped
+    at the boundary. >10 minutes (600_000 ms) trips 422 — prevents a clock-skew
+    or tampered client from poisoning FSRS scheduling and stats aggregations."""
+    token = await _register_and_login(client, "rcap@example.com")
+    s = await _start_session(client, token)
+    r = await client.post(
+        f"/api/sessions/{s['id']}/answer",
+        json={
+            "card_id": s["queue"][0],
+            "rating": 3,
+            "response_ms": 600_001,  # 1 ms over the cap
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_answer_response_ms_at_cap_accepted(
+    client: httpx.AsyncClient,
+) -> None:
+    """Boundary check — exactly 600_000 is accepted."""
+    token = await _register_and_login(client, "rcapok@example.com")
+    s = await _start_session(client, token)
+    r = await client.post(
+        f"/api/sessions/{s['id']}/answer",
+        json={"card_id": s["queue"][0], "rating": 3, "response_ms": 600_000},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_answer_rating_out_of_range_returns_422(client: httpx.AsyncClient) -> None:
     """Rating must be 1..4 (Again, Hard, Good, Easy). Anything else is 422
     at the Pydantic boundary — never reaches the SDK's `Rating(int)` cast,
