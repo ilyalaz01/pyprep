@@ -52,6 +52,11 @@ docker compose up                    # OR run uv run pyprep-api and pnpm --dir f
 
 Open `http://localhost:5173`. Default single-user mode is enabled — no registration screen.
 
+> **Database migrations run automatically on app startup.** No manual
+> `alembic upgrade head` is needed for dev or prod — the FastAPI lifespan
+> hook brings the schema to head every boot (idempotent). See
+> `src/pyprep/api/lifespan.py` and `PLAN.md` ADR-012.
+
 ---
 
 ## Configuration

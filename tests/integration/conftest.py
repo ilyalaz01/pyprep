@@ -4,9 +4,12 @@ Each test gets a fresh `Settings` (file-backed SQLite under tmp_path,
 deterministic secret) and a fresh `create_app(settings)` instance. No state
 leaks between tests.
 
-Tests build the schema via `Base.metadata.create_all` rather than running
-alembic per-test (alembic is exercised separately in `test_alembic_migration.py`
-which pins zero drift). This keeps integration tests fast.
+Schema source: `alembic upgrade head` (same code path as production —
+the lifespan runs this on app startup, audit Section D #2 fix). Tests
+that wrap with `with_lifespan(app)` get schema for free; tests that
+construct settings without an app can call `init_schema(settings)`
+directly, which is also `alembic upgrade head` (idempotent — safe to
+call twice if both init_schema and lifespan run).
 
 `httpx.ASGITransport` does NOT trigger ASGI lifespan events (startup /
 shutdown) — by design, since transports are protocol-only. For tests that
@@ -18,12 +21,17 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 
 from pyprep.sdk.shared.config import Settings
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @asynccontextmanager
@@ -36,15 +44,13 @@ TEST_SECRET = "x" * 48  # ≥32 chars (T2.5.1 hardening)
 
 
 def init_schema(settings: Settings) -> None:
-    """Create all ORM tables on the engine for `settings`. Used by tests
-    that construct their own apps (single-user tests) — `test_settings`
-    fixture below also calls this for the standard `client` flow."""
-    from pyprep.api.db import create_engine_for
-    from pyprep.sdk.repos import models as _m  # noqa: F401
-    from pyprep.sdk.repos.database import Base
-
-    engine = create_engine_for(settings)
-    Base.metadata.create_all(engine)
+    """Run `alembic upgrade head` against `settings.database_url`.
+    Same code path as production (lifespan); idempotent; safe to call
+    twice in sequence with no error."""
+    cfg = Config(str(_REPO_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(_REPO_ROOT / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    command.upgrade(cfg, "head")
 
 
 @pytest.fixture

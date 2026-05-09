@@ -466,6 +466,15 @@ Vite dev server stays separate (port 5173) in dev.
   no-ops (same-origin requests need no CORS headers).
 - TODO.md Phase 10 (T10.3) updated to call out this StaticFiles mount.
 
+**Migrations amendment (T4.2 unblock, audit Section D #2):** the
+production deploy used to need a separate `alembic upgrade head` step
+before the app process started — easy to forget, easy to break. As of
+T4.2-unblock the FastAPI lifespan runs `alembic upgrade head` at
+startup (idempotent, no-op when DB is at head). Production deploy is
+now: drop a new build, restart the process, schema follows. No manual
+migration step in the Dockerfile / deploy guide. The Phase 10
+deploy-guide (T10.4) should NOT recommend a separate alembic step.
+
 ---
 
 ### ADR-013: See ADR-010 amendment (Pyodide client-side trust boundary)
