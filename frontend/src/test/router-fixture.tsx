@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-router'
 import { render } from '@testing-library/react'
 
+import { AppShell } from '../components/AppShell'
 import { getToken } from '../lib/auth'
 import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
@@ -45,7 +46,7 @@ export function buildRouter(initialUrl: string) {
         throw redirect({ to: '/login', search: { from: location.href } })
       }
     },
-    component: () => <Outlet />,
+    component: AppShell,
   })
   const home = createRoute({
     getParentRoute: () => authed,

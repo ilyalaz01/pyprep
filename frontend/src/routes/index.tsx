@@ -19,6 +19,7 @@ import {
   redirect,
 } from '@tanstack/react-router'
 
+import { AppShell } from '../components/AppShell'
 import { getToken } from '../lib/auth'
 import { HomePage } from '../pages/HomePage'
 import { LoginPage } from '../pages/LoginPage'
@@ -48,7 +49,8 @@ const loginRoute = createRoute({
   component: LoginPage,
 })
 
-/** Parent layout route that gates all protected children via beforeLoad. */
+/** Parent layout route that gates all protected children via beforeLoad
+ *  AND wraps them in the AppShell (TopBar + content). */
 const authedLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_auth',
@@ -60,7 +62,7 @@ const authedLayoutRoute = createRoute({
       })
     }
   },
-  component: () => <Outlet />,
+  component: AppShell,
 })
 
 const homeRoute = createRoute({

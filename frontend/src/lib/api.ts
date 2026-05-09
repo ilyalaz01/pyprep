@@ -42,6 +42,7 @@ export const api = {
     login: (email: string, password: string) =>
       call<AccessToken>('/api/auth/login', post({ email, password })),
     refresh: () => call<AccessToken>('/api/auth/refresh', post()),
+    me: () => call<User>('/api/auth/me'),
   },
 
   modules: {

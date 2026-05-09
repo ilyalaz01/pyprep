@@ -553,6 +553,7 @@ Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level sh
 POST   /api/auth/register                  # auth: none (404 in single-user mode)
 POST   /api/auth/login                     # auth: none
 POST   /api/auth/refresh                   # auth: Bearer (rotates jti per call)
+GET    /api/auth/me                        # auth: Bearer    {id, email, created_at}
 
 GET    /api/modules                        # auth: PUBLIC  (T3.5.7 — locked by test)
 GET    /api/modules/{module_id}            # auth: PUBLIC

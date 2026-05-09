@@ -79,6 +79,38 @@ async def test_register_too_long_password_returns_422(client: httpx.AsyncClient)
 
 
 @pytest.mark.asyncio
+async def test_me_requires_auth(client: httpx.AsyncClient) -> None:
+    """GET /api/auth/me — auth-gated; missing token → 401 with Bearer challenge."""
+    r = await client.get("/api/auth/me")
+    assert r.status_code == 401
+    assert r.headers.get("www-authenticate", "").lower().startswith("bearer")
+
+
+@pytest.mark.asyncio
+async def test_me_returns_current_user_shape(client: httpx.AsyncClient) -> None:
+    """Happy path: register → login → /me returns the same User shape as
+    /register (id, email, created_at). No password fields ever leak."""
+    await client.post(
+        "/api/auth/register",
+        json={"email": "me@example.com", "password": PASSWORD},
+    )
+    login = await client.post(
+        "/api/auth/login", json={"email": "me@example.com", "password": PASSWORD}
+    )
+    token = login.json()["access_token"]
+    r = await client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["email"] == "me@example.com"
+    assert "id" in body and len(body["id"]) > 0
+    assert "created_at" in body
+    assert "password" not in body
+    assert "password_hash" not in body
+
+
+@pytest.mark.asyncio
 async def test_login_response_carries_no_store_cache_headers(
     client: httpx.AsyncClient,
 ) -> None:

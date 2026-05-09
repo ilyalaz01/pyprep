@@ -7,8 +7,8 @@ import { describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+import { Banner } from './Banner'
 import { Button } from './Button'
-import { ErrorBanner } from './ErrorBanner'
 import { FormField } from './FormField'
 import { Input } from './Input'
 
@@ -88,9 +88,24 @@ describe('FormField', () => {
   })
 })
 
-describe('ErrorBanner', () => {
-  test('has role=alert', () => {
-    render(<ErrorBanner>Something broke.</ErrorBanner>)
+describe('Banner', () => {
+  test('error variant uses role=alert (announced by screen readers)', () => {
+    render(<Banner variant="error">Something broke.</Banner>)
     expect(screen.getByRole('alert')).toHaveTextContent('Something broke.')
+  })
+
+  test('info variant uses role=status (polite, not interruptive)', () => {
+    render(<Banner variant="info">Heads up.</Banner>)
+    expect(screen.getByRole('status')).toHaveTextContent('Heads up.')
+  })
+
+  test('success variant uses role=status', () => {
+    render(<Banner variant="success">All good.</Banner>)
+    expect(screen.getByRole('status')).toHaveTextContent('All good.')
+  })
+
+  test('default variant is info', () => {
+    render(<Banner>plain</Banner>)
+    expect(screen.getByRole('status')).toHaveTextContent('plain')
   })
 })

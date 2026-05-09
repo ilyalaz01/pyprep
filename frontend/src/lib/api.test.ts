@@ -88,6 +88,13 @@ describe('api.auth', () => {
     expect(init.method).toBe('POST')
     expect(init.body ?? null).toBeNull()
   })
+
+  test('me GETs /api/auth/me and returns the User shape', async () => {
+    mockJson({ id: 'u1', email: 'me@example.com', created_at: '2026-05-09T00:00:00Z' })
+    const r = await api.auth.me()
+    expect(r.email).toBe('me@example.com')
+    expect(lastCall().url).toContain('/api/auth/me')
+  })
 })
 
 describe('api.modules', () => {
@@ -122,26 +129,18 @@ describe('api.review', () => {
 })
 
 describe('api.sessions', () => {
-  test('start POSTs /api/sessions with mode/sphere_id/limit', async () => {
-    mockJson({
-      id: 's1', user_id: 'u1', mode: 'learn', queue: ['c1'],
-      started_at: '2026-05-09T00:00:00Z', ended_at: null,
-      cards_total: 1, cards_correct: 0,
-    }, 201)
+  test('start POSTs /api/sessions', async () => {
+    mockJson({ id: 's1', user_id: 'u1', mode: 'learn', queue: ['c1'], started_at: '2026-05-09T00:00:00Z', ended_at: null, cards_total: 1, cards_correct: 0 }, 201)
     await api.sessions.start({ mode: 'learn', sphere_id: 'm1-s0', limit: 5 })
-    const { url, init } = lastCall()
-    expect(url).toContain('/api/sessions')
-    expect(init.method).toBe('POST')
+    expect(lastCall().init.method).toBe('POST')
+    expect(lastCall().url).toContain('/api/sessions')
   })
 
   test('answer carries idempotency_key in body when provided', async () => {
+    const key = 'k-' + '0'.repeat(30)
     mockJson({ next_due_at: '2026-05-10', new_state: 'learning' })
-    await api.sessions.answer('s1', {
-      card_id: 'c1', rating: 3, response_ms: 1000,
-      idempotency_key: 'k-' + '0'.repeat(30),
-    })
-    const body = JSON.parse(lastCall().init.body as string)
-    expect(body.idempotency_key).toBe('k-' + '0'.repeat(30))
+    await api.sessions.answer('s1', { card_id: 'c1', rating: 3, response_ms: 1000, idempotency_key: key })
+    expect(JSON.parse(lastCall().init.body as string).idempotency_key).toBe(key)
   })
 })
 

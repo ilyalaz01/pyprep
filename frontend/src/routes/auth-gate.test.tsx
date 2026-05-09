@@ -43,7 +43,9 @@ describe('auth gate', () => {
   test('token present + visiting /home → renders HomePage', async () => {
     setToken('eyJ.test.token')
     renderAt('/home')
-    expect(await screen.findByRole('heading', { name: /home/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /welcome back/i }),
+    ).toBeInTheDocument()
   })
 
   test('token present + visiting / → redirected to /home', async () => {

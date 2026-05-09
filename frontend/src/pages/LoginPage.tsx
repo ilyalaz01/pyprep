@@ -11,8 +11,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 
+import { Banner } from '../components/Banner'
 import { Button } from '../components/Button'
-import { ErrorBanner } from '../components/ErrorBanner'
 import { FormField } from '../components/FormField'
 import { Input } from '../components/Input'
 import { api } from '../lib/api'
@@ -67,7 +67,7 @@ export function LoginPage() {
               : 'PyPrep — Python interview prep'}
           </p>
         </header>
-        {bannerError && <ErrorBanner>{bannerError}</ErrorBanner>}
+        {bannerError && <Banner variant="error">{bannerError}</Banner>}
         <FormField id="email" label="Email" error={fieldError.email}>
           <Input
             id="email" name="email" type="email" autoComplete="email"

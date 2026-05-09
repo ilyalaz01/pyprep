@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 
-from pyprep.api.deps import bearer_scheme, get_auth_service, get_settings
-from pyprep.sdk.auth import AuthService, InvalidTokenError
+from pyprep.api.deps import bearer_scheme, get_auth_service, get_current_user, get_settings
+from pyprep.sdk.auth import AuthService, InvalidTokenError, User
 from pyprep.sdk.shared.config import Settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -76,3 +76,8 @@ def refresh(
         raise InvalidTokenError()
     tok = auth.refresh_token(creds.credentials)
     return AccessTokenResponse(access_token=tok.token, expires_at=tok.expires_at)
+
+
+@router.get("/me", response_model=UserResponse)
+def me(user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse(id=user.id, email=user.email, created_at=user.created_at)
