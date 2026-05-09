@@ -152,7 +152,7 @@
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T4.1 | `frontend/src/lib/api.ts` — typed API client (generated from OpenAPI or hand-written). | All endpoints accessible | ⬜ |
+| T4.1 | `frontend/src/lib/api.ts` — hand-typed API client + auth.ts JWT helpers + fetch wrapper (401 clears token + redirects). | All 15 endpoints typed; boot hits /api/health | 🟡 |
 | T4.2 | Auth flow: login page, JWT in localStorage, protected route wrapper. | Login → redirect to home | ⬜ |
 | T4.3 | Layout shell: sidebar nav, header with streak/XP widget, content area. | Lighthouse a11y ≥ 95 | ⬜ |
 | T4.4 | `/home` route: greeting, "Review now" widget, top-3-weakness widget, recent activity. | Renders with stub data, then real | ⬜ |
