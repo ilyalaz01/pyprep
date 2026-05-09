@@ -124,8 +124,15 @@ class AuthService:
     def _issue(self, user_id: str) -> AccessToken:
         now = self._clock()
         exp = now + self._ttl
+        # T3.5.6: jti guarantees byte-distinct tokens even when iat/exp
+        # collide at second resolution (back-to-back refresh calls).
         token = jwt.encode(
-            {"sub": user_id, "iat": int(now.timestamp()), "exp": int(exp.timestamp())},
+            {
+                "sub": user_id,
+                "iat": int(now.timestamp()),
+                "exp": int(exp.timestamp()),
+                "jti": uuid.uuid4().hex,
+            },
             self._secret,
             algorithm=self._algorithm,
         )

@@ -319,6 +319,30 @@ def test_decode_rejects_token_with_missing_exp(auth: AuthService) -> None:
         auth.verify_token(bad)
 
 
+def test_refresh_token_is_byte_distinct_from_input_within_same_second(
+    auth: AuthService,
+) -> None:
+    """T3.5.6 — jti claim guarantees uniqueness even when iat collides at
+    second resolution. Two refresh calls under a frozen clock must still
+    produce byte-distinct tokens. Without jti, this would silently pass-
+    through the original token and refresh would be a no-op."""
+    auth.register(email="rot@example.com", password="hunter2!")
+    first = auth.login(email="rot@example.com", password="hunter2!")
+    # Frozen clock: same iat, same exp. Only jti can disambiguate.
+    second = auth.refresh_token(first.token)
+    assert first.token != second.token
+
+
+def test_issued_token_carries_jti_claim(auth: AuthService) -> None:
+    """jti must be a non-empty string (regression: if removed, the previous
+    test could pass for stochastic reasons under a non-frozen clock)."""
+    auth.register(email="jti@example.com", password="hunter2!")
+    tok = auth.login(email="jti@example.com", password="hunter2!")
+    payload = jwt.decode(tok.token, SECRET, algorithms=["HS256"])
+    assert "jti" in payload
+    assert isinstance(payload["jti"], str) and len(payload["jti"]) > 0
+
+
 def test_login_body_carries_n012_3_todo_comment() -> None:
     """N012.3 — surface the deferred N011 timing-parity decision at the
     call site (so a future reader sees it next to the unknown-email branch).

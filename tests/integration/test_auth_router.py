@@ -185,6 +185,32 @@ async def test_refresh_with_valid_token_returns_new_token(
 
 
 @pytest.mark.asyncio
+async def test_refresh_returns_token_distinct_from_input(
+    client: httpx.AsyncClient,
+) -> None:
+    """T3.5.6 — `/refresh` MUST issue a fresh token. The previous test
+    only asserted non-empty, which would pass even if the SDK echoed
+    the input bytes back. If `iat` doesn't change between calls (same-
+    second resolution), the encoded JWTs collide and refresh is a no-op."""
+    await client.post(
+        "/api/auth/register", json={"email": "rot@example.com", "password": PASSWORD}
+    )
+    login = await client.post(
+        "/api/auth/login", json={"email": "rot@example.com", "password": PASSWORD}
+    )
+    original = login.json()["access_token"]
+    r = await client.post(
+        "/api/auth/refresh", headers={"Authorization": f"Bearer {original}"}
+    )
+    assert r.status_code == 200
+    rotated = r.json()["access_token"]
+    assert rotated != original, (
+        "refresh returned byte-equal token — JWT rotation broken. "
+        "Likely cause: same-second iat collision; need a jti claim or clock advance."
+    )
+
+
+@pytest.mark.asyncio
 async def test_refresh_with_no_token_returns_401(client: httpx.AsyncClient) -> None:
     r = await client.post("/api/auth/refresh")
     assert r.status_code == 401
