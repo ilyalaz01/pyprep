@@ -3,9 +3,8 @@
  *
  * No "next lesson" auto-advance: spheres are independent, not a sequence.
  */
-import { Link } from '@tanstack/react-router'
-
 import { Button } from './Button'
+import { LinkButton } from './LinkButton'
 
 interface LessonActionsProps {
   moduleId: number
@@ -25,18 +24,13 @@ export function LessonActions({ moduleId, sphereId, cardCount }: LessonActionsPr
       >
         Start review session
       </Button>
-      <Link
+      <LinkButton
+        variant="ghost"
         to="/modules/$moduleId"
         params={{ moduleId: String(moduleId) }}
-        className={[
-          'inline-flex items-center justify-center gap-2 h-9 px-4 rounded text-sm font-medium',
-          'bg-transparent text-[color:var(--color-fg-muted)]',
-          'hover:text-[color:var(--color-fg)]',
-          'transition-colors duration-120',
-        ].join(' ')}
       >
         Back to module
-      </Link>
+      </LinkButton>
     </div>
   )
 }

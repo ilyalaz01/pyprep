@@ -40,6 +40,24 @@ describe('Button', () => {
     await userEvent.click(screen.getByRole('button'))
     expect(onClick).not.toHaveBeenCalled()
   })
+
+  test.each(['primary', 'secondary', 'ghost'] as const)(
+    'variant %s applies a distinct theme-token-driven background',
+    (variant) => {
+      render(<Button variant={variant}>x</Button>)
+      const btn = screen.getByRole('button')
+      // Each variant must reference at least one --color-* token in its
+      // class blob — guards against a future "let me hardcode #fff" PR.
+      expect(btn.className).toMatch(/var\(--color-/)
+    },
+  )
+
+  test('size sm renders a tighter height/text token than md (default)', () => {
+    const { rerender } = render(<Button>md</Button>)
+    expect(screen.getByRole('button').className).toMatch(/h-9/)
+    rerender(<Button size="sm">sm</Button>)
+    expect(screen.getByRole('button').className).toMatch(/h-7/)
+  })
 })
 
 describe('Input', () => {
@@ -55,6 +73,16 @@ describe('Input', () => {
       'aria-invalid',
       'true',
     )
+  })
+
+  test('disabled attribute carries through to the underlying input', () => {
+    render(<Input id="x" placeholder="email" disabled />)
+    expect(screen.getByPlaceholderText('email')).toBeDisabled()
+  })
+
+  test('type="password" forwards (LoginPage relies on browser autofill)', () => {
+    render(<Input id="x" type="password" data-testid="pw" />)
+    expect(screen.getByTestId('pw')).toHaveAttribute('type', 'password')
   })
 })
 
@@ -85,6 +113,16 @@ describe('FormField', () => {
       </FormField>,
     )
     expect(screen.getByText('optional')).toBeInTheDocument()
+  })
+
+  test('label.htmlFor matches the wrapped input id (no orphan label)', () => {
+    render(
+      <FormField id="email" label="Email">
+        <Input id="email" />
+      </FormField>,
+    )
+    const label = screen.getByText('Email').closest('label')!
+    expect(label.getAttribute('for')).toBe('email')
   })
 })
 
