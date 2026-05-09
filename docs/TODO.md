@@ -114,7 +114,7 @@
 | T3.2 | `src/pyprep/api/routers/auth.py` — register, login, refresh endpoints. | Postman happy paths green | ✅ (15 router + 5 deps + 4 single-user tests; closes N012; AUTH_ERROR_MAPPINGS centralized; token_type=bearer; single-user → 404 register + auto-create owner via lifespan; bcrypt rounds=12 explicit) |
 | T3.3 | `src/pyprep/api/routers/modules.py` — list modules, get lesson. | Tests green | ✅ (6 tests; ContentIndex eager-loaded into app.state in create_app; 3 endpoints — list / detail / lesson; sphere-in-wrong-module → 404) |
 | T3.4 | `src/pyprep/api/routers/sessions.py` — create, next-card, answer, finish. | Tests green | ⬜ |
-| T3.5 | `src/pyprep/api/routers/review.py` — daily queue. | Tests green | ⬜ |
+| T3.5 | `src/pyprep/api/routers/review.py` — daily queue. | Tests green | 🟡 |
 | T3.6 | `src/pyprep/api/routers/stats.py` — me, weakness. | Tests green | ⬜ |
 | T3.7 | `src/pyprep/api/routers/mock.py` — generate mock-interview prompt. | Tests green | ⬜ |
 | T3.8 | `src/pyprep/api/deps.py` — auth dependency (decode JWT, return current user). | Tests cover invalid/expired tokens | ✅ (5 tests pin no-header / malformed / expired / deleted-user / happy paths; deps.py at 100% coverage; build_auth_service shared with lifespan as single source of truth) |
