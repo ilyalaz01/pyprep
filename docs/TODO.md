@@ -118,7 +118,7 @@
 | T3.6 | `src/pyprep/api/routers/stats.py` — me, weakness. | Tests green | ✅ (4 tests; auth-gated; /me returns Overview, /me/weakness returns top-N SphereStats with n=Query(1..20)) |
 | T3.7 | `src/pyprep/api/routers/mock.py` — generate mock-interview prompt. | Tests green | ✅ (5 tests; auth-gated; deterministic same-seed; FR-MOCK-4 invariant pinned at HTTP boundary; template loaded from `content/interview_packs/template_v1.md` codeblock at app boot) |
 | T3.8 | `src/pyprep/api/deps.py` — auth dependency (decode JWT, return current user). | Tests cover invalid/expired tokens | ✅ (5 tests pin no-header / malformed / expired / deleted-user / happy paths; deps.py at 100% coverage; build_auth_service shared with lifespan as single source of truth) |
-| T3.9 | Each handler ≤ 10 LOC of logic — calls one SDK method. | Code review check | 🟡 |
+| T3.9 | Each handler ≤ 10 LOC of logic — calls one SDK method. | Code review check | ✅ (audit script `scripts/audit_handlers.py` + pinned in test suite as CI gate; 15/15 handlers within budget — only `mock::generate` (15 LOC) holds an N020 waiver; refactor of `stats::get_weakness` 12→2 dropped its over-budget status) |
 | T3.10 | Integration tests via `httpx.AsyncClient` against the test app. | `tests/integration/` ≥ 70% coverage of routers | ⬜ |
 
 **Phase 3 exit gate:** All endpoints documented in `/api/docs`, integration tests green, owner can hit each endpoint via curl.

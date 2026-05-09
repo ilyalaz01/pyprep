@@ -53,14 +53,13 @@ def get_weakness(
     stats: StatsService = Depends(get_stats_service),
 ) -> WeaknessResponse:
     rows = stats.weakness_top_n(user.id, n=n)
-    return WeaknessResponse(
-        top=[
-            SphereStatsResponse(
-                sphere_id=s.sphere_id,
-                reviews_total=s.reviews_total,
-                retention=s.retention,
-                weakness=s.weakness,
-            )
-            for s in rows
-        ]
+    return WeaknessResponse(top=[_to_sphere(s) for s in rows])
+
+
+def _to_sphere(s) -> SphereStatsResponse:  # type: ignore[no-untyped-def]
+    return SphereStatsResponse(
+        sphere_id=s.sphere_id,
+        reviews_total=s.reviews_total,
+        retention=s.retention,
+        weakness=s.weakness,
     )
