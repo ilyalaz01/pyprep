@@ -30,13 +30,12 @@ jobs:
       - name: Ruff (lint)
         run: uv run ruff check .
 
-      - name: Mypy (strict on sdk; skipped until Phase 2)
-        run: |
-          if [ -d src/pyprep/sdk ]; then
-            uv run mypy
-          else
-            echo "src/pyprep/sdk/ not present yet — skipping mypy until Phase 2 (T2.x)."
-          fi
+      - name: Mypy (strict on sdk + api)
+        # Files list comes from pyproject [tool.mypy]. T3.5.1 added api/.
+        run: uv run mypy
+
+      - name: Handler-LOC audit (≤10 logic LOC, NOTES-waivered exceptions only)
+        run: uv run python scripts/audit_handlers.py
 
       - name: Pytest (with coverage)
         run: uv run pytest

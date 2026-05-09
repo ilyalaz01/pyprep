@@ -7,10 +7,12 @@ each handler within Hard Rule 2's ≤10-LOC budget.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+ExceptionHandler = Callable[[Request, Exception], Awaitable[JSONResponse]]
 
 
 class HTTPMapping:
@@ -34,7 +36,7 @@ def install_error_handlers(app: FastAPI, mappings: dict[type[Exception], HTTPMap
         app.add_exception_handler(exc_type, _handler_for(mapping))
 
 
-def _handler_for(mapping: HTTPMapping):
+def _handler_for(mapping: HTTPMapping) -> ExceptionHandler:
     async def _handle(_request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(
             status_code=mapping.status,

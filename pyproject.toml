@@ -130,5 +130,5 @@ extend-immutable-calls = [
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src/pyprep/sdk"]
+files = ["src/pyprep/sdk", "src/pyprep/api"]
 ignore_missing_imports = true
