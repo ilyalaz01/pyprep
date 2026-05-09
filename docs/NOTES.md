@@ -208,44 +208,31 @@ Anti-enumeration timing-parity follow-up tracked in N012.
 
 ---
 
-## N012 — AuthService polish nits (Phase 10 backlog)
+## N012 — AuthService polish nits [CLOSED]
 
-**Phase:** 2 (T2.7 review) · **Date:** 2026-05-08 · **Status:** open
-(do NOT fix in Phase 2 per owner directive — Phase 10 polish)
+**Phase:** 2 (T2.7 review) · **Opened:** 2026-05-08 · **Closed:** 2026-05-09
+(promoted from Phase 10 to T3.2 per owner directive — adapter scope was the
+right time for these to land alongside HTTP error mappings)
 
 Three nits raised at the T2.7 owner review of `auth/service.py`. All
 three are contract-tightening, not security holes. Fix in the Phase 10
 polish pass.
 
-### N012.1 — Pin `bcrypt.gensalt(rounds=12)` explicitly
+### N012.1 — Pin `bcrypt.gensalt(rounds=12)` explicitly [CLOSED, T3.2]
 
-`auth/service.py:61` uses `bcrypt.gensalt()` with library defaults.
-Make explicit to protect against silent default drift across `bcrypt`
-versions.
+`auth/service.py` now hard-codes `_BCRYPT_ROUNDS = 12` and passes it to
+`bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)`. Owner picked Option A (no knob);
+exposing rounds via constructor was YAGNI for current scale. Test
+`test_register_uses_explicit_bcrypt_rounds_12` asserts the cost factor
+in the produced hash so future bcrypt-default drift trips CI.
 
-```python
-# Option A: hard-code
-password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
+### N012.2 — Tighten `_decode` exp-claim handling [CLOSED, T3.2]
 
-# Option B: expose a knob
-def __init__(self, *, ..., bcrypt_rounds: int = 12) -> None:
-    self._bcrypt_rounds = bcrypt_rounds
-```
-
-### N012.2 — Tighten `_decode` exp-claim handling
-
-`auth/service.py:_decode` falls through silently when `exp` is missing
-or non-int (defensively unreachable today since we always set it in
-`_issue`, but the contract should reject malformed payloads, not
-accept them).
-
-```python
-exp = payload.get("exp")
-if not isinstance(exp, int):
-    raise InvalidTokenError()
-if self._clock().timestamp() >= exp:
-    raise ExpiredTokenError()
-```
+`_decode` now raises `InvalidTokenError` when `exp` is missing or non-int,
+*before* the expiry check. Tests pin both the non-int path
+(`test_decode_rejects_token_with_non_int_exp`) and the missing-exp path
+(`test_decode_rejects_token_with_missing_exp`). Contract is now: a
+malformed payload is invalid, not silently accepted.
 
 ### N013 — NFR-OBS-1 (structured logs) is API-layer, not SDK [CLOSED]
 
@@ -330,17 +317,9 @@ now. Track for the polish pass.
 
 ---
 
-### N012.3 — Surface deferred timing-parity at the call site
+### N012.3 — Surface deferred timing-parity at the call site [CLOSED, T3.2]
 
-Add an inline TODO comment in `login()` body so the deferred N011
-decision is visible at the right place in the code:
-
-```python
-def login(self, email: str, password: str) -> AccessToken:
-    user = self._users.get_by_email(email)
-    # TODO(public-mode): add dummy bcrypt.checkpw on unknown-email
-    # branch for timing parity (anti-enumeration). See NOTES N011.
-    if user is None or not bcrypt.checkpw(...):
-        raise InvalidCredentialsError()
-    return self._issue(user.id)
-```
+`login()` now carries the inline `TODO(public-mode)` comment between
+`get_by_email` and the `checkpw` branch. Test
+`test_login_body_carries_n012_3_todo_comment` greps the source so the
+comment can't be silently deleted by a future refactor.
