@@ -119,9 +119,9 @@
 | T3.7 | `src/pyprep/api/routers/mock.py` — generate mock-interview prompt. | Tests green | ✅ (5 tests; auth-gated; deterministic same-seed; FR-MOCK-4 invariant pinned at HTTP boundary; template loaded from `content/interview_packs/template_v1.md` codeblock at app boot) |
 | T3.8 | `src/pyprep/api/deps.py` — auth dependency (decode JWT, return current user). | Tests cover invalid/expired tokens | ✅ (5 tests pin no-header / malformed / expired / deleted-user / happy paths; deps.py at 100% coverage; build_auth_service shared with lifespan as single source of truth) |
 | T3.9 | Each handler ≤ 10 LOC of logic — calls one SDK method. | Code review check | ✅ (audit script `scripts/audit_handlers.py` + pinned in test suite as CI gate; 15/15 handlers within budget — only `mock::generate` (15 LOC) holds an N020 waiver; refactor of `stats::get_weakness` 12→2 dropped its over-budget status) |
-| T3.10 | Integration tests via `httpx.AsyncClient` against the test app. | `tests/integration/` ≥ 70% coverage of routers | 🟡 |
+| T3.10 | Integration tests via `httpx.AsyncClient` against the test app. | `tests/integration/` ≥ 70% coverage of routers | ✅ (integration→routers coverage at 99% — far above PRD §7 70% gate; all 15 OpenAPI endpoints covered; `scripts/check_router_coverage.py` available as on-demand gate) |
 
-**Phase 3 exit gate:** All endpoints documented in `/api/docs`, integration tests green, owner can hit each endpoint via curl.
+**Phase 3 exit gate:** ✅ 15 endpoints documented in `/api/docs` (verified: enumerate all PRD §7 routes), integration tests green (228 total, 96 integration), owner can hit each endpoint via curl. **Phase 3 closed 2026-05-09.** Pause here for the second fresh-eyes audit pass before Phase 4 starts.
 
 ---
 
