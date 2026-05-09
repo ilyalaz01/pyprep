@@ -142,7 +142,7 @@
 **ADRs added:** ADR-011 (JWT in localStorage for MVP-1; review trigger: public-multi-user), ADR-012 (FastAPI StaticFiles for prod static hosting; CORS becomes no-op), ADR-013 (amendment to ADR-010 — Pyodide pass/fail signal is client-reported under same trust model as queue progression).
 **NOTES added:** N024 (inbound rate limiting on /api/auth/* — Phase 10), N025 (two-worker single-user-startup race test — Phase 10), N026 (alembic downgrade test — Phase 10), N027 (body-size limit + 413 — Phase 10), N028 (content hot-reload — merged into N018). APIGatekeeper module docstring updated to clarify it's outbound-only.
 
-**Phase 3.5 exit gate:** all 7 tasks ✅; full test suite + ruff + mypy(api/+sdk/) + LOC + handler-LOC audit + integration→routers ≥70% all green. ADRs 011/012/013 added to `PLAN.md`. NOTES N024-N028 added with deferral context. Push, verify CI green.
+**Phase 3.5 exit gate:** ✅ all 7 tasks complete. ADRs 011/012/013 added to `PLAN.md` (JWT storage, prod static hosting, Pyodide trust amendment to ADR-010). NOTES N024-N028 added with deferral context (inbound rate limit, two-worker race, alembic downgrade, body-size limit; N028 merged into N018). One real bug fixed: `_issue` now adds `jti` claim so refresh tokens are byte-distinct. **Phase 3.5 closed 2026-05-09.**
 
 ---
 

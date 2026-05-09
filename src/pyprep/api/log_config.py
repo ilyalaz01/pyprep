@@ -27,5 +27,10 @@ def configure_logging(level: LogLevel) -> None:
         ],
         wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level)),
         logger_factory=structlog.PrintLoggerFactory(),
-        cache_logger_on_first_use=True,
+        # Cache disabled (T3.5.5): cached loggers bind the active processor
+        # chain at first `get_logger()` and ignore later `structlog.configure()`
+        # calls — which defeats `structlog.testing.capture_logs()` when test
+        # ordering binds a logger before the capture scope runs. The per-call
+        # resolution cost is microseconds; the test reliability is worth it.
+        cache_logger_on_first_use=False,
     )
