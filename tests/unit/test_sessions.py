@@ -366,6 +366,29 @@ def test_finish_marks_ended_at_and_returns_summary(service, stores) -> None:
     assert sessions.get(s.id).ended_at == T0
 
 
+def test_preview_queue_returns_same_card_ids_as_start_review(service, stores) -> None:
+    """N019 — preview_queue is the side-effect-free twin of start(). Same
+    inputs → same queue, but no Session row is persisted."""
+    preview = service.preview_queue(user_id="u1", mode="review", limit=10)
+    started = service.start(user_id="u1", mode="review", limit=10)
+
+    assert tuple(preview) == tuple(started.queue)
+
+
+def test_preview_queue_persists_no_session(service, stores) -> None:
+    sessions, _ = stores
+
+    service.preview_queue(user_id="u1", mode="review", limit=5)
+
+    assert sessions.rows == {}
+
+
+def test_preview_queue_supports_learn_mode_with_sphere(service, stores) -> None:
+    out = service.preview_queue(user_id="u1", mode="learn", sphere_id="m1-s0", limit=3)
+    assert isinstance(out, tuple)
+    assert len(out) <= 3
+
+
 def _dummy_state() -> CardState:
     return CardState(
         stability=1.0,

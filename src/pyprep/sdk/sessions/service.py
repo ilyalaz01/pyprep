@@ -118,6 +118,28 @@ class SessionService:
             self._sessions.increment_cards_correct(session.id)
         return SubmitResult(next_state=next_state)
 
+    def preview_queue(
+        self,
+        *,
+        user_id: str,
+        mode: SessionMode = "review",
+        sphere_id: str | None = None,
+        limit: int = 20,
+        daily_new_card_cap: int = 15,
+    ) -> tuple[str, ...]:
+        """Side-effect-free queue preview (N019). Same selection rules as
+        `start()` but persists nothing — for the home-page review widget."""
+        return build_queue(
+            cards=self._cards,
+            reviews=self._reviews,
+            user_id=user_id,
+            mode=mode,
+            sphere_id=sphere_id,
+            limit=limit,
+            daily_new_card_cap=daily_new_card_cap,
+            now=self._clock(),
+        )
+
     def finish(self, session_id: str) -> SessionSummary:
         session = self._sessions.get(session_id)
         ended = replace(session, ended_at=self._clock())
