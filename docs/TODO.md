@@ -111,13 +111,13 @@
 | ID | Task | DoD | Status |
 |---|---|---|---|
 | T3.1 | `src/pyprep/api/app.py` — FastAPI app factory, middleware (CORS, logging, error handler). | Boots, `/api/docs` reachable | ✅ (8 api/ files all ≤150 LOC; 8 integration tests; structlog JSON logging closes N013; HTTPMapping registry stub for T3.2 routers; alembic baseline + drift test; SQLite FK PRAGMA per-connection) |
-| T3.2 | `src/pyprep/api/routers/auth.py` — register, login, refresh endpoints. | Postman happy paths green | ⬜ |
+| T3.2 | `src/pyprep/api/routers/auth.py` — register, login, refresh endpoints. | Postman happy paths green | 🟡 (N012.1/.2/.3 polish lands here; T3.8 deps baked in) |
 | T3.3 | `src/pyprep/api/routers/modules.py` — list modules, get lesson. | Tests green | ⬜ |
 | T3.4 | `src/pyprep/api/routers/sessions.py` — create, next-card, answer, finish. | Tests green | ⬜ |
 | T3.5 | `src/pyprep/api/routers/review.py` — daily queue. | Tests green | ⬜ |
 | T3.6 | `src/pyprep/api/routers/stats.py` — me, weakness. | Tests green | ⬜ |
 | T3.7 | `src/pyprep/api/routers/mock.py` — generate mock-interview prompt. | Tests green | ⬜ |
-| T3.8 | `src/pyprep/api/deps.py` — auth dependency (decode JWT, return current user). | Tests cover invalid/expired tokens | ⬜ |
+| T3.8 | `src/pyprep/api/deps.py` — auth dependency (decode JWT, return current user). | Tests cover invalid/expired tokens | 🟡 (baked into T3.2 per owner directive — deps shape decided by auth wiring) |
 | T3.9 | Each handler ≤ 10 LOC of logic — calls one SDK method. | Code review check | ⬜ |
 | T3.10 | Integration tests via `httpx.AsyncClient` against the test app. | `tests/integration/` ≥ 70% coverage of routers | ⬜ |
 
