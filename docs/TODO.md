@@ -110,7 +110,7 @@
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T3.1 | `src/pyprep/api/app.py` — FastAPI app factory, middleware (CORS, logging, error handler). | Boots, `/api/docs` reachable | 🟡 |
+| T3.1 | `src/pyprep/api/app.py` — FastAPI app factory, middleware (CORS, logging, error handler). | Boots, `/api/docs` reachable | ✅ (8 api/ files all ≤150 LOC; 8 integration tests; structlog JSON logging closes N013; HTTPMapping registry stub for T3.2 routers; alembic baseline + drift test; SQLite FK PRAGMA per-connection) |
 | T3.2 | `src/pyprep/api/routers/auth.py` — register, login, refresh endpoints. | Postman happy paths green | ⬜ |
 | T3.3 | `src/pyprep/api/routers/modules.py` — list modules, get lesson. | Tests green | ⬜ |
 | T3.4 | `src/pyprep/api/routers/sessions.py` — create, next-card, answer, finish. | Tests green | ⬜ |

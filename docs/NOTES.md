@@ -247,17 +247,22 @@ if self._clock().timestamp() >= exp:
     raise ExpiredTokenError()
 ```
 
-### N013 — NFR-OBS-1 (structured logs) is API-layer, not SDK [Phase 3]
+### N013 — NFR-OBS-1 (structured logs) is API-layer, not SDK [CLOSED]
 
-**Phase:** 2.5 audit · **Date:** 2026-05-08 · **Status:** open
+**Phase:** 2.5 audit · **Opened:** 2026-05-08 · **Closed:** 2026-05-09 (T3.1)
 
 NFR-OBS-1 says "Structured JSON logs, log levels configurable via env."
 Today this lives nowhere — SDK services have no logging, and there is
-no API layer yet. The audit flagged it as missing. Resolution: clarify
-in PRD when Phase 3 starts that this is an API-layer concern (FastAPI
-middleware + structlog config), not SDK; the SDK is a pure-function
-library and should not log on hot paths. Update PRD §4 NFRs accordingly
-at Phase 3 kickoff.
+no API layer yet. The audit flagged it as missing.
+
+**Resolution (T3.1):** wired at the API layer per the audit's preferred
+seam. `src/pyprep/api/log_config.py` configures structlog with a JSON
+renderer, ISO-UTC timestamp, contextvars merge, and exc_info formatter.
+`src/pyprep/api/middleware.py:RequestLoggingMiddleware` binds a
+`request_id` (header or uuid4) to contextvars per request and emits one
+`request` event with method, path, status, duration_ms (and `x-request-id`
+on the response). Log level is `Settings.log_level`. SDK code remains
+pure — no logging on hot paths, as planned. Closed.
 
 ---
 
