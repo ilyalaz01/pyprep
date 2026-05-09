@@ -110,6 +110,22 @@ async def test_next_at_end_of_queue_returns_404(client: httpx.AsyncClient) -> No
 
 
 @pytest.mark.asyncio
+async def test_next_with_unknown_after_returns_404_not_500(
+    client: httpx.AsyncClient,
+) -> None:
+    """T3.5.2 — `?after=<card_id_not_in_queue>` previously raised
+    `ValueError` from `queue.index(after)` → 500. Must be 404."""
+    token = await _register_and_login(client, "unknownafter@example.com")
+    s = await _start_session(client, token)
+    r = await client.get(
+        f"/api/sessions/{s['id']}/next",
+        params={"after": "not-a-real-card-id-zzz"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 404, f"expected 404, got {r.status_code}: {r.text}"
+
+
+@pytest.mark.asyncio
 async def test_next_for_other_users_session_returns_404(
     client: httpx.AsyncClient,
 ) -> None:

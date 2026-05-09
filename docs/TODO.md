@@ -132,7 +132,7 @@
 | ID | Task | DoD | Status |
 |---|---|---|---|
 | T3.5.1 | Restore mypy gate on `src/pyprep/api/` (errors.py:_handler_for missing return annotation) + wire CI to run it. | `uv run mypy src/pyprep/api/` clean; CI fails if a return annotation goes missing | ✅ (errors.py: `ExceptionHandler` type alias + return annotation; pyproject `[tool.mypy].files` adds `src/pyprep/api`; CI step renamed + new audit_handlers step; 4 config-regression tests pin api/ in `files` + strict mode) |
-| T3.5.2 | Fix `/api/sessions/{id}/next` 500 on unknown `?after=` — extract `_resolve_next_index` helper, raise 404. | Test: `?after=NOT_A_REAL_CARD` returns 404, not 500 | ⬜ |
+| T3.5.2 | Fix `/api/sessions/{id}/next` 500 on unknown `?after=` — extract `_resolve_next_index` helper, raise 404. | Test: `?after=NOT_A_REAL_CARD` returns 404, not 500 | ✅ (`_resolve_next_index(queue, after)` module-level helper raises 404 on unknown; next_card stays at 10 LOC; new test green) |
 | T3.5.3 | Clamp `AnswerRequest.response_ms` to `le=600_000` (10 min cap). Doc in PRD §3.3 that it's best-effort client-reported. | Test for >600_000 → 422; PRD §3.3 amended | ⬜ |
 | T3.5.4 | Middleware adds `Cache-Control: no-store` + `Pragma: no-cache` to any `/api/auth/*` response. | Test: login response carries the headers | ⬜ |
 | T3.5.5 | Log-leak property test (`tests/integration/test_log_hygiene.py`). Captures structlog output; asserts no password / no JWT bytes / no `idempotency_key` value / no `password` key in any field across register→login→sessions→answer flow. | Test green | ⬜ |

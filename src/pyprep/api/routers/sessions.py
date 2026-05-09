@@ -98,6 +98,17 @@ def _owned_session(
     return s
 
 
+def _resolve_next_index(queue: list[str], after: str | None) -> int:
+    """Translate `?after=card_id` into the next-position index in `queue`.
+    Unknown `after` raises 404 (T3.5.2 — was a 500 via `queue.index` ValueError)."""
+    if after is None:
+        return 0
+    try:
+        return queue.index(after) + 1
+    except ValueError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="after not in queue") from e
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=SessionResponse)
 def start(
     body: StartRequest,
@@ -125,7 +136,7 @@ def next_card(
 ) -> NextCardResponse:
     s = _owned_session(session_id, user, store)
     queue = list(s.queue)
-    idx = (queue.index(after) + 1) if after is not None else 0
+    idx = _resolve_next_index(queue, after)
     if idx >= len(queue):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no more cards in queue")
     c = cards.get(queue[idx])
