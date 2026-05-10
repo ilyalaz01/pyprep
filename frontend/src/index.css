@@ -168,6 +168,17 @@ body {
   padding: 0;
   font-size: inherit;
 }
+/* Tame WebKit's bright default scrollbar on horizontally-scrolling code blocks. */
+.prose pre::-webkit-scrollbar {
+  height: 8px;
+}
+.prose pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.prose pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-fg-muted) 30%, transparent);
+  border-radius: 4px;
+}
 
 .prose table {
   border-collapse: collapse;
