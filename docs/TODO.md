@@ -164,6 +164,32 @@
 
 ---
 
+## Phase 4.5 — Audit fixes (post-T4.7.2 Impeccable audit triage)
+
+**Goal:** address the 9 audit findings owner triaged from the 16 total (2 P1 + 4 P2 + 3 P3). Systemic fixes (contrast gate, ESLint guard, content lint) land first to prevent regression; tactical fixes follow. P3 items deferred to Phase 10 polish recorded in N030.
+
+| ID | Task | DoD | Status |
+|---|---|---|---|
+| T4.5.1 | Light-mode `--color-fg-subtle` 0.62→0.50 + dark 0.56→0.60 (headroom). `scripts/check-contrast.mjs` asserts WCAG AA on token pairings (fg / fg-muted / fg-subtle vs bg / bg-elevated, both modes). Wire to pre-push hook. | Script fails when contrast drops; deliberate-fail test passes; CI gate green | 🟡 |
+| T4.5.2 | `Input.describedBy` prop; `FormField` wires `errorId`. Same commit replaces `title=` tooltip on disabled "Start review session" with visible inline note. | Test asserts `<input aria-describedby>` matches `<p id="...-error">` when error present; disabled-button visible note renders | 🟡 |
+| T4.5.3 | Replace 1 of 4 `window.location.href` with `<Link>` (HomeDashboard Continue). LessonPage:100 swap to `LinkButton`. Mark Review-now + Start-review with `// TODO(phase-5):` (route doesn't exist yet). ESLint `no-restricted-syntax` rule forbidding `window.location.href` in `pages/`/`components/` with allow-list comments. | Lint fails on deliberate reintroduction; 2 TODO sites have explicit allow comments | 🟡 |
+| T4.5.4 | Three em dashes → punctuation (LoginPage:50, :67, HomeDashboard:81). `scripts/check-em-dash.mjs` greps user-facing copy for U+2014. | Lint fails on deliberate reintroduction; copy reads clean | 🟡 |
+| T4.5.5 | Extract `MODULE_NAMES` → `lib/module-names.ts`. Import in `ModulesList` + `ModuleDetailPage`. ModuleDetail h1 = MODULE_NAMES[id]; eyebrow stays "MODULE 1". | h1 reads "Python Core & OOP" not "Module 1"; both surfaces tested | 🟡 |
+| T4.5.6 | Backend: `SphereSummary.lesson_title` from `ContentLoader.LessonMeta`. Frontend: ModuleDetail sphere rows + HomeDashboard weakness list show `lesson_title` prominent + `sphere_id` as `text-xs` caption. | Backend integration test asserts field; frontend tests assert both elements render | 🟡 |
+| T4.5.7 | One commit, 4 TODOs: Shiki dark-permanent comment + blockquote carve-out comment + login error multi-user TODO + Shiki XSS multi-user TODO. | Comments present at correct line; no behavior change | 🟡 |
+| T4.5.8 | `--ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1)` in `@theme`. Apply `ease-(--ease-out-quart)` to Button/LinkButton/Input. | Tests pin the easing class in className for all 3 primitives | 🟡 |
+| T4.5.9 | Run `/impeccable document` to regenerate DESIGN.md from current code reality (token names, primitive list, composed components, anti-pattern carve-outs). | DESIGN.md no longer marked "seeded starter"; matches shipped tokens | 🟡 |
+
+**N030 — Phase-10 polish deferrals (from T4.7.2 audit):**
+- P3.4 `<Section>` accessible name (judgment call, low impact — implicit h2 naming acceptable)
+- P3.6 Sphere/module row touch targets at 44px line (desktop-only, mobile out of scope per PRD §5)
+- P3.8 Geist Mono ~50KB for one CSS rule (premature; brand commitment justifies cost)
+- P3.9 HomePage `<section>` semantic redundancy with AppShell `<main>` (cosmetic)
+
+**Phase 4.5 exit gate:** all 9 tasks complete; CI green (ruff/mypy/eslint/tsc + new contrast + em-dash gates); regenerated DESIGN.md captures shipped state. Audit re-run skipped — diff between this audit and shipped state IS the changelog. Pause for owner direction; do NOT auto-roll into Phase 5.
+
+---
+
 ## Phase 5 — Card Session UI
 
 **Goal:** All five card types render and function. FSRS rating wired.
