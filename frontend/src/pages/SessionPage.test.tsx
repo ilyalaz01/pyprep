@@ -15,27 +15,22 @@ vi.mock('../components/CodeMirrorEditor', () => ({
   ),
 }))
 
-function jsonResponse(b: unknown, s = 200): Response {
-  return new Response(JSON.stringify(b), { status: s })
-}
+const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s })
 const ME = { id: 'u1', email: 'me@example.com', created_at: '2026-05-09T00:00:00Z' }
 const CONFIG = { single_user: false, version: '1.00', single_user_email: null }
-function stubMe() {
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-    const url = typeof input === 'string' ? input : input.toString()
-    if (url.includes('/api/auth/me')) return jsonResponse(ME)
-    if (url.includes('/api/config')) return jsonResponse(CONFIG)
-    return new Response('not mocked: ' + url, { status: 500 })
-  }))
-}
-function mockSession(over: Partial<UseSessionResult>): UseSessionResult {
-  return {
-    status: 'loading', error: null, currentCard: null,
-    cardsTotal: 0, completedCount: 0, summary: null,
-    submitAnswer: vi.fn(), finish: vi.fn(),
-    ...over,
-  }
-}
+const stubMe = () => vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+  const url = typeof input === 'string' ? input : input.toString()
+  if (url.includes('/api/auth/me')) return json(ME)
+  if (url.includes('/api/config')) return json(CONFIG)
+  return new Response('not mocked: ' + url, { status: 500 })
+}))
+const mockSession = (over: Partial<UseSessionResult>): UseSessionResult => ({
+  status: 'loading', error: null, currentCard: null,
+  cardsTotal: 0, completedCount: 0, summary: null,
+  totalCardsInSphere: null,
+  submitAnswer: vi.fn(), finish: vi.fn(),
+  ...over,
+})
 
 const baseRaw = { topic: 't', difficulty: 1, tags: ['x'] }
 const flipRaw = { ...baseRaw, id: 'm1-s0-c1', type: 'flip',
@@ -103,12 +98,15 @@ describe('SessionPage — state machine', () => {
     expect(useSessionMock().mock.calls.length).toBeGreaterThan(before)
   })
 
-  test('empty (cardsTotal=0 + finished) shows "Nothing to review" + Back link', async () => {
-    useSessionMock().mockReturnValue(
-      mockSession({ status: 'finished', cardsTotal: 0 }),
-    )
+  test.each([
+    ['sphere has no cards', 0, /this sphere has no cards yet/i],
+    ['caught up for today', 12, /you're caught up/i],
+  ] as const)('empty queue (%s) shows the right copy', async (_l, total, copy) => {
+    useSessionMock().mockReturnValue(mockSession({
+      status: 'finished', cardsTotal: 0, totalCardsInSphere: total,
+    }))
     renderAt(SESSION_URL)
-    expect(await screen.findByText(/nothing to review here yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(copy)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /back to module/i }))
       .toHaveAttribute('href', '/modules/1')
   })

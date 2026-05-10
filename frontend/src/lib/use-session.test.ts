@@ -17,7 +17,7 @@ const card = (id: string) => ({
 const sess = (id: string, queue: string[]) => ({
   id, user_id: 'u1', mode: 'review', queue,
   started_at: '2026-05-10T00:00:00Z', ended_at: null,
-  cards_total: 0, cards_correct: 0,
+  cards_total: 0, cards_correct: 0, total_cards_in_sphere: queue.length,
 })
 
 interface Recorder {

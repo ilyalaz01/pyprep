@@ -72,6 +72,10 @@ export interface Session {
   ended_at: string | null
   cards_total: number
   cards_correct: number
+  /** Total cards authored for the sphere; null when no sphere_id was set
+   *  (global review mode). T5.10 fix lets SessionPage tell "no cards yet"
+   *  from "caught up for today" when queue comes back empty. */
+  total_cards_in_sphere: number | null
 }
 export interface NextCard {
   card_id: string

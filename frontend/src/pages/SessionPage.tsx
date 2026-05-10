@@ -46,8 +46,12 @@ export function SessionPage() {
 function SessionRunner({
   moduleId, sphereId, onRetry,
 }: { moduleId: number; sphereId: string; onRetry: () => void }) {
+  // mode='mixed' is the right default for both fresh users (no Reviews
+  // → falls back to new cards under daily_new_card_cap) and existing
+  // users (review-due first, top up with new). T5.10 fix: was 'review',
+  // which returned empty for any user with zero Review rows.
   const session = useSession({
-    mode: 'review', sphereId, moduleId, limit: 20,
+    mode: 'mixed', sphereId, moduleId, limit: 20,
   })
 
   if (session.status === 'loading') return <SessionSkeleton />
@@ -64,7 +68,12 @@ function SessionRunner({
   }
 
   if (session.status === 'finished' && session.cardsTotal === 0) {
-    return <EmptySphere moduleId={moduleId} />
+    return (
+      <EmptySession
+        moduleId={moduleId}
+        totalCardsInSphere={session.totalCardsInSphere}
+      />
+    )
   }
 
   if (session.status === 'finished') {
@@ -97,13 +106,21 @@ function SessionSkeleton() {
   )
 }
 
-function EmptySphere({ moduleId }: { moduleId: number }) {
+function EmptySession({
+  moduleId, totalCardsInSphere,
+}: { moduleId: number; totalCardsInSphere: number | null }) {
+  // Two distinct empty cases — "no cards authored" vs "caught up
+  // for today" — disambiguated by the total_cards_in_sphere field
+  // on the session start response.
+  // TODO(phase-7): add a "Practice anyway" CTA on the caught-up
+  // path that bypasses the daily_new_card_cap. Per ADR-015 spec.
+  const message =
+    totalCardsInSphere === 0
+      ? 'This sphere has no cards yet.'
+      : "You're caught up. Come back tomorrow for new cards."
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[color:var(--color-fg-muted)]">
-        Nothing to review here yet. Cards from this sphere will show up
-        once they have been added to the daily queue.
-      </p>
+      <p className="text-sm text-[color:var(--color-fg-muted)]">{message}</p>
       <LinkButton
         variant="secondary"
         to="/modules/$moduleId"

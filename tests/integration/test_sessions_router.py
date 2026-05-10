@@ -62,6 +62,47 @@ async def test_start_learn_without_sphere_id_returns_422(
     assert r.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_start_mixed_zero_history_yields_new_cards_and_total_count(
+    client: httpx.AsyncClient,
+) -> None:
+    """T5.10 fix: a fresh user with zero Reviews against a real sphere
+    must get a non-empty queue under mode='mixed' (review-due is empty,
+    so mixed falls back to new cards up to daily_new_card_cap). The
+    response also carries total_cards_in_sphere so the SPA can tell
+    "no cards yet" from "caught up for today" when the queue IS empty."""
+    token = await _register_and_login(client, "freshmixed@example.com")
+    r = await client.post(
+        "/api/sessions",
+        json={"mode": "mixed", "sphere_id": "m1-s0", "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["mode"] == "mixed"
+    assert isinstance(body["queue"], list)
+    assert len(body["queue"]) > 0, "mixed mode against zero history must yield new cards"
+    assert body["total_cards_in_sphere"] is not None
+    assert body["total_cards_in_sphere"] >= len(body["queue"])
+    assert body["cards_total"] == len(body["queue"])
+
+
+@pytest.mark.asyncio
+async def test_start_review_without_sphere_omits_total_cards_in_sphere(
+    client: httpx.AsyncClient,
+) -> None:
+    """When sphere_id is absent (global review mode), total_cards_in_sphere
+    is null — the field is sphere-scoped by definition."""
+    token = await _register_and_login(client, "globalreview@example.com")
+    r = await client.post(
+        "/api/sessions",
+        json={"mode": "review"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["total_cards_in_sphere"] is None
+
+
 # --- next -----------------------------------------------------------------
 
 

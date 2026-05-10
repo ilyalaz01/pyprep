@@ -43,6 +43,9 @@ export interface UseSessionResult {
   cardsTotal: number
   completedCount: number
   summary: SessionSummary | null
+  /** Authored card count for the sphere; null in global review mode.
+   *  Disambiguates "this sphere has no cards yet" from "caught up". */
+  totalCardsInSphere: number | null
   submitAnswer: (rating: Rating) => Promise<void>
   finish: () => Promise<void>
 }
@@ -62,6 +65,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
   const [cardsTotal, setCardsTotal] = useState(0)
   const [completedCount, setCompletedCount] = useState(0)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [totalCardsInSphere, setTotalCardsInSphere] = useState<number | null>(null)
 
   const sessionIdRef = useRef<string | null>(null)
   const queueRef = useRef<SessionQueue | null>(null)
@@ -114,6 +118,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
         sessionIdRef.current = s.id
         queueRef.current = createSessionQueue(s.queue)
         setCardsTotal(s.queue.length)
+        setTotalCardsInSphere(s.total_cards_in_sphere)
         if (params.moduleId !== undefined && params.sphereId !== undefined) {
           setLastActive({ module_id: params.moduleId, sphere_id: params.sphereId })
         }
@@ -155,6 +160,6 @@ export function useSession(params: UseSessionParams): UseSessionResult {
 
   return {
     status, error, currentCard, cardsTotal, completedCount, summary,
-    submitAnswer, finish,
+    totalCardsInSphere, submitAnswer, finish,
   }
 }

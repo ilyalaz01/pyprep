@@ -55,6 +55,12 @@ class SessionResponse(BaseModel):
     ended_at: dt.datetime | None
     cards_total: int
     cards_correct: int
+    # Total cards authored for the sphere (independent of FSRS due-state and
+    # daily-cap). Lets the SPA distinguish "this sphere has no cards yet"
+    # from "you're caught up for today" when queue comes back empty.
+    # Null when the session was started without a sphere_id (e.g. global
+    # review mode). T5.10 fix-up.
+    total_cards_in_sphere: int | None = None
 
 
 class NextCardResponse(BaseModel):
@@ -115,16 +121,15 @@ def start(
     body: StartRequest,
     user: User = Depends(get_current_user),
     sessions: SessionService = Depends(get_session_service),
+    cards: CardService = Depends(get_card_service),
     settings: Settings = Depends(get_settings),
 ) -> SessionResponse:
     s = sessions.start(
-        user_id=user.id,
-        mode=body.mode,
-        sphere_id=body.sphere_id,
-        limit=body.limit,
-        daily_new_card_cap=settings.daily_new_card_cap,
+        user_id=user.id, mode=body.mode, sphere_id=body.sphere_id,
+        limit=body.limit, daily_new_card_cap=settings.daily_new_card_cap,
     )
-    return _to_session_response(s)
+    total = len(cards.by_sphere(body.sphere_id)) if body.sphere_id else None
+    return _to_session_response(s, total)
 
 
 @router.get("/{session_id}/next", response_model=NextCardResponse)
@@ -174,5 +179,9 @@ def finish(
     return FinishResponse(**dataclasses.asdict(sessions.finish(session_id)))
 
 
-def _to_session_response(s: DomainSession) -> SessionResponse:
-    return SessionResponse(**dataclasses.asdict(s))
+def _to_session_response(
+    s: DomainSession, total_cards_in_sphere: int | None = None
+) -> SessionResponse:
+    return SessionResponse(
+        **dataclasses.asdict(s), total_cards_in_sphere=total_cards_in_sphere,
+    )
