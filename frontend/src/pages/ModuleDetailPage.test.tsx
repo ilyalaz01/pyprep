@@ -50,6 +50,20 @@ describe('ModuleDetailPage', () => {
     expect(screen.getByText(/7 cards/)).toBeInTheDocument()
   })
 
+  test('h1 renders the module name from MODULE_NAMES, not "Module N" (T4.5.5)', async () => {
+    mockFetch({
+      '/api/auth/me': () => jsonResponse(ME),
+      '/api/config': () => jsonResponse(CONFIG),
+      '/api/modules/1': () =>
+        jsonResponse({ module_id: 1, sphere_ids: [], spheres: [] }),
+    })
+    renderAt('/modules/1')
+    const h1 = await screen.findByRole('heading', { level: 1 })
+    expect(h1).toHaveTextContent('Python Core & OOP')
+    // Eyebrow stays as the technical address.
+    expect(screen.getByText(/^MODULE 1$/i)).toBeInTheDocument()
+  })
+
   test('error state renders Banner', async () => {
     mockFetch({
       '/api/auth/me': () => jsonResponse(ME),

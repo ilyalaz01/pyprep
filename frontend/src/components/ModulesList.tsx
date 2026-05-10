@@ -12,14 +12,8 @@
  */
 import { Link } from '@tanstack/react-router'
 
+import { MODULE_NAMES } from '../lib/module-names'
 import type { ModulesList as ModulesListData } from '../lib/types'
-
-const MODULE_NAMES: Record<number, string> = {
-  1: 'Python Core & OOP',
-  2: 'Automation, Scripting & Infrastructure',
-  3: 'Testing & QA',
-  4: 'Linux, Docker, SQL & Git',
-}
 
 interface ModulesListProps {
   data: ModulesListData | null

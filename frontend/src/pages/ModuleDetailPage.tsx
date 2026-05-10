@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Banner } from '../components/Banner'
 import { Section } from '../components/Section'
 import { api } from '../lib/api'
+import { MODULE_NAMES } from '../lib/module-names'
 
 export function ModuleDetailPage() {
   const { moduleId } = useParams({ from: '/_auth/modules/$moduleId' })
@@ -38,7 +39,7 @@ export function ModuleDetailPage() {
           Module {id}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {detail.data?.module_id ? `Module ${detail.data.module_id}` : 'Module'}
+          {MODULE_NAMES[id] ?? 'Module'}
         </h1>
       </header>
 
