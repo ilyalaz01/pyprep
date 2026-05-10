@@ -103,6 +103,18 @@ describe('FormField', () => {
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
+  test('binds the input to the error message via aria-describedby (T4.5.2)', () => {
+    render(
+      <FormField id="email" label="Email" error="Invalid email.">
+        <Input id="email" />
+      </FormField>,
+    )
+    const input = screen.getByLabelText('Email')
+    const errorId = input.getAttribute('aria-describedby')
+    expect(errorId).toBe('email-error')
+    expect(document.getElementById(errorId!)).toHaveTextContent('Invalid email.')
+  })
+
   test('renders error with role=alert (announced by screen readers)', () => {
     render(
       <FormField id="email" label="Email" error="invalid format">

@@ -4,8 +4,12 @@
  * Pairs with Input. Error text is small, --color-danger, with an
  * implicit icon glyph (▲) so the signal is not color-only — DESIGN.md
  * accessibility requirement.
+ *
+ * T4.5.2: when `error` is set, the child input is cloned with
+ * `aria-describedby="{id}-error"` so screen readers tie the error
+ * announcement to the input itself, not just the alert region.
  */
-import type { ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
 
 interface FormFieldProps {
   id: string
@@ -18,6 +22,14 @@ interface FormFieldProps {
 export function FormField({ id, label, error, hint, children }: FormFieldProps) {
   const errorId = `${id}-error`
   const hintId = `${id}-hint`
+  const describedBy = error ? errorId : hint ? hintId : undefined
+  const decoratedChildren = describedBy
+    ? Children.map(children, (c) =>
+        isValidElement(c)
+          ? cloneElement(c, { 'aria-describedby': describedBy } as Partial<typeof c.props>)
+          : c,
+      )
+    : children
   return (
     <div className="space-y-1.5">
       <label
@@ -26,7 +38,7 @@ export function FormField({ id, label, error, hint, children }: FormFieldProps) 
       >
         {label}
       </label>
-      {children}
+      {decoratedChildren}
       {error ? (
         <p
           id={errorId}

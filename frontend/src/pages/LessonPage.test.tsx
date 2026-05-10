@@ -114,12 +114,13 @@ describe('LessonPage — happy path', () => {
     expect(btn).not.toBeDisabled()
   })
 
-  test('Start review disabled with title when card_count is 0', async () => {
+  test('Start review disabled with visible inline note when card_count is 0 (T4.5.2)', async () => {
     mockLesson(() => lessonOk(SAMPLE_MD, 0))
     renderAt('/modules/1/lesson/m1-s0')
     const btn = await screen.findByRole('button', { name: /start review session/i })
     expect(btn).toBeDisabled()
-    expect(btn).toHaveAttribute('title', expect.stringMatching(/no cards/i))
+    expect(btn).not.toHaveAttribute('title')
+    expect(screen.getByText(/no cards in this sphere yet/i)).toBeInTheDocument()
   })
 
   test('Back to module link points to /modules/1', async () => {
