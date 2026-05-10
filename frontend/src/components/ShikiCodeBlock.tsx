@@ -7,6 +7,17 @@
  * code text the SPA already trusts (it's lesson content from our own
  * /api/modules endpoint), and shiki's output is structured HTML with
  * no script vector.
+ * TODO(multi-user): re-evaluate the dangerouslySetInnerHTML trust
+ * assumption when user-authored content lands. Today the lesson is
+ * owner-authored only; once peer/instructor authors can post, this
+ * becomes an XSS surface and the input needs sanitization.
+ *
+ * Theme: github-dark-dimmed is dark-permanent on purpose. Geist Mono
+ * on warm-dark surface is the lesson reader's identity; swapping to a
+ * light theme under prefers-color-scheme: light would put the only
+ * "loud" element on the page on a quiet background, which reads worse
+ * than keeping the code block dark across themes. Defensible deviation
+ * from "respect the OS theme."
  */
 import { useEffect, useState } from 'react'
 

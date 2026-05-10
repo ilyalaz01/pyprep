@@ -45,6 +45,10 @@ export function LoginPage() {
     } catch (err) {
       if (err instanceof APIError) {
         if (err.status === 422) setFieldError(parseValidation(err))
+        // TODO(multi-user): map known error codes (account_locked,
+        // password_expired, rate_limited, etc.) to friendly copy.
+        // Today single-user deployments expose the raw err.code to
+        // the owner — fine in a dev/owner context, not for end users.
         else setBannerError(err.code === 'invalid_credentials'
           ? 'Email or password is incorrect.'
           : `Sign in failed (${err.code}).`)

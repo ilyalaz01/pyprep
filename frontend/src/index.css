@@ -143,6 +143,13 @@ body {
 .prose ol { list-style: decimal; }
 .prose li + li { margin-top: 0.375rem; }
 
+/*
+ * Blockquote is the conventional carve-out for the impeccable shared
+ * "side-stripe borders >1px" ban. The ban exists to stop the SaaS
+ * "left bar of color = callout" reflex on cards/list items/alerts.
+ * On a blockquote, the left rule IS the typographic mark — this is
+ * the one place it earns the 2px.
+ */
 .prose blockquote {
   border-left: 2px solid var(--color-accent-muted);
   padding-left: 1rem;
