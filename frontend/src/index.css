@@ -95,6 +95,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Card-reveal motion: crossfade + 2px upward shift. NOT a 3D rotateY
+   flip per DESIGN.md "no Duolingo affordance." Used by FlipCard's
+   answer-reveal and re-used by every card type's post-submit reveal. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 180ms var(--ease-out-quart) both;
+}
+
 /* Reduced-motion: kill non-opacity transitions everywhere (DESIGN.md). */
 @media (prefers-reduced-motion: reduce) {
   *,
