@@ -170,6 +170,29 @@ describe('HomeDashboard — Weakness section', () => {
     expect(screen.getByText(/66% retention/)).toBeInTheDocument()
   })
 
+  test('weakness row shows lesson_title prominent + sphere_id caption (T4.5.6)', async () => {
+    mockRoutes({
+      '/api/stats/me/weakness': () =>
+        jsonResponse({
+          top: [
+            {
+              sphere_id: 'm1-s4',
+              reviews_total: 8,
+              retention: 0.5,
+              weakness: 0.42,
+              lesson_title: 'Closures and decorators',
+            },
+          ],
+        }),
+      '/api/review/queue': () => jsonResponse({ card_ids: [], sphere_id: null }),
+      '/api/stats/me': () =>
+        jsonResponse({ reviews_total: 25, retention: 0.7, streak: 0, xp: 0, orphan_review_count: 0 }),
+    })
+    renderDashboard()
+    expect(await screen.findByText(/closures and decorators/i)).toBeInTheDocument()
+    expect(screen.getByText('m1-s4')).toBeInTheDocument()
+  })
+
   test('eligible but empty top: shows "keep practicing" copy', async () => {
     mockRoutes({
       '/api/stats/me/weakness': () => jsonResponse({ top: [] }),

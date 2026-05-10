@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from pyprep.api.deps import get_current_user, get_stats_service
+from pyprep.api.deps import get_content_index, get_current_user, get_stats_service
 from pyprep.sdk.auth import User
+from pyprep.sdk.content_loader import ContentIndex
 from pyprep.sdk.stats import StatsService
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -25,6 +26,8 @@ class SphereStatsResponse(BaseModel):
     reviews_total: int
     retention: float
     weakness: float
+    # T4.5.6: human label from lesson frontmatter; null if no lesson/title.
+    lesson_title: str | None = None
 
 
 class WeaknessResponse(BaseModel):
@@ -51,15 +54,19 @@ def get_weakness(
     n: int = Query(default=3, ge=1, le=20),
     user: User = Depends(get_current_user),
     stats: StatsService = Depends(get_stats_service),
+    index: ContentIndex = Depends(get_content_index),
 ) -> WeaknessResponse:
     rows = stats.weakness_top_n(user.id, n=n)
-    return WeaknessResponse(top=[_to_sphere(s) for s in rows])
+    return WeaknessResponse(top=[_to_sphere(s, index) for s in rows])
 
 
-def _to_sphere(s) -> SphereStatsResponse:  # type: ignore[no-untyped-def]
+def _to_sphere(s, index: ContentIndex) -> SphereStatsResponse:  # type: ignore[no-untyped-def]
+    sphere = index.spheres.get(s.sphere_id)
+    title = sphere.lesson_meta.title if sphere and sphere.lesson_meta else None
     return SphereStatsResponse(
         sphere_id=s.sphere_id,
         reviews_total=s.reviews_total,
         retention=s.retention,
         weakness=s.weakness,
+        lesson_title=title,
     )

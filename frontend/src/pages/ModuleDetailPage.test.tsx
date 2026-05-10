@@ -50,6 +50,56 @@ describe('ModuleDetailPage', () => {
     expect(screen.getByText(/7 cards/)).toBeInTheDocument()
   })
 
+  test('sphere row shows lesson_title prominent + sphere_id as caption (T4.5.6)', async () => {
+    mockFetch({
+      '/api/auth/me': () => jsonResponse(ME),
+      '/api/config': () => jsonResponse(CONFIG),
+      '/api/modules/1': () =>
+        jsonResponse({
+          module_id: 1,
+          sphere_ids: ['m1-s0'],
+          spheres: [
+            {
+              sphere_id: 'm1-s0',
+              card_count: 12,
+              lesson_present: true,
+              lesson_title: 'Foundations: variables and types',
+            },
+          ],
+        }),
+    })
+    renderAt('/modules/1')
+    expect(
+      await screen.findByText(/foundations: variables and types/i),
+    ).toBeInTheDocument()
+    // sphere_id is still rendered as the technical caption.
+    expect(screen.getByText('m1-s0')).toBeInTheDocument()
+  })
+
+  test('sphere row falls back to sphere_id when lesson_title is null (T4.5.6)', async () => {
+    mockFetch({
+      '/api/auth/me': () => jsonResponse(ME),
+      '/api/config': () => jsonResponse(CONFIG),
+      '/api/modules/1': () =>
+        jsonResponse({
+          module_id: 1,
+          sphere_ids: ['m1-s9'],
+          spheres: [
+            {
+              sphere_id: 'm1-s9',
+              card_count: 3,
+              lesson_present: false,
+              lesson_title: null,
+            },
+          ],
+        }),
+    })
+    renderAt('/modules/1')
+    // No title → sphere_id appears once, in the primary slot.
+    const matches = await screen.findAllByText('m1-s9')
+    expect(matches).toHaveLength(1)
+  })
+
   test('h1 renders the module name from MODULE_NAMES, not "Module N" (T4.5.5)', async () => {
     mockFetch({
       '/api/auth/me': () => jsonResponse(ME),

@@ -29,6 +29,10 @@ class SphereSummary(BaseModel):
     sphere_id: str
     card_count: int
     lesson_present: bool
+    # T4.5.6: human label from YAML frontmatter; SPA renders it prominent
+    # with sphere_id as a small caption beneath. Null when the lesson
+    # has no frontmatter title (or no lesson at all).
+    lesson_title: str | None = None
 
 
 class ModuleDetail(BaseModel):
@@ -90,6 +94,7 @@ def _to_sphere_summary(index: ContentIndex, sphere_id: str) -> SphereSummary:
         sphere_id=sphere_id,
         card_count=len(sphere.cards),
         lesson_present=bool(sphere.lesson_md),
+        lesson_title=sphere.lesson_meta.title if sphere.lesson_meta else None,
     )
 
 

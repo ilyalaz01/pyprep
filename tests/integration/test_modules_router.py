@@ -67,6 +67,20 @@ async def test_get_module_returns_spheres_with_card_counts(
 
 
 @pytest.mark.asyncio
+async def test_sphere_summary_exposes_lesson_title_when_frontmatter_present(
+    client: httpx.AsyncClient,
+) -> None:
+    """T4.5.6: SphereSummary carries the human lesson_title alongside the
+    technical sphere_id, so the SPA can render readable row labels."""
+    r = await client.get("/api/modules/1")
+    assert r.status_code == 200
+    spheres = {s["sphere_id"]: s for s in r.json()["spheres"]}
+    # m1-s0 is the gold sample; its frontmatter includes title.
+    assert "lesson_title" in spheres["m1-s0"]
+    assert spheres["m1-s0"]["lesson_title"]  # non-empty
+
+
+@pytest.mark.asyncio
 async def test_get_unknown_module_returns_404(client: httpx.AsyncClient) -> None:
     r = await client.get("/api/modules/999")
     assert r.status_code == 404

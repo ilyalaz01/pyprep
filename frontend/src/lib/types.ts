@@ -44,6 +44,7 @@ export interface SphereSummary {
   sphere_id: string
   card_count: number
   lesson_present: boolean
+  lesson_title: string | null
 }
 export interface ModuleDetail {
   module_id: number
@@ -103,6 +104,7 @@ export interface SphereStats {
   reviews_total: number
   retention: number
   weakness: number
+  lesson_title: string | null
 }
 export interface Weakness { top: SphereStats[] }
 

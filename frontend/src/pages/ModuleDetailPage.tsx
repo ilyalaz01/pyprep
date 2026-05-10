@@ -52,13 +52,25 @@ export function ModuleDetailPage() {
                   to="/modules/$moduleId/lesson/$sphereId"
                   params={{ moduleId: String(id), sphereId: s.sphere_id }}
                   className={[
-                    'flex items-baseline justify-between py-3 -mx-2 px-2 rounded',
+                    'flex items-baseline justify-between gap-4 py-3 -mx-2 px-2 rounded',
                     'text-[color:var(--color-fg)] hover:bg-[color:var(--color-surface-2)]',
                     'transition-colors duration-120',
                   ].join(' ')}
                 >
-                  <span className="text-sm font-medium">{s.sphere_id}</span>
-                  <span className="text-xs text-[color:var(--color-fg-muted)]">
+                  <span className="min-w-0 flex-1">
+                    {/* T4.5.6: human title prominent; sphere_id as
+                        small mono caption beneath. Falls back to the
+                        sphere_id alone if the lesson has no title. */}
+                    <span className="block text-sm font-medium truncate">
+                      {s.lesson_title ?? s.sphere_id}
+                    </span>
+                    {s.lesson_title && (
+                      <span className="block text-xs font-mono text-[color:var(--color-fg-subtle)]">
+                        {s.sphere_id}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs text-[color:var(--color-fg-muted)]">
                     {s.card_count} card{s.card_count === 1 ? '' : 's'}
                     {s.lesson_present ? ' · lesson available' : ''}
                     <span aria-hidden="true" className="ml-1">→</span>

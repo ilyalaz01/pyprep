@@ -74,14 +74,25 @@ export function HomeDashboard() {
       {showWeakness && (
         <Section title="Top 3 weakness areas">
           {weakness.data?.top.length ? (
-            <ul className="space-y-1.5">
+            <ul className="space-y-2">
               {weakness.data.top.map((s) => (
                 <li
                   key={s.sphere_id}
-                  className="flex items-baseline justify-between text-sm"
+                  className="flex items-baseline justify-between gap-4 text-sm"
                 >
-                  <span className="text-[color:var(--color-fg)]">{s.sphere_id}</span>
-                  <span className="text-xs text-[color:var(--color-fg-muted)] tabular-nums">
+                  <span className="min-w-0 flex-1">
+                    {/* T4.5.6: title primary, sphere_id as caption when
+                        we have a title; sphere_id alone otherwise. */}
+                    <span className="block text-[color:var(--color-fg)] truncate">
+                      {s.lesson_title ?? s.sphere_id}
+                    </span>
+                    {s.lesson_title && (
+                      <span className="block text-xs font-mono text-[color:var(--color-fg-subtle)]">
+                        {s.sphere_id}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs text-[color:var(--color-fg-muted)] tabular-nums">
                     {Math.round(s.retention * 100)}% retention
                   </span>
                 </li>
