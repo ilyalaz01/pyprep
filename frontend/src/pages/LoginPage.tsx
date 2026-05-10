@@ -63,8 +63,8 @@ export function LoginPage() {
           <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
           <p className="text-xs text-[color:var(--color-fg-subtle)]">
             {config?.single_user
-              ? 'Single-user deployment — owner credentials only.'
-              : 'PyPrep — Python interview prep'}
+              ? 'Single-user deployment. Owner credentials only.'
+              : 'Python interview prep.'}
           </p>
         </header>
         {bannerError && <Banner variant="error">{bannerError}</Banner>}

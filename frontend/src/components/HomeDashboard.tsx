@@ -89,7 +89,7 @@ export function HomeDashboard() {
             </ul>
           ) : (
             <p className="text-sm text-[color:var(--color-fg-muted)]">
-              No weak spheres yet — keep practicing.
+              No weak spheres yet. Keep practicing.
             </p>
           )}
         </Section>
