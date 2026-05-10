@@ -70,5 +70,9 @@ jobs:
       - name: ESLint
         run: pnpm lint
 
+      - name: Contrast gate (WCAG AA on theme tokens)
+        working-directory: ${{ github.workspace }}
+        run: node scripts/check-contrast.mjs
+
       - name: Build (tsc -b && vite build)
         run: pnpm build

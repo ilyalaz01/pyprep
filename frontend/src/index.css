@@ -32,7 +32,8 @@
 
   --color-fg: oklch(0.94 0.005 80);
   --color-fg-muted: oklch(0.74 0.005 80);
-  --color-fg-subtle: oklch(0.56 0.005 80);
+  /* T4.5.1: 0.56 → 0.62 to clear WCAG AA against both bg and bg-elevated. */
+  --color-fg-subtle: oklch(0.62 0.005 80);
 
   --color-accent: oklch(0.78 0.13 70);
   --color-accent-fg: oklch(0.18 0.006 80);
@@ -65,7 +66,8 @@
 
     --color-fg: oklch(0.20 0.005 80);
     --color-fg-muted: oklch(0.42 0.005 80);
-    --color-fg-subtle: oklch(0.62 0.005 80);
+    /* T4.5.1: 0.62 → 0.50 to clear WCAG AA against light bg. */
+    --color-fg-subtle: oklch(0.50 0.005 80);
 
     --color-accent: oklch(0.55 0.14 70);
     --color-accent-fg: oklch(0.98 0.004 80);

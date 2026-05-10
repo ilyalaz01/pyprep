@@ -45,3 +45,9 @@ repos:
         entry: pnpm --dir frontend lint
         language: system
         pass_filenames: false
+
+      - id: contrast-gate
+        name: contrast gate (WCAG AA on theme tokens)
+        entry: node scripts/check-contrast.mjs
+        language: system
+        pass_filenames: false
