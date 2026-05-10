@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-10T00:00:00Z",
+  "title": "Design System: PyPrep",
+  "extensions": {
+    "colorMeta": {
+      "bg":            { "role": "neutral", "displayName": "Page Background",   "canonical": "oklch(0.18 0.006 80)", "tonalRamp": ["oklch(0.10 0.006 80)", "oklch(0.14 0.006 80)", "oklch(0.18 0.006 80)", "oklch(0.22 0.006 80)", "oklch(0.30 0.006 80)", "oklch(0.45 0.006 80)", "oklch(0.65 0.006 80)", "oklch(0.85 0.005 80)"] },
+      "bg-elevated":   { "role": "neutral", "displayName": "Elevated Surface",  "canonical": "oklch(0.22 0.006 80)", "tonalRamp": ["oklch(0.10 0.006 80)", "oklch(0.14 0.006 80)", "oklch(0.18 0.006 80)", "oklch(0.22 0.006 80)", "oklch(0.30 0.006 80)", "oklch(0.45 0.006 80)", "oklch(0.65 0.006 80)", "oklch(0.85 0.005 80)"] },
+      "surface-2":     { "role": "neutral", "displayName": "Inset Surface",     "canonical": "oklch(0.26 0.006 80)", "tonalRamp": ["oklch(0.10 0.006 80)", "oklch(0.14 0.006 80)", "oklch(0.18 0.006 80)", "oklch(0.22 0.006 80)", "oklch(0.30 0.006 80)", "oklch(0.45 0.006 80)", "oklch(0.65 0.006 80)", "oklch(0.85 0.005 80)"] },
+      "border":        { "role": "neutral", "displayName": "Hairline",          "canonical": "oklch(0.32 0.006 80)", "tonalRamp": ["oklch(0.18 0.006 80)", "oklch(0.24 0.006 80)", "oklch(0.32 0.006 80)", "oklch(0.42 0.006 80)", "oklch(0.55 0.006 80)", "oklch(0.70 0.005 80)", "oklch(0.85 0.005 80)", "oklch(0.95 0.004 80)"] },
+      "border-strong": { "role": "neutral", "displayName": "Strong Hairline",   "canonical": "oklch(0.42 0.006 80)", "tonalRamp": ["oklch(0.18 0.006 80)", "oklch(0.24 0.006 80)", "oklch(0.32 0.006 80)", "oklch(0.42 0.006 80)", "oklch(0.55 0.006 80)", "oklch(0.70 0.005 80)", "oklch(0.85 0.005 80)", "oklch(0.95 0.004 80)"] },
+      "fg":            { "role": "neutral", "displayName": "Foreground",        "canonical": "oklch(0.94 0.005 80)", "tonalRamp": ["oklch(0.18 0.005 80)", "oklch(0.32 0.005 80)", "oklch(0.50 0.005 80)", "oklch(0.62 0.005 80)", "oklch(0.74 0.005 80)", "oklch(0.85 0.005 80)", "oklch(0.94 0.005 80)", "oklch(0.98 0.004 80)"] },
+      "fg-muted":      { "role": "neutral", "displayName": "Muted Foreground",  "canonical": "oklch(0.74 0.005 80)", "tonalRamp": ["oklch(0.18 0.005 80)", "oklch(0.32 0.005 80)", "oklch(0.50 0.005 80)", "oklch(0.62 0.005 80)", "oklch(0.74 0.005 80)", "oklch(0.85 0.005 80)", "oklch(0.94 0.005 80)", "oklch(0.98 0.004 80)"] },
+      "fg-subtle":     { "role": "neutral", "displayName": "Subtle Foreground", "canonical": "oklch(0.62 0.005 80)", "tonalRamp": ["oklch(0.18 0.005 80)", "oklch(0.32 0.005 80)", "oklch(0.50 0.005 80)", "oklch(0.62 0.005 80)", "oklch(0.74 0.005 80)", "oklch(0.85 0.005 80)", "oklch(0.94 0.005 80)", "oklch(0.98 0.004 80)"] },
+      "accent":        { "role": "primary", "displayName": "Studio Ochre",      "canonical": "oklch(0.78 0.13 70)",  "tonalRamp": ["oklch(0.30 0.06 70)", "oklch(0.42 0.08 70)", "oklch(0.55 0.10 70)", "oklch(0.65 0.12 70)", "oklch(0.78 0.13 70)", "oklch(0.86 0.10 70)", "oklch(0.92 0.06 70)", "oklch(0.97 0.02 70)"] },
+      "accent-fg":     { "role": "primary", "displayName": "On-Ochre Charcoal", "canonical": "oklch(0.18 0.006 80)", "tonalRamp": ["oklch(0.10 0.006 80)", "oklch(0.14 0.006 80)", "oklch(0.18 0.006 80)", "oklch(0.22 0.006 80)", "oklch(0.30 0.006 80)", "oklch(0.45 0.006 80)", "oklch(0.65 0.006 80)", "oklch(0.85 0.005 80)"] },
+      "accent-muted":  { "role": "tertiary", "displayName": "Quiet Ochre",      "canonical": "oklch(0.55 0.06 70)",  "tonalRamp": ["oklch(0.20 0.04 70)", "oklch(0.32 0.05 70)", "oklch(0.42 0.06 70)", "oklch(0.55 0.06 70)", "oklch(0.65 0.06 70)", "oklch(0.78 0.05 70)", "oklch(0.88 0.03 70)", "oklch(0.96 0.01 70)"] },
+      "good":          { "role": "secondary", "displayName": "Pass Green",      "canonical": "oklch(0.78 0.14 145)", "tonalRamp": ["oklch(0.28 0.06 145)", "oklch(0.40 0.09 145)", "oklch(0.55 0.12 145)", "oklch(0.66 0.13 145)", "oklch(0.78 0.14 145)", "oklch(0.86 0.11 145)", "oklch(0.92 0.07 145)", "oklch(0.97 0.03 145)"] },
+      "warn":          { "role": "secondary", "displayName": "Hold Amber",      "canonical": "oklch(0.82 0.14 80)",  "tonalRamp": ["oklch(0.30 0.07 80)", "oklch(0.42 0.10 80)", "oklch(0.55 0.12 80)", "oklch(0.68 0.13 80)", "oklch(0.82 0.14 80)", "oklch(0.88 0.11 80)", "oklch(0.93 0.07 80)", "oklch(0.97 0.03 80)"] },
+      "danger":        { "role": "secondary", "displayName": "Fail Coral",      "canonical": "oklch(0.65 0.18 25)",  "tonalRamp": ["oklch(0.22 0.07 25)", "oklch(0.34 0.11 25)", "oklch(0.48 0.15 25)", "oklch(0.58 0.17 25)", "oklch(0.65 0.18 25)", "oklch(0.78 0.14 25)", "oklch(0.88 0.09 25)", "oklch(0.96 0.04 25)"] }
+    },
+    "typographyMeta": {
+      "display":  { "displayName": "Display",  "purpose": "Page title <h1>. One per route." },
+      "headline": { "displayName": "Headline", "purpose": "In-lesson <h2>." },
+      "title":    { "displayName": "Title",    "purpose": "In-lesson <h3>." },
+      "body":     { "displayName": "Body",     "purpose": "Default UI body and dashboard text." },
+      "prose":    { "displayName": "Prose",    "purpose": "Lesson reader body. 70ch line cap." },
+      "label":    { "displayName": "Label",    "purpose": "Buttons, table cells, dashboard list rows." },
+      "caption":  { "displayName": "Caption",  "purpose": "Eyebrows, breadcrumbs, meta. Uppercase on Section headers." },
+      "mono":     { "displayName": "Mono",     "purpose": "Inline code, code blocks, sphere ID captions, tabular numbers." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Default easing for state transitions on Button, LinkButton, Input. No bounce, no spring." },
+      { "name": "duration-state", "value": "120ms",                          "purpose": "All state transitions (color, background-color, border-color, filter, outline-color)." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Studio Ochre fill, On-Ochre Charcoal text. The single CTA per route.",
+      "html": "<button class=\"ds-btn-primary\">Sign in</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 1rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; background: var(--color-accent, oklch(0.78 0.13 70)); color: var(--color-accent-fg, oklch(0.18 0.006 80)); border: 0; border-radius: 4px; cursor: pointer; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms cubic-bezier(0.16, 1, 0.3, 1), filter 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { filter: brightness(1.10); } .ds-btn-primary:active { filter: brightness(0.95); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-border-strong, oklch(0.42 0.006 80)); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Elevated Surface fill with hairline border. Default Button variant.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 1rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; background: var(--color-bg-elevated, oklch(0.22 0.006 80)); color: var(--color-fg, oklch(0.94 0.005 80)); border: 1px solid var(--color-border, oklch(0.32 0.006 80)); border-radius: 4px; cursor: pointer; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { border-color: var(--color-border-strong, oklch(0.42 0.006 80)); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--color-border-strong, oklch(0.42 0.006 80)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Transparent. Tertiary action. Used for Sign-out in TopBar and 'Back to module' in lesson reader.",
+      "html": "<button class=\"ds-btn-ghost\">Sign out</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 1rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; background: transparent; color: var(--color-fg-muted, oklch(0.74 0.005 80)); border: 0; border-radius: 4px; cursor: pointer; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { color: var(--color-fg, oklch(0.94 0.005 80)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-border-strong, oklch(0.42 0.006 80)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Single-line text input. Pairs with FormField for label + inline error.",
+      "html": "<input class=\"ds-input\" type=\"email\" placeholder=\"you@example.com\" />",
+      "css": ".ds-input { display: block; width: 100%; height: 2.25rem; padding: 0 0.75rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; background: var(--color-bg-elevated, oklch(0.22 0.006 80)); color: var(--color-fg, oklch(0.94 0.005 80)); border: 1px solid var(--color-border, oklch(0.32 0.006 80)); border-radius: 4px; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), outline-color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: var(--color-fg-subtle, oklch(0.62 0.005 80)); } .ds-input:focus-visible { outline: 2px solid var(--color-border-strong, oklch(0.42 0.006 80)); outline-offset: 2px; } .ds-input:disabled { opacity: 0.6; cursor: not-allowed; }"
+    },
+    {
+      "name": "Error Banner",
+      "kind": "custom",
+      "refersTo": "banner-error",
+      "description": "Full-form-width error message with role=alert. Glyph + colored border + colored glyph color = three signals.",
+      "html": "<div class=\"ds-banner-error\" role=\"alert\"><span class=\"ds-banner-error__glyph\" aria-hidden=\"true\">▲</span><span>Email or password is incorrect.</span></div>",
+      "css": ".ds-banner-error { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0.75rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; background: var(--color-bg-elevated, oklch(0.22 0.006 80)); color: var(--color-fg, oklch(0.94 0.005 80)); border: 1px solid var(--color-danger, oklch(0.65 0.18 25)); border-radius: 4px; } .ds-banner-error__glyph { color: var(--color-danger, oklch(0.65 0.18 25)); }"
+    },
+    {
+      "name": "Section Header",
+      "kind": "custom",
+      "refersTo": "section",
+      "description": "Linear-style uppercase eyebrow. Wraps any content slot; never adds card chrome around it.",
+      "html": "<section><header class=\"ds-section-head\"><h2 class=\"ds-section-title\">Today's review queue</h2></header><div class=\"ds-section-body\"><p>3 cards due today.</p></div></section>",
+      "css": ".ds-section-head { display: flex; align-items: baseline; justify-content: space-between; } .ds-section-title { font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: var(--color-fg-subtle, oklch(0.62 0.005 80)); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; } .ds-section-body { margin-top: 0.75rem; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; color: var(--color-fg, oklch(0.94 0.005 80)); }"
+    },
+    {
+      "name": "TopBar",
+      "kind": "nav",
+      "refersTo": "topbar",
+      "description": "56px-tall persistent app chrome. Wordmark left, single-user badge center, user identity + ghost Sign-out right. No sidebar in MVP-1.",
+      "html": "<header class=\"ds-topbar\"><div class=\"ds-topbar__mark\">PyPrep</div><span class=\"ds-topbar__badge\">Single-user mode</span><div class=\"ds-topbar__right\"><span class=\"ds-topbar__email\">owner@local.dev</span><button class=\"ds-btn-ghost\">Sign out</button></div></header>",
+      "css": ".ds-topbar { display: flex; align-items: center; gap: 1.5rem; height: 3.5rem; padding: 0 1.5rem; background: var(--color-bg-elevated, oklch(0.22 0.006 80)); border-bottom: 1px solid var(--color-border, oklch(0.32 0.006 80)); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; } .ds-topbar__mark { font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; color: var(--color-fg, oklch(0.94 0.005 80)); } .ds-topbar__badge { font-size: 0.75rem; color: var(--color-fg-subtle, oklch(0.62 0.005 80)); } .ds-topbar__right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; } .ds-topbar__email { font-size: 0.75rem; color: var(--color-fg-muted, oklch(0.74 0.005 80)); }"
+    },
+    {
+      "name": "Sphere Row",
+      "kind": "custom",
+      "refersTo": "sphere-row",
+      "description": "Module detail / weakness row. Human title primary, sphere_id mono caption beneath, meta right.",
+      "html": "<a class=\"ds-sphere-row\" href=\"#\"><span class=\"ds-sphere-row__main\"><span class=\"ds-sphere-row__title\">Closures and decorators</span><span class=\"ds-sphere-row__id\">m1-s4</span></span><span class=\"ds-sphere-row__meta\">12 cards · lesson available <span aria-hidden=\"true\">→</span></span></a>",
+      "css": ".ds-sphere-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.75rem 0.5rem; margin: 0 -0.5rem; border-radius: 4px; text-decoration: none; color: var(--color-fg, oklch(0.94 0.005 80)); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-sphere-row:hover { background: var(--color-surface-2, oklch(0.26 0.006 80)); } .ds-sphere-row__main { min-width: 0; flex: 1; } .ds-sphere-row__title { display: block; font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-sphere-row__id { display: block; font-family: 'Geist Mono Variable', ui-monospace, SF Mono, Menlo, monospace; font-size: 0.75rem; color: var(--color-fg-subtle, oklch(0.62 0.005 80)); } .ds-sphere-row__meta { flex-shrink: 0; font-size: 0.75rem; color: var(--color-fg-muted, oklch(0.74 0.005 80)); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Peer's Notebook",
+    "overview": "PyPrep is the surface a senior engineer would actually keep open while studying. Its job is to disappear into the task without theatre, without congratulating the user for showing up, and without hiding the score behind motivational chrome. The voice is declarative, not exclamatory; specific, not motivational. The tonal lane runs Linear, Anthropic Console, Vercel docs. It explicitly rejects the entire Duolingo / Udemy / generic-AI-SaaS axis. The audience reads documentation for a living and would clock Inter on contact as the SaaS default. The system commits the other direction: warm-tinted OKLCH neutrals, Geist Sans + Mono only, flat surfaces with hairlines (no shadows), one ochre accent on ≤10% of any screen, no decorative motion. Honest signaling is the operating principle: streaks reset silently, the weakness section hides until ≥10 reviews back it, the client owns the loop and the server records the truth.",
+    "keyCharacteristics": [
+      "Restrained color strategy (tinted neutrals + one ochre accent ≤10%)",
+      "Dark by default; light variant only via prefers-color-scheme",
+      "Geist Sans + Geist Mono only (no Inter, no display fonts in UI labels)",
+      "Flat surfaces; depth via hairline borders and tonal layering, never shadows",
+      "Motion is functional only: 120ms ease-out-quart on state, zero on layout",
+      "WCAG 2.1 AA target with a CI gate (scripts/check-contrast.mjs)",
+      "One screen, one task (no kitchen-sink dashboards)",
+      "Test coverage on shipped tokens (Tailwind classnames pinned by tests)"
+    ],
+    "rules": [
+      { "name": "The One-Tenth Rule",                  "body": "Studio Ochre is allowed on ≤10% of any screen. If two saturated elements compete, one is wrong.", "section": "colors" },
+      { "name": "The Color-Is-Never-Sole-Signal Rule", "body": "Every state-color use carries a glyph or label too. Banners pair color with ▲/✓/i; rating buttons carry text labels plus keyboard digits.", "section": "colors" },
+      { "name": "The Cool-Blue Refusal",               "body": "No color in the system is in the cool-blue family (hue 200–280). Every neutral tints warm (hue 80°).", "section": "colors" },
+      { "name": "The No-Inter Rule",                   "body": "Inter is forbidden. The audience would recognize it on contact as the SaaS default. Geist or system stack only.", "section": "typography" },
+      { "name": "The 70ch Reader Rule",                "body": "Lesson body is capped at 70 characters per line via max-w-[680px] on .prose. Code blocks may break out; prose may not.", "section": "typography" },
+      { "name": "The Address-vs-Label Rule",           "body": "Sphere IDs are technical addresses (Mono Caption); lesson titles from frontmatter own the <h1>. Eyebrow and title never restate each other.", "section": "typography" },
+      { "name": "The No-Shadow Rule",                  "body": "box-shadow is forbidden across the system. If you reach for a shadow, you actually want a tonal step or a hairline.", "section": "elevation" },
+      { "name": "The Hairline Rule",                   "body": "Borders are 1px. The only exception is the .prose blockquote left rule at 2px (the conventional typographic carve-out, documented at the source).", "section": "elevation" },
+      { "name": "The Hover-By-Tone Rule",              "body": "Interactive rows hover by switching to surface-2, not by adding a border or shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use OKLCH directly in tokens; --color-* is the only color vocabulary.",
+      "Do keep the Studio Ochre accent on ≤10% of any screen.",
+      "Do give every state color a co-signal (glyph or label).",
+      "Do keep transitions to 120ms on state-only properties using the --ease-out-quart token.",
+      "Do show an inline visible note next to disabled buttons that have a reason; title= tooltips are invisible to keyboard- and touch-only users.",
+      "Do wire aria-describedby from inputs to their error/hint text via FormField.",
+      "Do test-pin every shipped Tailwind classname that encodes a design choice.",
+      "Do keep the lesson reader at max-w-[680px] (≈70ch); code blocks may break out.",
+      "Do use TanStack Link / LinkButton / useNavigate for in-app navigation; ESLint forbids window.location.href in pages/ and components/.",
+      "Do render the human lesson_title from frontmatter as the row label and put sphere_id underneath in Mono Caption."
+    ],
+    "donts": [
+      "Don't use Inter or any other ubiquitous SaaS sans.",
+      "Don't use box-shadow anywhere; depth is tonal and via hairlines.",
+      "Don't use side-stripe borders greater than 1px as colored accents on cards, list items, callouts, or alerts (blockquote 2px is the only carve-out).",
+      "Don't nest cards inside cards.",
+      "Don't use rounded-square icon tiles above headings.",
+      "Don't use bouncy / spring easings on interactive elements.",
+      "Don't use fake glassmorphism (backdrop-filter: blur on translucent panels for no functional reason).",
+      "Don't put purple or blue gradient hero / banner / accent backgrounds anywhere.",
+      "Don't use em dashes (U+2014) in user-facing copy; enforced by scripts/check-em-dash.mjs.",
+      "Don't ship streak-loss guilt UI of any kind; PRD §3.5 FR-STATS-4 is binding.",
+      "Don't use emoji in app navigation or chrome (lesson markdown content may include emoji; the app shell may not).",
+      "Don't ship light-mode contrast below WCAG AA; scripts/check-contrast.mjs runs in CI.",
+      "Don't restate the heading; eyebrow is the address, h1 is the human label.",
+      "Don't use window.location.href = ... for in-app navigation.",
+      "Don't use title= tooltips as the only explanation for a disabled control.",
+      "Don't rely on color alone for any state."
+    ]
+  }
+}
