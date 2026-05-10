@@ -32,11 +32,7 @@ describe('Button', () => {
 
   test('disabled prevents clicks', async () => {
     const onClick = vi.fn()
-    render(
-      <Button onClick={onClick} disabled>
-        x
-      </Button>,
-    )
+    render(<Button onClick={onClick} disabled>x</Button>)
     await userEvent.click(screen.getByRole('button'))
     expect(onClick).not.toHaveBeenCalled()
   })
@@ -107,53 +103,30 @@ describe('Input', () => {
 
 describe('FormField', () => {
   test('label is associated with the wrapped input via htmlFor/id', () => {
-    render(
-      <FormField id="email" label="Email">
-        <Input id="email" />
-      </FormField>,
-    )
+    render(<FormField id="email" label="Email"><Input id="email" /></FormField>)
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
   test('binds the input to the error message via aria-describedby (T4.5.2)', () => {
-    render(
-      <FormField id="email" label="Email" error="Invalid email.">
-        <Input id="email" />
-      </FormField>,
-    )
-    const input = screen.getByLabelText('Email')
-    const errorId = input.getAttribute('aria-describedby')
+    render(<FormField id="email" label="Email" error="Invalid email."><Input id="email" /></FormField>)
+    const errorId = screen.getByLabelText('Email').getAttribute('aria-describedby')
     expect(errorId).toBe('email-error')
     expect(document.getElementById(errorId!)).toHaveTextContent('Invalid email.')
   })
 
   test('renders error with role=alert (announced by screen readers)', () => {
-    render(
-      <FormField id="email" label="Email" error="invalid format">
-        <Input id="email" invalid />
-      </FormField>,
-    )
-    const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('invalid format')
+    render(<FormField id="email" label="Email" error="invalid format"><Input id="email" invalid /></FormField>)
+    expect(screen.getByRole('alert')).toHaveTextContent('invalid format')
   })
 
   test('renders hint when no error', () => {
-    render(
-      <FormField id="x" label="X" hint="optional">
-        <Input id="x" />
-      </FormField>,
-    )
+    render(<FormField id="x" label="X" hint="optional"><Input id="x" /></FormField>)
     expect(screen.getByText('optional')).toBeInTheDocument()
   })
 
   test('label.htmlFor matches the wrapped input id (no orphan label)', () => {
-    render(
-      <FormField id="email" label="Email">
-        <Input id="email" />
-      </FormField>,
-    )
-    const label = screen.getByText('Email').closest('label')!
-    expect(label.getAttribute('for')).toBe('email')
+    render(<FormField id="email" label="Email"><Input id="email" /></FormField>)
+    expect(screen.getByText('Email').closest('label')!.getAttribute('for')).toBe('email')
   })
 })
 
