@@ -24,9 +24,13 @@ interface Recorder {
   calls: { url: string; method: string; body?: Record<string, unknown> }[]
 }
 
+type AnswerBody = { card_id: string; rating: number; response_ms: number; idempotency_key: string }
+
 function mockFetch(handler: (url: string) => Response): Recorder {
   const r: Recorder = { calls: [] }
-  vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+  vi.stubGlobal('fetch', vi.fn(async (
+    input: RequestInfo | URL, init?: RequestInit,
+  ) => {
     const url = typeof input === 'string' ? input : input.toString()
     r.calls.push({
       url, method: init?.method ?? 'GET',
@@ -89,11 +93,13 @@ describe('useSession — happy path', () => {
     await waitFor(() => expect(result.current.currentCard?.card_id).toBe('c2'))
     expect(result.current.completedCount).toBe(1)
 
-    const a = recorder.calls.find((c) => c.url.includes('/answer'))!
+    const a = recorder.calls.find((c) => c.url.includes('/answer'))
+    if (!a?.body) throw new Error('expected /answer call with body')
+    const body = a.body as unknown as AnswerBody
     expect(a.method).toBe('POST')
-    expect(a.body).toMatchObject({ card_id: 'c1', rating: 2 })
-    expect(a.body.response_ms).toBeGreaterThanOrEqual(0)
-    expect(a.body.idempotency_key).toMatch(/^[A-Za-z0-9_-]{16,128}$/)
+    expect(body).toMatchObject({ card_id: 'c1', rating: 2 })
+    expect(body.response_ms).toBeGreaterThanOrEqual(0)
+    expect(body.idempotency_key).toMatch(/^[A-Za-z0-9_-]{16,128}$/)
 
     await act(async () => { await result.current.submitAnswer(3) })
     await waitFor(() => expect(result.current.status).toBe('finished'))
@@ -140,7 +146,7 @@ describe('useSession — AGAIN re-insertion (ADR-010 client-owned loop)', () => 
     await waitFor(() => expect(result.current.status).toBe('finished'))
     const c1Keys = recorder.calls
       .filter((c) => c.url.includes('/answer') && c.body?.card_id === 'c1')
-      .map((c) => c.body.idempotency_key as string)
+      .map((c) => (c.body as unknown as AnswerBody).idempotency_key)
     expect(c1Keys).toHaveLength(2)
     expect(new Set(c1Keys).size).toBe(2)
   })
