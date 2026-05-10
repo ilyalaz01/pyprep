@@ -6,6 +6,14 @@
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { render, screen, waitFor } from '@testing-library/react'
 
 import { setLastActive, clearLastActive } from '../lib/last-active'
@@ -28,11 +36,32 @@ function mockRoutes(routes: Record<string, () => Response>) {
   )
 }
 
+/**
+ * Wrap HomeDashboard in a minimal in-memory router so its <Link> calls
+ * (T4.5.3: Continue link) can resolve. We don't render the real lesson
+ * route — the stub component is enough to satisfy type-checked targets.
+ */
 function renderDashboard() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const root = createRootRoute({ component: () => <Outlet /> })
+  const indexRoute = createRoute({
+    getParentRoute: () => root,
+    path: '/',
+    component: () => <HomeDashboard />,
+  })
+  const lessonStub = createRoute({
+    getParentRoute: () => root,
+    path: '/modules/$moduleId/lesson/$sphereId',
+    component: () => null,
+  })
+  const tree = root.addChildren([indexRoute, lessonStub])
+  const router = createRouter({
+    routeTree: tree,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
   return render(
     <QueryClientProvider client={qc}>
-      <HomeDashboard />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   )
 }

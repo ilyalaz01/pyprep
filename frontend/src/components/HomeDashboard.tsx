@@ -8,6 +8,7 @@
  * principle 1: honest signaling > motivational theatre.
  */
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 
 import { api } from '../lib/api'
 import { getLastActive } from '../lib/last-active'
@@ -34,12 +35,16 @@ export function HomeDashboard() {
     <div className="space-y-8">
       {lastActive && (
         <Section title="Continue where you left off">
-          <a
-            href={`/modules/${lastActive.module_id}/lesson/${lastActive.sphere_id}`}
+          <Link
+            to="/modules/$moduleId/lesson/$sphereId"
+            params={{
+              moduleId: String(lastActive.module_id),
+              sphereId: lastActive.sphere_id,
+            }}
             className="text-sm text-[color:var(--color-fg)] underline-offset-4 hover:underline"
           >
             Module {lastActive.module_id} · {lastActive.sphere_id}
-          </a>
+          </Link>
         </Section>
       )}
 
@@ -47,7 +52,13 @@ export function HomeDashboard() {
         title="Today's review queue"
         action={
           queueCount > 0 ? (
-            <Button variant="primary" size="sm" onClick={() => (window.location.href = '/review')}>
+            <Button
+              variant="primary"
+              size="sm"
+              // TODO(phase-5): swap to <LinkButton to="/review"> when route exists.
+              // eslint-disable-next-line no-restricted-syntax
+              onClick={() => (window.location.href = '/review')}
+            >
               Review now
             </Button>
           ) : null

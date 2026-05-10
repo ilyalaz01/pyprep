@@ -23,6 +23,7 @@ export function LessonActions({ moduleId, sphereId, cardCount }: LessonActionsPr
       <Button
         variant="primary"
         // TODO(phase-5): swap to <LinkButton to="/review"> when route exists.
+        // eslint-disable-next-line no-restricted-syntax
         onClick={() => (window.location.href = `/review?sphere=${sphereId}`)}
         disabled={!hasCards}
       >

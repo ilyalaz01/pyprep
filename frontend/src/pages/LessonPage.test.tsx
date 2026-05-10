@@ -141,11 +141,12 @@ describe('LessonPage — happy path', () => {
 })
 
 describe('LessonPage — branches', () => {
-  test('empty content shows "Lesson content coming soon" + back button', async () => {
+  test('empty content shows "Lesson content coming soon" + back link (T4.5.3: LinkButton, not Button)', async () => {
     mockLesson(() => lessonOk(''))
     renderAt('/modules/1/lesson/m1-s0')
     expect(await screen.findByText(/lesson content coming soon/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /back to module/i })).toBeInTheDocument()
+    const back = screen.getByRole('link', { name: /back to module/i })
+    expect(back).toHaveAttribute('href', '/modules/1')
   })
 
   test('error: 404 shows Banner with retry, NOT a stale loading state', async () => {

@@ -12,9 +12,9 @@ import { useParams } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 
 import { Banner } from '../components/Banner'
-import { Button } from '../components/Button'
 import { LessonActions } from '../components/LessonActions'
 import { LessonReader } from '../components/LessonReader'
+import { LinkButton } from '../components/LinkButton'
 import { api } from '../lib/api'
 
 export function LessonPage() {
@@ -97,9 +97,13 @@ function EmptyLesson({ moduleId }: { moduleId: number }) {
       <p className="text-sm text-[color:var(--color-fg-muted)]">
         Lesson content coming soon.
       </p>
-      <Button onClick={() => (window.location.href = `/modules/${moduleId}`)}>
+      <LinkButton
+        variant="secondary"
+        to="/modules/$moduleId"
+        params={{ moduleId: String(moduleId) }}
+      >
         Back to module
-      </Button>
+      </LinkButton>
     </div>
   )
 }
