@@ -12,7 +12,7 @@ import { Link } from '@tanstack/react-router'
 
 import { api } from '../lib/api'
 import { getLastActive } from '../lib/last-active'
-import { Button } from './Button'
+import { LinkButton } from './LinkButton'
 import { Section } from './Section'
 
 const WEAKNESS_MIN_REVIEWS = 10
@@ -52,15 +52,27 @@ export function HomeDashboard() {
         title="Today's review queue"
         action={
           queueCount > 0 ? (
-            <Button
-              variant="primary"
-              size="sm"
-              // TODO(phase-5): swap to <LinkButton to="/review"> when route exists.
-              // eslint-disable-next-line no-restricted-syntax
-              onClick={() => (window.location.href = '/review')}
-            >
-              Review now
-            </Button>
+            lastActive ? (
+              <LinkButton
+                variant="primary"
+                size="sm"
+                to="/modules/$moduleId/sphere/$sphereId/session"
+                params={{
+                  moduleId: String(lastActive.module_id),
+                  sphereId: lastActive.sphere_id,
+                }}
+              >
+                Review now
+              </LinkButton>
+            ) : (
+              // No last-active history: send the user to the module
+              // dashboard to pick a sphere. (Owner spec said "/modules"
+              // but that route does not exist — /home is the module
+              // discovery surface.)
+              <LinkButton variant="primary" size="sm" to="/home">
+                Review now
+              </LinkButton>
+            )
           ) : null
         }
       >

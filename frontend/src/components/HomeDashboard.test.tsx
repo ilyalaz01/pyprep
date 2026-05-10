@@ -40,7 +40,11 @@ function renderDashboard() {
     <QueryClientProvider client={qc}>
       <HomeDashboard />
     </QueryClientProvider>,
-    ['/modules/$moduleId/lesson/$sphereId'],
+    [
+      '/modules/$moduleId/lesson/$sphereId',
+      '/modules/$moduleId/sphere/$sphereId/session',
+      '/home',
+    ],
   )
 }
 
@@ -66,14 +70,15 @@ describe('HomeDashboard — Continue section', () => {
 })
 
 describe('HomeDashboard — Review queue', () => {
-  test('shows count and Review-now action when queue has cards', async () => {
-    mockRoutes({
-      '/api/review/queue': () => queue('c1', 'c2', 'c3'),
-      '/api/stats/me': () => overview(0),
-    })
+  test.each([
+    ['with last-active', true, '/modules/1/sphere/m1-s0/session'],
+    ['without last-active', false, '/home'],
+  ] as const)('Review-now LinkButton %s targets %s', async (_l, hasLA, href) => {
+    if (hasLA) setLastActive({ module_id: 1, sphere_id: 'm1-s0' })
+    mockRoutes({ '/api/review/queue': () => queue('c1', 'c2'), '/api/stats/me': () => overview(0) })
     renderDashboard()
-    expect(await screen.findByText(/3 cards due today/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /review now/i })).toBeInTheDocument()
+    const link = await screen.findByRole('link', { name: /review now/i })
+    expect(link).toHaveAttribute('href', href)
   })
 
   test('singular card', async () => {

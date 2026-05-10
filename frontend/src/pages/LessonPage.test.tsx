@@ -107,11 +107,11 @@ describe('LessonPage — happy path', () => {
     expect(h1).toBeInTheDocument()
   })
 
-  test('Start review session button renders enabled when card_count > 0', async () => {
+  test('Start review session is a LinkButton when card_count > 0 (T5.10)', async () => {
     mockLesson(() => lessonOk(SAMPLE_MD))
     renderAt('/modules/1/lesson/m1-s0')
-    const btn = await screen.findByRole('button', { name: /start review session/i })
-    expect(btn).not.toBeDisabled()
+    const link = await screen.findByRole('link', { name: /start review session/i })
+    expect(link).toHaveAttribute('href', '/modules/1/sphere/m1-s0/session')
   })
 
   test('Start review disabled with visible inline note when card_count is 0 (T4.5.2)', async () => {

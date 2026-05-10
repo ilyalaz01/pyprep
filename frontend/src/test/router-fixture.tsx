@@ -20,6 +20,7 @@ import { HomePage } from '../pages/HomePage'
 import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
 import { ModuleDetailPage } from '../pages/ModuleDetailPage'
+import { SessionPage } from '../pages/SessionPage'
 
 interface LoginSearch { from?: string }
 
@@ -65,10 +66,15 @@ export function buildRouter(initialUrl: string) {
     path: '/modules/$moduleId/lesson/$sphereId',
     component: LessonPage,
   })
+  const session = createRoute({
+    getParentRoute: () => authed,
+    path: '/modules/$moduleId/sphere/$sphereId/session',
+    component: SessionPage,
+  })
   const tree = root.addChildren([
     indexRoute,
     login,
-    authed.addChildren([home, moduleDetail, lesson]),
+    authed.addChildren([home, moduleDetail, lesson, session]),
   ])
   return createRouter({
     routeTree: tree,

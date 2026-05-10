@@ -25,6 +25,7 @@ import { HomePage } from '../pages/HomePage'
 import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
 import { ModuleDetailPage } from '../pages/ModuleDetailPage'
+import { SessionPage } from '../pages/SessionPage'
 
 interface LoginSearch {
   from?: string
@@ -85,10 +86,18 @@ const lessonRoute = createRoute({
   component: LessonPage,
 })
 
+const sessionRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/modules/$moduleId/sphere/$sphereId/session',
+  component: SessionPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  authedLayoutRoute.addChildren([homeRoute, moduleDetailRoute, lessonRoute]),
+  authedLayoutRoute.addChildren([
+    homeRoute, moduleDetailRoute, lessonRoute, sessionRoute,
+  ]),
 ])
 
 export const router = createRouter({ routeTree })
