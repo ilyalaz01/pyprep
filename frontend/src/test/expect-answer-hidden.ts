@@ -22,10 +22,13 @@ function answerStrings(card: Card): string[] {
     case 'code_trap':
       return [card.explanation_md]
     case 'fill_in':
-      return [
-        ...card.accepted_answers.flat(),
-        card.explanation_md ?? '',
-      ].filter(Boolean)
+      // accepted_answers tokens (e.g. "is", "[]") collide with substrings
+      // of the snippet text — they are inherently short and the snippet
+      // IS the question. Renderer-test masking for fill_in must use a
+      // structural assertion (no [data-testid="blank-remediation"], no
+      // input has data-correct set) instead of substring sniffing on the
+      // accepted answers. We still pin explanation_md absence here.
+      return [card.explanation_md ?? ''].filter(Boolean)
     case 'code_task':
       return [card.solution_code, card.tests]
   }

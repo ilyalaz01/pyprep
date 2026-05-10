@@ -154,10 +154,13 @@ describe('expectAnswerHidden — masking helper for renderer tests', () => {
     expect(() => expectAnswerHidden(card, el)).toThrow(/answer leaked/i)
   })
 
-  test('throws when the DOM leaks a fill-in accepted answer', () => {
+  test('throws when the DOM leaks a fill-in explanation_md', () => {
+    // accepted_answers are intentionally NOT substring-checked for
+    // fill_in — short tokens like "is"/"[]" collide with the snippet
+    // text. Renderer tests assert pre-submit masking structurally.
     const el = document.createElement('div')
     const card = parseCard(fillIn) as FillInCard
-    el.innerHTML = `<code>${card.accepted_answers[0][0]}</code>`
+    el.innerHTML = `<p>${card.explanation_md}</p>`
     expect(() => expectAnswerHidden(card, el)).toThrow(/answer leaked/i)
   })
 
