@@ -27,7 +27,7 @@ export function Input({ invalid = false, className = '', ...rest }: InputProps) 
           ? 'focus-visible:outline-[color:var(--color-danger)]'
           : 'focus-visible:outline-[color:var(--color-border-strong)]',
         'disabled:opacity-60 disabled:cursor-not-allowed',
-        'transition-[border-color,outline-color] duration-120',
+        'transition-[border-color,outline-color] duration-120 ease-(--ease-out-quart)',
         className,
       ].join(' ')}
       {...rest}

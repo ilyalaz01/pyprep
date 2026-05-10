@@ -66,4 +66,14 @@ describe('LinkButton', () => {
     const link = await screen.findByRole('link')
     expect(link.className).toMatch(/h-7/)
   })
+
+  test('uses ease-out-quart easing on transitions (T4.5.8)', async () => {
+    renderButton(
+      <LinkButton to="/modules/$moduleId" params={{ moduleId: '1' }}>
+        x
+      </LinkButton>,
+    )
+    const link = await screen.findByRole('link')
+    expect(link.className).toContain('ease-(--ease-out-quart)')
+  })
 })

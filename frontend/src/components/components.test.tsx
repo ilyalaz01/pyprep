@@ -41,6 +41,11 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
+  test('uses ease-out-quart easing on transitions (T4.5.8)', () => {
+    render(<Button>go</Button>)
+    expect(screen.getByRole('button').className).toContain('ease-(--ease-out-quart)')
+  })
+
   test.each(['primary', 'secondary', 'ghost'] as const)(
     'variant %s applies a distinct theme-token-driven background',
     (variant) => {
@@ -84,6 +89,13 @@ describe('Input', () => {
     render(<Input id="x" placeholder="email" disabled />)
     expect(screen.getByPlaceholderText('email').className).toContain(
       'disabled:opacity-60',
+    )
+  })
+
+  test('uses ease-out-quart easing on transitions (T4.5.8)', () => {
+    render(<Input id="x" placeholder="email" />)
+    expect(screen.getByPlaceholderText('email').className).toContain(
+      'ease-(--ease-out-quart)',
     )
   })
 

@@ -49,7 +49,7 @@ export function Button({
       type={type}
       className={[
         'inline-flex items-center justify-center gap-2 rounded font-medium',
-        'transition-[color,background-color,border-color,filter] duration-120',
+        'transition-[color,background-color,border-color,filter] duration-120 ease-(--ease-out-quart)',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[color:var(--color-border-strong)]',
         'disabled:opacity-50 disabled:cursor-not-allowed',
