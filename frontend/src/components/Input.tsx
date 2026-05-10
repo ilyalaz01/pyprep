@@ -26,7 +26,7 @@ export function Input({ invalid = false, className = '', ...rest }: InputProps) 
         invalid
           ? 'focus-visible:outline-[color:var(--color-danger)]'
           : 'focus-visible:outline-[color:var(--color-border-strong)]',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
+        'disabled:opacity-60 disabled:cursor-not-allowed',
         'transition-[border-color,outline-color] duration-120',
         className,
       ].join(' ')}

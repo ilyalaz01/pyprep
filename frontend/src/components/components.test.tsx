@@ -80,6 +80,13 @@ describe('Input', () => {
     expect(screen.getByPlaceholderText('email')).toBeDisabled()
   })
 
+  test('pins disabled opacity at 60 (less harsh than the Tailwind 50 default)', () => {
+    render(<Input id="x" placeholder="email" disabled />)
+    expect(screen.getByPlaceholderText('email').className).toContain(
+      'disabled:opacity-60',
+    )
+  })
+
   test('type="password" forwards (LoginPage relies on browser autofill)', () => {
     render(<Input id="x" type="password" data-testid="pw" />)
     expect(screen.getByTestId('pw')).toHaveAttribute('type', 'password')
