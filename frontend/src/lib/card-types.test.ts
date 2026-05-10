@@ -125,6 +125,18 @@ describe('parseCard — schema violations throw CardSchemaError', () => {
   })
 })
 
+// expectAnswerHidden uses substring matching, which works for the
+// answer fields of flip / multiple_choice / code_trap / code_task
+// (long enough to be unique). It does NOT work for fill_in
+// accepted_answers — short tokens like "is", "[]", "in" inevitably
+// collide with substrings of the snippet text that IS the question
+// (e.g. "is" inside "tags"). For fill_in the helper deliberately
+// skips accepted_answers and renderer tests pin masking structurally
+// (no [data-testid="blank-remediation"], no input has data-correct).
+//
+// Future short-answer card types (none currently planned) should
+// reuse this pattern: substring sniff what's safely long, structural
+// pin what's collision-prone.
 describe('expectAnswerHidden — masking helper for renderer tests', () => {
   test('passes when DOM contains no answer-shaped strings', () => {
     const el = document.createElement('div')
