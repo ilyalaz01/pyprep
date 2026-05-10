@@ -40,6 +40,7 @@
   --color-accent-muted: oklch(0.55 0.06 70);  /* desaturated accent for blockquote rules etc. */
 
   --color-good: oklch(0.78 0.14 145);
+  --color-good-muted: oklch(0.65 0.07 145);  /* lower-saturation green for the FSRS Good rating (Anki convention) — keeps the positive-feedback hue without competing with Easy. */
   --color-warn: oklch(0.82 0.14 80);
   --color-danger: oklch(0.65 0.18 25);
 

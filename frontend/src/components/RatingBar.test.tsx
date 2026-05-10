@@ -50,12 +50,15 @@ describe('RatingBar', () => {
     )
   })
 
-  test('uses theme color tokens for outcome-specific buttons (no hardcoded hex)', () => {
+  test('outcome buttons use Anki-convention semantic tokens (red/warn/good-muted/good)', () => {
     render(<RatingBar onRate={vi.fn()} />)
-    const again = screen.getByRole('button', { name: /again/i })
-    const easy = screen.getByRole('button', { name: /easy/i })
-    expect(again.className).toMatch(/var\(--color-danger/)
-    expect(easy.className).toMatch(/var\(--color-good/)
+    const get = (name: RegExp) => screen.getByRole('button', { name })
+    expect(get(/again/i).className).toMatch(/var\(--color-danger\)/)
+    expect(get(/hard/i).className).toMatch(/var\(--color-warn\)/)
+    // Good = same hue as Easy (success), reduced chroma — keeps the
+    // positive-feedback signal but lets Easy stand out as the bright pole.
+    expect(get(/good/i).className).toMatch(/var\(--color-good-muted\)/)
+    expect(get(/easy/i).className).toMatch(/var\(--color-good\)/)
   })
 
   test('each button exposes its rating via aria-label for screen readers', () => {

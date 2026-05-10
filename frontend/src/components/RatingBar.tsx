@@ -3,10 +3,12 @@
  * shown at the bottom of every card after the user has revealed the
  * answer. Mapping pinned by ADR-015: 1=Again, 2=Hard, 3=Good, 4=Easy.
  *
- * Token-pinned outcome colors (Again→danger, Hard→warn, Easy→good)
- * make the destructive and reward poles visually distinct without
- * hard-coded colors. Good is intentionally neutral so the most-used
- * path doesn't compete for attention.
+ * Token-pinned outcome colors follow the Anki convention:
+ * Again→danger (red), Hard→warn (yellow), Good→good-muted
+ * (lower-saturation green), Easy→good (full-saturation green).
+ * Two saturation levels of green keep restraint without losing
+ * positive-feedback semantics — see the index.css comment on
+ * --color-good-muted.
  *
  * Keyboard digits 1-4 are rendered as captions; the actual key
  * handling lives at the session-page level (T5.12) so the same
@@ -44,9 +46,9 @@ const CHOICES: readonly Choice[] = [
   {
     rating: 3, label: 'Good', digit: '3',
     variant:
-      'border border-[color:var(--color-border-strong)] ' +
-      'text-[color:var(--color-fg)] ' +
-      'hover:border-[color:var(--color-fg-muted)]',
+      'border border-[color:var(--color-good-muted)] ' +
+      'text-[color:var(--color-good-muted)] ' +
+      'hover:bg-[color:var(--color-good-muted)]/10',
   },
   {
     rating: 4, label: 'Easy', digit: '4',
