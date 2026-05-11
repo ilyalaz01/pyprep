@@ -192,20 +192,27 @@
 
 ## Phase 5 — Card Session UI
 
-**Goal:** All five card types render and function. FSRS rating wired.
+**Goal:** All five card types render and function. FSRS rating wired. Session lifecycle (start → loop → finish → summary). Keyboard map.
+
+12-task breakdown (supplants the older 8-task list owner approved at Phase 5 entry). ADRs filed mid-phase: 015 (self-rate on objective cards), 016 (`key={card.id}` per-card React isolation), 017 (nested route + no MVP resumption). Editor framework: CodeMirror 6 (Monaco rejected — IntelliSense undermines learning).
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T5.1 | `/session/:sphereId` route + `useSession` hook (TanStack Query). | Loads session, fetches next card | ⬜ |
-| T5.2 | `<FlipCard />` — front/back animation, rating buttons (Again/Hard/Good/Easy). | Rating posts to API, advances | ⬜ |
-| T5.3 | `<CodeTrapCard />` — render Python with Prism/Shiki, multiple choice, post-answer explainer. | Works for Module 1 traps | ⬜ |
-| T5.4 | `<MultipleChoiceCard />` — generic MC with per-option explanations. | Works | ⬜ |
-| T5.5 | `<FillInCard />` — code with `___` blanks, input fields, tolerant validation. | Works | ⬜ |
-| T5.6 | `<CodeTaskCard />` — Monaco editor, "Run tests" button (Phase 6 wires Pyodide). | Editor renders | ⬜ |
-| T5.7 | Session summary screen: cards reviewed, accuracy, time, XP earned, next-due preview. | Shown after `finish` | ⬜ |
-| T5.8 | Keyboard shortcuts: Space=flip, 1/2/3/4=rate, Enter=next. Documented in tooltip. | Manual QA pass | ⬜ |
+| T5.1 | `lib/session-queue.ts` — pure client-side queue, ADR-010 client-owned progression, AGAIN re-insertion. | Pure module, no React, no network | ✅ (`bd6bede`) |
+| T5.2 | `lib/use-session.ts` — hook wiring queue to /api/sessions/*, NextCard cache for AGAIN re-presentations, idempotency keys, response_ms clamp. | Status machine loading→active→finishing→finished; AGAIN's cached re-present produces distinct idempotency keys per attempt | ✅ (`b8a77bf`) |
+| T5.3 | `<RatingBar />` — 4-button cluster, token-pinned outcome colors (Anki convention), digit captions. | Click forwards rating; disabled-prop blocks; aria-labels carry digit | ✅ (`84054f9`) |
+| T5.4 | `lib/card-types.ts` — discriminated union + Zod parser. Five card shapes typed against authored content. | parseCard validates and narrows on `type` discriminator | ✅ |
+| T5.5 | `<FlipCard />` — front/back crossfade reveal (NOT 3D rotation per DESIGN.md), self-rate handed to RatingBar. | Pre-reveal masks answer; reveal animates; rating advances | ✅ |
+| T5.6 | `<MultipleChoiceCard />` — generic MC with per-option explanations, ADR-015 self-rate after submit. | Submit shows correct/incorrect + per-option explanations; rating loop runs | ✅ |
+| T5.7 | `<CodeTrapCard />` — Python snippet via Shiki, multiple-choice answer, post-answer explainer. | Module 1 trap cards render with correct highlighting | ✅ (`d9b9074`) |
+| T5.8 | `<FillInCard />` — code-with-`___`-blanks renderer, per-blank inputs, match-blank policy. | Multi-blank inputs validated against `accepted_answers[][]`; remediation surfaces; Enter-on-last-blank submits | ✅ (`96d554f`) |
+| T5.9 | `<CodeTaskCard />` + CodeMirror 6 editor + Pyodide runner stub. | Editor renders Python with starter code; Run wires to runner.ts stub (Phase 6 swaps in real Pyodide) | ✅ (`0240673`) |
+| T5.10 | `SessionPage` + `CardRenderer` dispatch + home/lesson "Review" rewiring. | Loading skeleton, error+Retry, two empty-states, active CardShell+renderer, finished placeholder. Default `mode='mixed'` (review-due first, top up with new) — was `'review'` which returned empty for users with no Reviews yet. | ✅ (`5aa59f3`, fix `da3f613`) |
+| T5.10.5 | Polish round from owner browser re-test: replace per-button rating captions with single info-icon + tooltip (extracted as `<RatingHelp />`), drop pre-engagement DifficultyMeter from CardShell header (read as a progress indicator + primes against ADR-015), aggressive +4px-on-base typography re-bump for high-DPI legibility. NOTES backlog N031–N035 filed. | Pre-push gates green; owner re-verifies in browser | ✅ (`19f4c78`, `dd7a72c`, `5abc82f`, `5f70ddd`, `74a9805`, `4d21a77`, `2ed06dc`, `47e3d30`) |
+| T5.11 | `<SessionSummary />` — calm reporting at session end. Cards reviewed · time invested (wall-clock M min Ss) · per-rating breakdown · accuracy on objective card types only (rating ≥ 3) · next-due preview bucketed by ≤1d / 1-3d / 3-7d / >7d. CTAs: Back to module + Practice again. NO XP, NO streaks, NO celebratory copy. | All sections render; accuracy row omitted when no objective cards; empty buckets omitted; aggregation is client-side from `AnswerResult.next_due_at` (latest-wins per card on AGAIN-then-rerate) | ✅ (`6c6ef56`) |
+| T5.12 | Global keyboard map (`useSessionKeys` hook): Space → reveal (flip cards), 1-4 → rate, Esc → confirm + exit. Visible cheatsheet footer in session, hidden on summary. Editable-target gate so per-card local bindings (CodeMirror, FillIn Enter) don't conflict. | Keys fire via DOM click on the matching affordance (respects disabled state); pre-reveal digit press is no-op; Esc with confirm-yes navigates back to module | ✅ (`3d9dbf4`) |
 
-**Phase 5 exit gate:** Owner completes a real 20-card session of mixed types and sees correct stats updates.
+**Phase 5 exit gate:** code-complete and CI-green. All 8 pre-push gates green: ruff / mypy / file-size (≤150 LOC) / handler-LOC (≤10) / eslint / tsc / contrast (WCAG AA) / em-dash. Test counts at close: vitest ~280 tests across ~25 files; pytest ~230 tests. **Manual exit gate (owner runs a real 20-card mixed-types session against `m1-s0` end-to-end and verifies stats updates) is PENDING owner re-test** — that's an owner action; auto-roll into Phase 6 only after owner confirms. **Phase 5 code-closed 2026-05-11.**
 
 ---
 
