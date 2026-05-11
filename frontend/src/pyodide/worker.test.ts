@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import {
-  bootPyodide, handleMessage, _setBootEnvForTests,
+  bootPyodide, handleMessage,
+  _setBootEnvForTests, _setBootErrorForTests,
 } from './worker'
 
 const fakePyodide = (loadOk = true) => ({
@@ -19,6 +20,7 @@ afterEach(() => {
     vi.fn(async () => fakePyodide()),
     'about:test',
   )
+  _setBootErrorForTests(null)
 })
 
 describe('handleMessage — dispatch shape', () => {
@@ -93,5 +95,31 @@ describe('bootPyodide — error paths', () => {
     expect(post.mock.calls[0][0]).toEqual({
       type: 'error', message: expect.stringMatching(/not configured/i),
     })
+  })
+
+  // T6.0.5: when the production bootstrap detects a missing
+  // VITE_PYODIDE_CDN env var, it sets _bootError with an actionable
+  // setup message. bootPyodide must surface that exact message so the
+  // user gets a fix path, not a riddle.
+  test('_bootError set with env-not-set message surfaces verbatim', async () => {
+    const msg =
+      '[pyprep:pyodide] VITE_PYODIDE_CDN env var is not set. ' +
+      'Copy frontend/.env.example to frontend/.env.local and restart pnpm dev. ' +
+      'See README setup section.'
+    _setBootErrorForTests(msg)
+    const post = vi.fn()
+    await bootPyodide(post)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post.mock.calls[0][0]).toEqual({ type: 'error', message: msg })
+  })
+
+  test('_bootError takes precedence over _loadPyodide (env error wins over generic)', async () => {
+    _setBootErrorForTests('env not set: see README')
+    _setBootEnvForTests(fakeLoad(fakePyodide()), 'about:test')
+    const post = vi.fn()
+    await bootPyodide(post)
+    const m = post.mock.calls[0][0] as { type: string; message?: string }
+    expect(m.type).toBe('error')
+    expect(m.message).toMatch(/env not set/i)
   })
 })

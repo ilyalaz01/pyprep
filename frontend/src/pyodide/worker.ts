@@ -1,17 +1,22 @@
-// Pyodide Web Worker entry (Phase 6 / T6.3).
+// Pyodide Web Worker entry (Phase 6 / T6.3 + T6.0.5 fix).
 //
 // On a 'boot' message: dynamic-imports pyodide.mjs from the CDN
 // pinned in VITE_PYODIDE_CDN (ADR-020), calls loadPyodide({ indexURL }),
 // loadPackage('pytest'), and emits the three readiness signals. The
-// main-thread loader.ts owns the clock and timestamps each signal —
-// the worker just orders the events.
+// main-thread loader.ts owns the clock and timestamps each signal.
+//
+// T6.0.5 race fix: the production bootstrap uses top-level await so
+// the worker doesn't register onmessage (and therefore can't dispatch
+// a 'boot' message) until the CDN import has resolved or failed.
+// Before the fix, the IIFE was fire-and-forget — a 'boot' message
+// arriving before the import resolved produced
+// "pyodide bootstrap not configured" indistinguishably from a missing
+// env var, which is exactly what stop #2 surfaced.
 //
 // Bootstrap is injectable so the unit tests (PRD §6.1: mock the worker)
-// can drive bootPyodide() against a fake loadPyodide that returns a
-// fake Pyodide{loadPackage}. The dynamic CDN import only fires when
-// running as a real DedicatedWorker (jsdom test imports take the
-// _setBootEnvForTests path instead).
-import type { ColdStartMetrics as _Metrics } from './types' // type-only; ensures the contract import stays linked
+// can drive bootPyodide() against a fake loadPyodide. The CDN import
+// only fires when running as a real DedicatedWorker.
+import type { ColdStartMetrics as _Metrics } from './types' // ensures the contract import stays linked
 void (null as unknown as _Metrics)
 
 export type WorkerInbound = { type: 'boot' }
@@ -28,16 +33,25 @@ type LoadPyodide = (opts: { indexURL: string }) => Promise<PyodideInstance>
 
 let _loadPyodide: LoadPyodide | null = null
 let _indexURL = ''
+let _bootError: string | null = null
 
 export function _setBootEnvForTests(load: LoadPyodide, indexURL: string): void {
   _loadPyodide = load
   _indexURL = indexURL
 }
 
+export function _setBootErrorForTests(message: string | null): void {
+  _bootError = message
+}
+
 export async function bootPyodide(
   post: (m: WorkerOutbound) => void,
 ): Promise<void> {
   try {
+    if (_bootError) {
+      post({ type: 'error', message: _bootError })
+      return
+    }
     if (!_loadPyodide) {
       post({ type: 'error', message: 'pyodide bootstrap not configured' })
       return
@@ -77,43 +91,49 @@ export function handleMessage(
   })
 }
 
-// Production-side bootstrap. Only attaches in a real DedicatedWorker
-// context — jsdom unit tests skip this block and use the
-// _setBootEnvForTests escape hatch instead.
-//
-// `DedicatedWorkerGlobalScope` lives in TS's `WebWorker` lib which
-// isn't in tsconfig.app.json (we run lib: [ES2023, DOM]). Inlining a
-// minimal structural type keeps the worker code self-contained
-// without forcing a project-wide lib bump.
+// Production-side bootstrap. Only attaches in a real DedicatedWorker.
+// `DedicatedWorkerGlobalScope` lives in TS's WebWorker lib (not in
+// tsconfig.app.json's lib: [ES2023, DOM]); the inline structural type
+// keeps the worker self-contained.
 interface WorkerLikeSelf {
   postMessage: (m: unknown) => void
   onmessage: ((e: MessageEvent) => void) | null
 }
 declare const self: WorkerLikeSelf & typeof globalThis
 
-const isWorker =
+const ENV_NOT_SET_MSG =
+  '[pyprep:pyodide] VITE_PYODIDE_CDN env var is not set. ' +
+  'Copy frontend/.env.example to frontend/.env.local and restart pnpm dev. ' +
+  'See README setup section.'
+
+if (
   typeof self !== 'undefined' &&
   'WorkerGlobalScope' in (globalThis as Record<string, unknown>)
-
-if (isWorker) {
-  // Vite reads VITE_PYODIDE_CDN from the env at build time. The CDN
-  // url is the indexURL passed to loadPyodide AND the base for the
-  // dynamic pyodide.mjs import.
-  const cdn =
-    (import.meta as ImportMeta & { env?: { VITE_PYODIDE_CDN?: string } })
-      .env?.VITE_PYODIDE_CDN ??
-    'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
-  void (async () => {
+) {
+  const envCdn = (
+    import.meta as ImportMeta & { env?: { VITE_PYODIDE_CDN?: string } }
+  ).env?.VITE_PYODIDE_CDN
+  if (!envCdn) {
+    _bootError = ENV_NOT_SET_MSG
+    console.error(ENV_NOT_SET_MSG)
+  } else {
     try {
-      const mod = await import(/* @vite-ignore */ new URL('pyodide.mjs', cdn).toString())
-      _setBootEnvForTests(mod.loadPyodide as LoadPyodide, cdn)
+      // Top-level await: blocks worker activation until the CDN
+      // import resolves. Browser queues main-thread postMessage('boot')
+      // until then, so the 'boot' handler always sees _loadPyodide
+      // populated (or _bootError set).
+      const mod = await import(
+        /* @vite-ignore */ new URL('pyodide.mjs', envCdn).toString()
+      )
+      _setBootEnvForTests(mod.loadPyodide as LoadPyodide, envCdn)
     } catch (e) {
-      // Surface CDN-import failures at boot time, not silently. First
-      // incoming 'boot' message will see _loadPyodide=null and post a
-      // structured error reply.
-      console.error('[pyprep:pyodide] CDN import failed', e)
+      _bootError =
+        '[pyprep:pyodide] CDN import failed: ' +
+        (e instanceof Error ? e.message : String(e)) +
+        ' (check VITE_PYODIDE_CDN and network).'
+      console.error(_bootError, e)
     }
-  })()
+  }
   self.onmessage = (e: MessageEvent) =>
     handleMessage((m) => self.postMessage(m), e.data)
 }

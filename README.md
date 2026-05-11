@@ -43,8 +43,8 @@ cd pyprep
 uv sync                              # install all Python deps from pyproject.toml + uv.lock
 cp .env-example .env                 # adjust if needed
 
-# 3. frontend
-cd frontend && pnpm install && cd ..
+# 3. frontend (env.local is gitignored; vite reads VITE_* at start only)
+cd frontend && pnpm install && cp .env.example .env.local && cd ..
 
 # 4. one-time per clone: pre-push hook (mirrors CI gates locally)
 uv run pre-commit install --hook-type pre-push
