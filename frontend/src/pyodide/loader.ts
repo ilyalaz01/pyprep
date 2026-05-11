@@ -38,7 +38,13 @@ export function bootPyodideWorker(
 ): Promise<void> {
   // T6.3 stop-#2 retry diagnostic — proves the call reached the loader.
   console.info('[pyprep:pyodide] bootPyodideWorker called')
-  if (_readyPromise) return _readyPromise
+  if (_readyPromise) {
+    // React 19 Strict Mode runs useEffect twice in dev; the cached
+    // promise should be returned on the second call. Loud log so the
+    // singleton-vs-double-create question is unambiguous.
+    console.info('[pyprep:pyodide] returning cached worker (singleton hit)')
+    return _readyPromise
+  }
   const t0 = performance.now()
   _worker = factory()
   _readyPromise = new Promise<void>((resolve, reject) => {
@@ -81,6 +87,7 @@ export function bootPyodideWorker(
     _worker.onerror = (ev: ErrorEvent) =>
       reject(new Error(ev.message || 'pyodide worker onerror'))
     _worker.postMessage({ type: 'boot' })
+    console.info('[pyprep:pyodide] boot message posted to worker')
   })
   return _readyPromise
 }

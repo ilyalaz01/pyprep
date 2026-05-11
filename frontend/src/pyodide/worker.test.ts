@@ -14,6 +14,14 @@ const fakePyodide = (loadOk = true) => ({
 const fakeLoad = (pyodide: ReturnType<typeof fakePyodide>) =>
   vi.fn(async () => pyodide)
 
+// Diagnostic emits were added to bootPyodide for stop-#2 visibility.
+// Sequence/count assertions filter them out so the contract pins
+// stay focused on the ready/error signals loader.ts consumes.
+const nonDiag = (post: ReturnType<typeof vi.fn>) =>
+  post.mock.calls
+    .map((c) => c[0] as { type: string; message?: string })
+    .filter((m) => m.type !== 'diagnostic')
+
 afterEach(() => {
   // Reset module-level state between tests.
   _setBootEnvForTests(
@@ -55,8 +63,8 @@ describe('bootPyodide — happy path', () => {
     _setBootEnvForTests(fakeLoad(py), 'https://cdn.test/pyodide/')
     const post = vi.fn()
     await bootPyodide(post)
-    const types = post.mock.calls.map((c) => (c[0] as { type: string }).type)
-    expect(types).toEqual(['pyodide-ready', 'pytest-ready', 'ready'])
+    expect(nonDiag(post).map((m) => m.type))
+      .toEqual(['pyodide-ready', 'pytest-ready', 'ready'])
     expect(py.loadPackage).toHaveBeenCalledWith('pytest')
   })
 
@@ -70,25 +78,25 @@ describe('bootPyodide — happy path', () => {
 })
 
 describe('bootPyodide — error paths', () => {
-  test('loadPyodide rejection produces a single error reply', async () => {
+  test('loadPyodide rejection: error reply posted, then rethrown', async () => {
     const load = vi.fn(async () => { throw new Error('cdn down') })
     _setBootEnvForTests(load as unknown as never, 'about:test')
     const post = vi.fn()
-    await bootPyodide(post)
-    expect(post).toHaveBeenCalledTimes(1)
-    expect(post.mock.calls[0][0]).toEqual({ type: 'error', message: 'cdn down' })
+    await expect(bootPyodide(post)).rejects.toThrow('cdn down')
+    const events = nonDiag(post)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toEqual({ type: 'error', message: 'cdn down' })
   })
 
-  test('loadPackage rejection produces an error reply after pyodide-ready', async () => {
+  test('loadPackage rejection: emits pyodide-ready then error, rethrows', async () => {
     const py = fakePyodide(false)
     _setBootEnvForTests(fakeLoad(py), 'about:test')
     const post = vi.fn()
-    await bootPyodide(post)
-    const types = post.mock.calls.map((c) => (c[0] as { type: string }).type)
-    expect(types).toEqual(['pyodide-ready', 'error'])
+    await expect(bootPyodide(post)).rejects.toThrow('pytest fetch failed')
+    expect(nonDiag(post).map((m) => m.type)).toEqual(['pyodide-ready', 'error'])
   })
 
-  test('null bootstrap config produces a clear error', async () => {
+  test('null bootstrap config produces a clear error (no rethrow, early-return path)', async () => {
     _setBootEnvForTests(null as unknown as never, 'about:test')
     const post = vi.fn()
     await bootPyodide(post)

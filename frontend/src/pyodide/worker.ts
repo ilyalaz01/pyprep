@@ -61,19 +61,26 @@ export async function bootPyodide(
       post({ type: 'error', message: 'pyodide bootstrap not configured' })
       return
     }
+    post({ type: 'diagnostic', message: 'starting loadPyodide' })
     const pyodide = await _loadPyodide({ indexURL: _indexURL })
+    post({ type: 'diagnostic', message: 'loadPyodide complete, starting loadPackage(pytest)' })
     post({ type: 'pyodide-ready' })
     await pyodide.loadPackage('pytest')
+    post({ type: 'diagnostic', message: 'loadPackage(pytest) complete' })
     post({ type: 'pytest-ready' })
     // T6.4 will install pytest_harness.py here. T6.3 ships the
     // ready signal without harness work so stop #2 measures a
     // representative cold-start (loader + pytest) accurately.
     post({ type: 'ready' })
   } catch (e) {
-    post({
-      type: 'error',
-      message: e instanceof Error ? e.message : String(e),
-    })
+    const message = e instanceof Error ? e.message : String(e)
+    // Two-channel surfacing per stop-#2 retry brief: diagnostic
+    // (visible in DevTools as an info log) + error (rejects loader's
+    // promise). Rethrow so DevTools also shows the full stack trace
+    // as an unhandled rejection inside the worker.
+    post({ type: 'diagnostic', message: `boot error: ${message}` })
+    post({ type: 'error', message })
+    throw e
   }
 }
 
@@ -158,6 +165,9 @@ if (
     }
   }
   diag('attaching onmessage; ready for boot')
-  self.onmessage = (e: MessageEvent) =>
+  self.onmessage = (e: MessageEvent) => {
+    const incoming = (e.data as { type?: string } | null)?.type ?? 'unknown'
+    diag(`onmessage received: ${incoming}`)
     handleMessage((m) => self.postMessage(m), e.data)
+  }
 }
