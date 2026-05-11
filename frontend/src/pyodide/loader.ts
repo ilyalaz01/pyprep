@@ -105,6 +105,24 @@ export function getPyodideWorker(): Worker | null {
   return _worker
 }
 
+// T6.8: terminate the current worker and reset the singleton + metrics.
+// Called by runner.ts on timeout (FR-SBX-4). The next bootPyodideWorker()
+// call reconstructs a fresh worker, paying the cold-start cost again —
+// acceptable per the proposal; FR-SBX-4 doesn't mandate fast recovery.
+export function invalidateWorker(): void {
+  if (_worker) {
+    try { _worker.terminate() } catch { /* no-op */ }
+    _worker = null
+  }
+  _readyPromise = null
+  _metrics = {
+    pyodide_load_ms: null,
+    pytest_load_ms: null,
+    harness_init_ms: null,
+    total_ms: null,
+  }
+}
+
 // Test-only escape hatch. Resets the singleton so the test suite can
 // drive boot() multiple times against fresh mock workers. Underscore-
 // prefixed to mark non-production; not re-exported via index/barrel.

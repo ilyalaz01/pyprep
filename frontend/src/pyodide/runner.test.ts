@@ -7,6 +7,7 @@ vi.mock('./loader', () => ({
   bootPyodideWorker: vi.fn(() => Promise.resolve()),
   getPyodideWorker: vi.fn(),
   getColdStartMetrics: vi.fn(),
+  invalidateWorker: vi.fn(),
 }))
 
 // Fake Worker that retains addEventListener listeners so tests can
@@ -104,4 +105,51 @@ test('TestResult + RunResult types stay exported from runner', () => {
   const t: TestResult = { name: 'test_x', passed: true, duration_ms: 1 }
   const r: RunResult = fakeRunResult({ tests: [t] })
   expect(r.tests[0].name).toBe('test_x')
+})
+
+describe('runCodeTask — T6.8 timeout + worker invalidation', () => {
+  test('timeout fires: returns timed_out RunResult and invalidates worker', async () => {
+    vi.useFakeTimers()
+    const promise = runCodeTask('while True: pass', 't', [], { timeout_ms: 5000 })
+    await Promise.resolve(); await Promise.resolve()
+    // Worker never responds — advance time past the timeout.
+    await vi.advanceTimersByTimeAsync(5001)
+    const r = await promise
+    expect(r.timed_out).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toMatch(/timeout/i)
+    expect(r.total_duration_ms).toBe(5000)
+    expect(loader.invalidateWorker).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  test('default timeout is 5000ms when options.timeout_ms not provided', async () => {
+    vi.useFakeTimers()
+    const promise = runCodeTask('hang', 't', [])
+    await Promise.resolve(); await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(loader.invalidateWorker).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2)
+    const r = await promise
+    expect(r.timed_out).toBe(true)
+    expect(loader.invalidateWorker).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  test('response before timeout: timer cleared, worker NOT invalidated', async () => {
+    vi.useFakeTimers()
+    const promise = runCodeTask('x', 'y', [], { timeout_ms: 5000 })
+    await Promise.resolve(); await Promise.resolve()
+    const posted = worker.postedMessages[0]
+    worker.emit({
+      type: 'result', requestId: posted.requestId, result: fakeRunResult(),
+    })
+    const r = await promise
+    expect(r.timed_out).toBe(false)
+    expect(loader.invalidateWorker).not.toHaveBeenCalled()
+    // Advance past would-have-been-timeout; no further effect.
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(loader.invalidateWorker).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
 })

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import {
-  bootPyodideWorker, getColdStartMetrics, _resetLoaderForTests,
+  bootPyodideWorker, getColdStartMetrics, getPyodideWorker,
+  invalidateWorker, _resetLoaderForTests,
 } from './loader'
 
 // Controllable mock — emits the three readiness signals on demand
@@ -80,6 +81,32 @@ describe('bootPyodideWorker — singleton', () => {
     const again = bootPyodideWorker(factory)
     expect(factory).toHaveBeenCalledTimes(1)
     await expect(again).resolves.toBeUndefined()
+  })
+})
+
+describe('invalidateWorker — T6.8 termination + respawn', () => {
+  test('terminates the worker, clears metrics, and re-boots fresh on next call', async () => {
+    const w1 = new StepWorker()
+    const factory1 = vi.fn(() => w1 as unknown as Worker)
+    const ready1 = bootPyodideWorker(factory1)
+    w1.emit({ type: 'pyodide-ready' })
+    w1.emit({ type: 'pytest-ready' })
+    w1.emit({ type: 'ready' })
+    await ready1
+    expect(getPyodideWorker()).not.toBeNull()
+
+    invalidateWorker()
+    expect(w1.terminated).toBe(true)
+    expect(getPyodideWorker()).toBeNull()
+    expect(getColdStartMetrics()).toEqual({
+      pyodide_load_ms: null, pytest_load_ms: null,
+      harness_init_ms: null, total_ms: null,
+    })
+
+    const w2 = new StepWorker()
+    const factory2 = vi.fn(() => w2 as unknown as Worker)
+    void bootPyodideWorker(factory2)
+    expect(factory2).toHaveBeenCalledTimes(1)
   })
 })
 

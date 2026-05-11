@@ -17,17 +17,27 @@
 // Timeout (T6.8) and input validation (T6.9, parallel) layer on top
 // of this; both modify the dispatch shell, not the worker contract.
 export type { RunResult, TestResult } from './types'
-import { bootPyodideWorker, getPyodideWorker } from './loader'
+import {
+  bootPyodideWorker, getPyodideWorker, invalidateWorker,
+} from './loader'
 import type { RunResult } from './types'
+
+// PRD §FR-SBX-4 default — overridable via options.timeout_ms. T6.9
+// will clamp to [100, 30000] per §7.1; T6.8 just uses the value.
+const DEFAULT_TIMEOUT_MS = 5000
 
 function errorResult(message: string): RunResult {
   return {
-    ok: false,
-    tests: [],
-    stdout: '',
-    stderr: message,
-    timed_out: false,
-    total_duration_ms: 0,
+    ok: false, tests: [], stdout: '', stderr: message,
+    timed_out: false, total_duration_ms: 0,
+  }
+}
+
+function timedOutResult(timeout_ms: number): RunResult {
+  return {
+    ok: false, tests: [], stdout: '',
+    stderr: `Execution exceeded ${timeout_ms}ms timeout. Worker terminated.`,
+    timed_out: true, total_duration_ms: timeout_ms,
   }
 }
 
@@ -45,21 +55,28 @@ function dispatch(
   user_code: string,
   hidden_tests: string,
   allowlist: string[],
+  timeout_ms: number,
 ): Promise<RunResult> {
   const requestId = `pyprep-req-${++_nextRequestId}`
   return new Promise<RunResult>((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | null = null
     const handler = (e: MessageEvent): void => {
       const d = e.data as ExecuteReply
       if (d.requestId !== requestId) return
+      if (timer !== null) { clearTimeout(timer); timer = null }
       worker.removeEventListener('message', handler)
-      if (d.type === 'result' && d.result) {
-        resolve(d.result)
-      } else if (d.type === 'error') {
-        resolve(errorResult(d.message ?? 'pyodide execute error'))
-      } else {
-        resolve(errorResult(`unexpected reply: ${d.type ?? '(no type)'}`))
-      }
+      if (d.type === 'result' && d.result) resolve(d.result)
+      else if (d.type === 'error') resolve(errorResult(d.message ?? 'pyodide execute error'))
+      else resolve(errorResult(`unexpected reply: ${d.type ?? '(no type)'}`))
     }
+    // T6.8: hard timeout. Termination + singleton invalidation makes
+    // the next runCodeTask construct a fresh worker (and pay cold-
+    // start again — documented cost; FR-SBX-4 allows it).
+    timer = setTimeout(() => {
+      worker.removeEventListener('message', handler)
+      invalidateWorker()
+      resolve(timedOutResult(timeout_ms))
+    }, timeout_ms)
     worker.addEventListener('message', handler)
     worker.postMessage({
       type: 'execute', requestId, user_code, hidden_tests, allowlist,
@@ -73,7 +90,7 @@ export async function runCodeTask(
   allowlist: string[],
   options?: { timeout_ms?: number },
 ): Promise<RunResult> {
-  void options // T6.8 wires the timeout layer
+  const timeout_ms = options?.timeout_ms ?? DEFAULT_TIMEOUT_MS
   try {
     await bootPyodideWorker()
   } catch (e) {
@@ -81,5 +98,5 @@ export async function runCodeTask(
   }
   const worker = getPyodideWorker()
   if (!worker) return errorResult('pyodide worker unavailable')
-  return dispatch(worker, user_code, hidden_tests, allowlist)
+  return dispatch(worker, user_code, hidden_tests, allowlist, timeout_ms)
 }
