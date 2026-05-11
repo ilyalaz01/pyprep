@@ -48,14 +48,20 @@
      Applied via Tailwind v4 arbitrary easing: ease-(--ease-out-quart). */
   --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Type scale (1.25 ratio between steps) */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: 2.25rem;
+  /* Type scale.
+     T5.10.5 Issue 3: bumped each tier by +2px (relative to 16px root)
+     after owner reported the app reading "as if a FullHD site is opened
+     on a 4K monitor" on a 1440p+ display. The biggest relative gain
+     goes to --text-xs (12 → 14px, the RatingBar caption / Card N of M
+     eyebrow / FormField helper-text tier — visibly cramped pre-bump).
+     Hierarchy spacing is preserved (+2px per step). */
+  --text-xs: 0.875rem;   /* was 0.75  (12 → 14) */
+  --text-sm: 1rem;       /* was 0.875 (14 → 16) */
+  --text-base: 1.125rem; /* was 1     (16 → 18) */
+  --text-lg: 1.25rem;    /* was 1.125 (18 → 20) */
+  --text-xl: 1.5rem;     /* was 1.375 (22 → 24) */
+  --text-2xl: 1.875rem;  /* was 1.75  (28 → 30) */
+  --text-3xl: 2.375rem;  /* was 2.25  (36 → 38) */
 }
 
 /* Light variant override — flips lightness, keeps hue + chroma. State
@@ -132,14 +138,14 @@ body {
 .prose h1 { display: none; }                  /* page header carries the title */
 .prose h2 {
   margin-top: 2.25rem;
-  font-size: 1.375rem;
+  font-size: 1.5rem;                            /* T5.10.5: 1.375 → 1.5 (matches new --text-xl) */
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--color-fg);
 }
 .prose h3 {
   margin-top: 1.75rem;
-  font-size: 1.125rem;
+  font-size: 1.25rem;                           /* T5.10.5: 1.125 → 1.25 (matches new --text-lg). Without this bump, h3 would collide with body text size after the type-scale bump. */
   font-weight: 600;
   color: var(--color-fg);
 }
@@ -185,7 +191,7 @@ body {
   padding: 1rem 1.25rem;
   border-radius: 6px;
   overflow-x: auto;
-  font-size: 0.875rem;
+  font-size: 1rem;                              /* T5.10.5: 0.875 → 1 (matches new --text-sm). */
   line-height: 1.55;
 }
 .prose pre code {
@@ -208,7 +214,7 @@ body {
 .prose table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.9rem;
+  font-size: 1rem;                              /* T5.10.5: 0.9 → 1 (matches new --text-sm). */
 }
 .prose th, .prose td {
   border: 1px solid var(--color-border);
