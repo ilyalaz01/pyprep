@@ -80,7 +80,16 @@ export function handleMessage(
 // Production-side bootstrap. Only attaches in a real DedicatedWorker
 // context — jsdom unit tests skip this block and use the
 // _setBootEnvForTests escape hatch instead.
-declare const self: DedicatedWorkerGlobalScope & typeof globalThis
+//
+// `DedicatedWorkerGlobalScope` lives in TS's `WebWorker` lib which
+// isn't in tsconfig.app.json (we run lib: [ES2023, DOM]). Inlining a
+// minimal structural type keeps the worker code self-contained
+// without forcing a project-wide lib bump.
+interface WorkerLikeSelf {
+  postMessage: (m: unknown) => void
+  onmessage: ((e: MessageEvent) => void) | null
+}
+declare const self: WorkerLikeSelf & typeof globalThis
 
 const isWorker =
   typeof self !== 'undefined' &&
@@ -99,9 +108,9 @@ if (isWorker) {
       const mod = await import(/* @vite-ignore */ new URL('pyodide.mjs', cdn).toString())
       _setBootEnvForTests(mod.loadPyodide as LoadPyodide, cdn)
     } catch (e) {
-      // Surface CDN-import failures at boot time, not silently.
-      // First incoming 'boot' message will see _loadPyodide=null and
-      // post a structured error reply.
+      // Surface CDN-import failures at boot time, not silently. First
+      // incoming 'boot' message will see _loadPyodide=null and post a
+      // structured error reply.
       console.error('[pyprep:pyodide] CDN import failed', e)
     }
   })()
