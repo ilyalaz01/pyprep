@@ -6,6 +6,7 @@ import { setToken } from '../lib/auth'
 import { renderAt } from '../test/router-fixture'
 import * as useSessionModule from '../lib/use-session'
 import type { UseSessionResult } from '../lib/use-session'
+import { emptyDetails } from '../lib/session-details'
 import type { NextCard } from '../lib/types'
 
 vi.mock('../lib/use-session', () => ({ useSession: vi.fn() }))
@@ -27,7 +28,7 @@ const stubMe = () => vi.stubGlobal('fetch', vi.fn(async (input: string | URL | R
 const mockSession = (over: Partial<UseSessionResult>): UseSessionResult => ({
   status: 'loading', error: null, currentCard: null,
   cardsTotal: 0, completedCount: 0, summary: null,
-  totalCardsInSphere: null,
+  totalCardsInSphere: null, details: emptyDetails(),
   submitAnswer: vi.fn(), finish: vi.fn(),
   ...over,
 })
@@ -42,8 +43,8 @@ const mcRaw = { ...baseRaw, id: 'm1-s0-c5', type: 'multiple_choice',
   correct_index: 1, option_explanations: ['', '', '', ''] }
 const codeTrapRaw = { ...baseRaw, id: 'm1-s0-c2', type: 'code_trap',
   code_snippet: 'def f(x, items=[]):\n    items.append(x); return items',
-  question: 'What does f(1) print twice in a row?',
-  options: ['[1] [1]', '[1] [1, 2]', 'Error', '[]'], correct_index: 1,
+  question: 'What does f(1) print twice in a row?', correct_index: 1,
+  options: ['[1] [1]', '[1] [1, 2]', 'Error', '[]'],
   explanation_md: 'The default is evaluated once at definition time and shared.' }
 const fillInRaw = { ...baseRaw, id: 'm1-s0-c3', type: 'fill_in',
   code_snippet_with_blanks: 'def f(x, items=___):\n    pass',
@@ -52,8 +53,7 @@ const codeTaskRaw = { ...baseRaw, id: 'm1-s0-c4', type: 'code_task', difficulty:
   prompt_md: 'Implement make_counter(start=0) returning a closure.',
   starter_code: 'def make_counter(start=0):\n    pass',
   solution_code: 'def make_counter(start=0):\n    c = start\n    def step(): nonlocal c; c += 1; return c\n    return step',
-  tests: 'def test_counts_from_zero():\n    c = make_counter(); assert c() == 1',
-  allowlist: ['pytest'] }
+  tests: 'def test_counts_from_zero():\n    c = make_counter(); assert c() == 1', allowlist: ['pytest'] }
 const next = (raw: Record<string, unknown>): NextCard => ({
   card_id: raw.id as string, type: raw.type as string,
   topic: raw.topic as string, difficulty: raw.difficulty as number,
@@ -80,18 +80,14 @@ describe('SessionPage — state machine', () => {
   })
 
   test('error shows a Banner alert + Retry button', async () => {
-    useSessionMock().mockReturnValue(
-      mockSession({ status: 'error', error: new Error('start failed') }),
-    )
+    useSessionMock().mockReturnValue(mockSession({ status: 'error', error: new Error('start failed') }))
     renderAt(SESSION_URL)
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
   })
 
   test('Retry remounts SessionRunner — useSession is called again', async () => {
-    useSessionMock().mockReturnValue(
-      mockSession({ status: 'error', error: new Error('boom') }),
-    )
+    useSessionMock().mockReturnValue(mockSession({ status: 'error', error: new Error('x') }))
     renderAt(SESSION_URL)
     const before = useSessionMock().mock.calls.length
     await userEvent.click(await screen.findByRole('button', { name: /retry/i }))
@@ -111,14 +107,20 @@ describe('SessionPage — state machine', () => {
       .toHaveAttribute('href', '/modules/1')
   })
 
-  test('finished (cardsTotal>0) shows the T5.11 placeholder + Back link', async () => {
+  test('finished (cardsTotal>0) shows the SessionSummary surface', async () => {
     useSessionMock().mockReturnValue(mockSession({
-      status: 'finished', cardsTotal: 5,
-      summary: { cards_total: 5, cards_correct: 4, retention: 0.8 },
+      status: 'finished', cardsTotal: 5, details: {
+        cardsReviewed: 5, elapsedMs: 65_000,
+        ratings: { again: 0, hard: 1, good: 3, easy: 1 },
+        accuracy: { correct: 3, total: 4 },
+        nextDueBuckets: [{ label: 'Tomorrow', count: 5 }],
+      },
     }))
     renderAt(SESSION_URL)
-    expect(await screen.findByText(/session complete/i)).toBeInTheDocument()
-    expect(screen.getByText(/t5\.11/i)).toBeInTheDocument()
+    const root = await screen.findByTestId('session-summary')
+    expect(root.textContent).toMatch(/cards reviewed:\s*5 cards/i)
+    expect(screen.getByRole('link', { name: /practice again/i }))
+      .toHaveAttribute('href', '/modules/1/sphere/m1-s0/session')
   })
 
   test('active state renders CardShell eyebrow + the matching renderer', async () => {

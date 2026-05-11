@@ -23,6 +23,7 @@ import { Button } from '../components/Button'
 import { CardRenderer } from '../components/CardRenderer'
 import { CardShell } from '../components/CardShell'
 import { LinkButton } from '../components/LinkButton'
+import { SessionSummary } from '../components/SessionSummary'
 import { parseCard } from '../lib/card-types'
 import { useSession } from '../lib/use-session'
 
@@ -77,7 +78,13 @@ function SessionRunner({
   }
 
   if (session.status === 'finished') {
-    return <FinishedPlaceholder moduleId={moduleId} />
+    return (
+      <SessionSummary
+        details={session.details}
+        moduleId={moduleId}
+        sphereId={sphereId}
+      />
+    )
   }
 
   if (session.currentCard === null) return <SessionSkeleton />
@@ -132,20 +139,3 @@ function EmptySession({
   )
 }
 
-function FinishedPlaceholder({ moduleId }: { moduleId: number }) {
-  return (
-    <div className="space-y-6">
-      <p className="text-base text-[color:var(--color-fg)]">
-        Session complete. T5.11 will land summary content shortly
-        (cards reviewed, accuracy, time invested, next-due preview).
-      </p>
-      <LinkButton
-        variant="secondary"
-        to="/modules/$moduleId"
-        params={{ moduleId: String(moduleId) }}
-      >
-        Back to module
-      </LinkButton>
-    </div>
-  )
-}

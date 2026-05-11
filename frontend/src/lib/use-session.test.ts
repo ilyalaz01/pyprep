@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 
 import { clearLastActive, getLastActive } from './last-active'
-import {
-  clampResponseMs,
-  makeIdempotencyKey,
-  useSession,
-} from './use-session'
+import { useSession } from './use-session'
+
+// Pure helper tests (idempotency-key, clamp, bucketing, accuracy
+// math) live in session-details.test.ts. This file = hook integration.
 
 const json = (b: unknown, s = 200): Response =>
   new Response(JSON.stringify(b), { status: s })
@@ -43,26 +42,6 @@ function mockFetch(handler: (url: string) => Response): Recorder {
 
 beforeEach(() => clearLastActive())
 afterEach(() => vi.unstubAllGlobals())
-
-describe('makeIdempotencyKey', () => {
-  test('matches server pattern [A-Za-z0-9_-]{16,128}', () => {
-    for (let i = 0; i < 8; i++) {
-      expect(makeIdempotencyKey()).toMatch(/^[A-Za-z0-9_-]{16,128}$/)
-    }
-  })
-  test('returns unique values', () => {
-    expect(new Set([
-      makeIdempotencyKey(), makeIdempotencyKey(), makeIdempotencyKey(),
-    ]).size).toBe(3)
-  })
-})
-
-describe('clampResponseMs', () => {
-  test.each([
-    [0, 0], [500, 500], [600_000, 600_000], [600_001, 600_000],
-    [-1, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 600_000],
-  ])('clamps %s -> %s', (i, e) => expect(clampResponseMs(i)).toBe(e))
-})
 
 describe('useSession — happy path', () => {
   test('loads, advances, finishes, writes last-active, posts well-formed answer', async () => {
@@ -149,6 +128,26 @@ describe('useSession — AGAIN re-insertion (ADR-010 client-owned loop)', () => 
       .map((c) => (c.body as unknown as AnswerBody).idempotency_key)
     expect(c1Keys).toHaveLength(2)
     expect(new Set(c1Keys).size).toBe(2)
+  })
+})
+
+describe('useSession — T5.11 details snapshot wires through', () => {
+  // Hook-level wiring only — pure logic in session-details.test.ts.
+  test('submitAnswer updates details.ratings and details.nextDueBuckets', async () => {
+    const due = new Date(Date.now() + 2 * 86_400_000).toISOString()
+    mockFetch((url) => {
+      if (url.endsWith('/api/sessions')) return json(sess('s1', ['c1', 'c2']))
+      if (url.includes('/next')) return json(card('c1'))
+      if (url.includes('/answer')) return json({ next_due_at: due, new_state: 'review' })
+      if (url.includes('/finish')) return json({ cards_total: 2, cards_correct: 2, retention: 1.0 })
+      return new Response('not mocked: ' + url, { status: 500 })
+    })
+    const { result } = renderHook(() => useSession({ mode: 'review', sphereId: 'm1-s0' }))
+    await waitFor(() => expect(result.current.currentCard?.card_id).toBe('c1'))
+    await act(async () => { await result.current.submitAnswer(3) })
+    await waitFor(() => expect(result.current.details.ratings.good).toBe(1))
+    expect(result.current.details.nextDueBuckets.find((b) => b.label === 'In 3 days')?.count).toBe(1)
+    expect(result.current.details.accuracy).toBeNull() // flip-only session
   })
 })
 
