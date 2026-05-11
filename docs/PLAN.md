@@ -651,7 +651,7 @@ attacker only what they could guess from the deployment hostname).
 
 ### ADR-019: Allowlist enforcement via Python import hook
 
-**Status:** Proposed (added Phase 6, T6.0). Flips to **Accepted** at T6.7 when the hook is live and the error-message format is verified end-to-end.
+**Status:** Accepted (T6.7, 2026-05-11). Hook installed once per worker lifetime; baseline snapshot captures pytest's transitive imports so internal machinery passes through; per-task allowlist gates user-code imports. Error-message format verified end-to-end against the documented example.
 
 **Context:** Each `code_task` card carries an `allowlist: string[]` of permitted modules (PRD §3 schema). The worker MUST reject imports outside that set with a clean, actionable error. Two enforcement layers are viable: (a) a Python import hook (`builtins.__import__` wrapper) that checks the allow-set *before* delegating to the real import; (b) a runtime audit (e.g. inspect `sys.modules` after `pytest.main()` returns and fail post-hoc).
 

@@ -21,6 +21,7 @@ T6.10 covers the real-Pyodide integration path.
 
 from __future__ import annotations
 
+import builtins
 import contextlib
 import io
 import shutil
@@ -29,6 +30,45 @@ import tempfile
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+
+# Allowlist import-hook (T6.7 / ADR-019). The hook is installed once
+# per worker lifetime — the baseline `sys.modules` snapshot at that
+# moment captures whatever pytest pulled in to start up, plus this
+# harness itself; per-run user code can additionally import from the
+# task's `allowlist`. `solution` / `test_solution` are always allowed
+# (the tmpdir module names the harness writes).
+_REAL_IMPORT = builtins.__import__
+_BASELINE_TOP: set[str] = set()
+_ALLOWED_TOP: set[str] = set()
+_HOOK_INSTALLED = False
+_ALWAYS_ALLOWED = frozenset({"solution", "test_solution"})
+
+
+def _gated_import(name, globals_=None, locals_=None, fromlist=(), level=0):
+    if level != 0:
+        return _REAL_IMPORT(name, globals_, locals_, fromlist, level)
+    top = name.split(".")[0]
+    if top in _BASELINE_TOP or top in _ALLOWED_TOP or top in _ALWAYS_ALLOWED:
+        return _REAL_IMPORT(name, globals_, locals_, fromlist, level)
+    user_list = ", ".join(sorted(_ALLOWED_TOP)) or "(none)"
+    raise ImportError(
+        f"'{name}' is not allowed in this code task. "
+        f"Allowed modules: {user_list}",
+    )
+
+
+def _install_import_hook() -> None:
+    global _HOOK_INSTALLED, _BASELINE_TOP
+    if _HOOK_INSTALLED:
+        return
+    # Pre-import pytest so its transitive deps land in baseline before
+    # the snapshot. Without this, the first run_code_task call would
+    # widen baseline mid-pytest and confuse the gate.
+    import pytest
+    del pytest
+    _BASELINE_TOP = {m.split(".")[0] for m in sys.modules}
+    builtins.__import__ = _gated_import
+    _HOOK_INSTALLED = True
 
 
 def run_code_task(
@@ -39,10 +79,12 @@ def run_code_task(
     Returns a dict matching the TS `RunResult` shape:
       ok, tests[], stdout, stderr, timed_out, total_duration_ms.
 
-    `allowlist` is wired by T6.7's import-hook; T6.4 accepts and
-    discards it so consumer call shapes are stable.
+    `allowlist` gates user imports via the install-once
+    `_install_import_hook` (T6.7 / ADR-019).
     """
-    del allowlist  # T6.7 wires the import-hook
+    global _ALLOWED_TOP
+    _install_import_hook()
+    _ALLOWED_TOP = set(allowlist)
 
     tmp = Path(tempfile.mkdtemp(prefix="pyprep_"))
     (tmp / "solution.py").write_text(user_code)
@@ -81,6 +123,7 @@ def run_code_task(
         with contextlib.suppress(ValueError):
             sys.path.remove(str(tmp))
         shutil.rmtree(tmp, ignore_errors=True)
+        _ALLOWED_TOP = set()  # reset per-task gate
 
     total_ms = int((time.monotonic() - t0) * 1000)
     ok = len(results) > 0 and all(r["passed"] for r in results)

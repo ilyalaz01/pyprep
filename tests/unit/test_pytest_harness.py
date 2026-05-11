@@ -88,6 +88,48 @@ def test_run_code_task_returns_runresult_shape() -> None:
             assert key in t
 
 
+def test_run_code_task_rejects_disallowed_import() -> None:
+    """T6.7 / ADR-019: user code importing a module outside its
+    allowlist (and outside the harness baseline) raises a clean
+    ImportError. PRD's canonical denied example is `socket`, but
+    under CPython pytest pulls `socket` into sys.modules transitively
+    so we use `smtplib` (not in CPython pytest baseline; exists in
+    Pyodide). T6.10 will exercise socket-rejection against real
+    Pyodide where socket is not auto-loaded."""
+    h = _load_harness()
+    r = h.run_code_task(
+        user_code="import smtplib\ndef f(): return 1\n",
+        hidden_tests=(
+            "from solution import f\ndef test(): assert f() == 1\n"
+        ),
+        allowlist=["math"],
+    )
+    assert r["ok"] is False
+    combined = (r["stdout"] + r["stderr"]).lower()
+    assert "smtplib" in combined
+    assert "not allowed" in combined
+    # Per ADR-019 format: includes the user's allowlist verbatim.
+    assert "allowed modules: math" in combined
+
+
+def test_run_code_task_allowlist_entry_imports_cleanly() -> None:
+    """Allowed modules per the task's allowlist pass through the
+    hook even if the harness baseline didn't include them."""
+    h = _load_harness()
+    r = h.run_code_task(
+        user_code=(
+            "import math\n"
+            "def double_pi(): return 2 * math.pi\n"
+        ),
+        hidden_tests=(
+            "from solution import double_pi\n"
+            "def test(): assert double_pi() > 6.28\n"
+        ),
+        allowlist=["math"],
+    )
+    assert r["ok"] is True
+
+
 def test_run_code_task_does_not_leak_solution_between_calls() -> None:
     """Per FR-SBX-6 / ADR-016 mental model: each call gets a fresh
     `solution` module — a previous call's globals must not leak."""
