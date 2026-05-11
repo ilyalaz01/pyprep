@@ -25,6 +25,11 @@ export type WorkerOutbound =
   | { type: 'pytest-ready' }
   | { type: 'ready' }
   | { type: 'error'; message: string }
+  // T6.3 stop-#2 retry: diagnostic messages surface worker-internal
+  // state to the main-thread console. Used to distinguish silent-
+  // failure modes (useEffect not firing vs. worker hang vs. env
+  // undefined in worker scope).
+  | { type: 'diagnostic'; message: string }
 
 interface PyodideInstance {
   loadPackage(name: string | string[]): Promise<unknown>
@@ -110,30 +115,49 @@ if (
   typeof self !== 'undefined' &&
   'WorkerGlobalScope' in (globalThis as Record<string, unknown>)
 ) {
-  const envCdn = (
-    import.meta as ImportMeta & { env?: { VITE_PYODIDE_CDN?: string } }
-  ).env?.VITE_PYODIDE_CDN
+  // T6.3 stop-#2 retry diagnostics. Each step posts to the main
+  // thread so DevTools shows a trace even if the worker hangs
+  // mid-import (workers' own console output isn't always visible
+  // alongside main-thread logs).
+  const diag = (message: string): void =>
+    self.postMessage({ type: 'diagnostic', message })
+
+  diag('worker top-level reached')
+  const env = (import.meta as ImportMeta & {
+    env?: { VITE_PYODIDE_CDN?: string }
+  }).env
+  const envCdn = env?.VITE_PYODIDE_CDN
+  diag(
+    `env check: hasEnv=${typeof env !== 'undefined'} ` +
+    `cdn=${envCdn ?? '(undefined)'}`,
+  )
+
   if (!envCdn) {
     _bootError = ENV_NOT_SET_MSG
+    diag('env not set; _bootError prepared')
     console.error(ENV_NOT_SET_MSG)
   } else {
     try {
+      diag(`importing pyodide.mjs from ${envCdn}`)
       // Top-level await: blocks worker activation until the CDN
-      // import resolves. Browser queues main-thread postMessage('boot')
-      // until then, so the 'boot' handler always sees _loadPyodide
-      // populated (or _bootError set).
+      // import resolves. Browser queues main-thread
+      // postMessage('boot') until then, so the 'boot' handler
+      // always sees _loadPyodide populated (or _bootError set).
       const mod = await import(
         /* @vite-ignore */ new URL('pyodide.mjs', envCdn).toString()
       )
+      diag('pyodide.mjs imported successfully')
       _setBootEnvForTests(mod.loadPyodide as LoadPyodide, envCdn)
     } catch (e) {
       _bootError =
         '[pyprep:pyodide] CDN import failed: ' +
         (e instanceof Error ? e.message : String(e)) +
         ' (check VITE_PYODIDE_CDN and network).'
+      diag(`CDN import threw: ${e instanceof Error ? e.message : String(e)}`)
       console.error(_bootError, e)
     }
   }
+  diag('attaching onmessage; ready for boot')
   self.onmessage = (e: MessageEvent) =>
     handleMessage((m) => self.postMessage(m), e.data)
 }

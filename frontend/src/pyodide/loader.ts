@@ -16,7 +16,7 @@ import type { ColdStartMetrics } from './types'
 type WorkerFactory = () => Worker
 
 interface BootMessage {
-  type: 'pyodide-ready' | 'pytest-ready' | 'ready' | 'error'
+  type: 'pyodide-ready' | 'pytest-ready' | 'ready' | 'error' | 'diagnostic'
   message?: string
 }
 
@@ -36,6 +36,8 @@ function defaultFactory(): Worker {
 export function bootPyodideWorker(
   factory: WorkerFactory = defaultFactory,
 ): Promise<void> {
+  // T6.3 stop-#2 retry diagnostic — proves the call reached the loader.
+  console.info('[pyprep:pyodide] bootPyodideWorker called')
   if (_readyPromise) return _readyPromise
   const t0 = performance.now()
   _worker = factory()
@@ -46,6 +48,11 @@ export function bootPyodideWorker(
     _worker.onmessage = (e: MessageEvent<BootMessage>) => {
       const now = performance.now()
       const d = e.data
+      if (d.type === 'diagnostic') {
+        // Surface worker-internal trace to main-thread console.
+        console.info('[pyprep:pyodide-worker]', d.message)
+        return
+      }
       if (d.type === 'pyodide-ready') {
         pyodideAt = now
         _metrics = { ..._metrics, pyodide_load_ms: now - t0 }

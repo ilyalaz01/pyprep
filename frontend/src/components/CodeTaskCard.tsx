@@ -51,7 +51,11 @@ export function CodeTaskCard({ card, onRate }: Props) {
   // Singleton per ADR-018 — subsequent mounts are no-ops. The Run
   // path still uses the runner stub in T6.3; T6.5 swaps it for the
   // worker-driven path.
-  useEffect(() => { void bootPyodideWorker() }, [])
+  useEffect(() => {
+    // Stop-#2 retry diagnostic — proves useEffect actually fires.
+    console.info('[pyprep:pyodide] CodeTaskCard useEffect fired, booting worker')
+    void bootPyodideWorker()
+  }, [])
 
   const run = useCallback(async () => {
     if (isEmpty || running) return
