@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { runCodeTask, type RunResult, type TestResult } from './runner'
 import * as loader from './loader'
+import { FakeWorker } from '../test/fake-worker'
 
 vi.mock('./loader', () => ({
   bootPyodideWorker: vi.fn(() => Promise.resolve()),
@@ -9,28 +10,6 @@ vi.mock('./loader', () => ({
   getColdStartMetrics: vi.fn(),
   invalidateWorker: vi.fn(),
 }))
-
-// Fake Worker that retains addEventListener listeners so tests can
-// drive the request/response handshake deterministically.
-class FakeWorker {
-  private listeners: Array<(e: MessageEvent) => void> = []
-  postedMessages: Array<{ type?: string; requestId?: string }> = []
-  addEventListener(_type: string, l: (e: MessageEvent) => void): void {
-    if (_type === 'message') this.listeners.push(l)
-  }
-  removeEventListener(_type: string, l: (e: MessageEvent) => void): void {
-    this.listeners = this.listeners.filter((x) => x !== l)
-  }
-  postMessage(m: unknown): void {
-    this.postedMessages.push(m as { type?: string; requestId?: string })
-  }
-  emit(data: unknown): void {
-    for (const l of this.listeners) {
-      l(new MessageEvent('message', { data }))
-    }
-  }
-  terminate(): void { /* no-op */ }
-}
 
 const fakeRunResult = (over: Partial<RunResult> = {}): RunResult => ({
   ok: true, tests: [], stdout: '', stderr: '',
@@ -53,11 +32,8 @@ describe('runCodeTask — happy path', () => {
     expect(posted.type).toBe('execute')
     expect(posted.requestId).toMatch(/^pyprep-req-/)
     const expected = fakeRunResult({ total_duration_ms: 42 })
-    worker.emit({
-      type: 'result', requestId: posted.requestId, result: expected,
-    })
-    const r = await promise
-    expect(r).toEqual(expected)
+    worker.emit({ type: 'result', requestId: posted.requestId, result: expected })
+    expect(await promise).toEqual(expected)
   })
 
   test('ignores results destined for a different requestId', async () => {
@@ -67,8 +43,7 @@ describe('runCodeTask — happy path', () => {
     const posted = worker.postedMessages[0]
     const mine = fakeRunResult({ ok: false })
     worker.emit({ type: 'result', requestId: posted.requestId, result: mine })
-    const r = await promise
-    expect(r).toEqual(mine)
+    expect(await promise).toEqual(mine)
   })
 })
 
@@ -105,6 +80,45 @@ test('TestResult + RunResult types stay exported from runner', () => {
   const t: TestResult = { name: 'test_x', passed: true, duration_ms: 1 }
   const r: RunResult = fakeRunResult({ tests: [t] })
   expect(r.tests[0].name).toBe('test_x')
+})
+
+describe('runCodeTask — T6.9 input validation (PRD §7.1)', () => {
+  test('user_code over 50,000 chars → rejected without booting worker', async () => {
+    const r = await runCodeTask('x'.repeat(50_001), 't', [])
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toMatch(/user_code exceeds 50000/i)
+    expect(loader.bootPyodideWorker).not.toHaveBeenCalled()
+  })
+
+  test('hidden_tests over 50,000 chars → rejected', async () => {
+    const r = await runCodeTask('x', 'y'.repeat(50_001), [])
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toMatch(/hidden_tests exceeds 50000/i)
+  })
+
+  test('non-string user_code → rejected', async () => {
+    const r = await runCodeTask(42 as unknown as string, 'y', [])
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toMatch(/user_code must be a string/i)
+  })
+
+  test.each([99, 30_001, Number.NaN, -1, Number.POSITIVE_INFINITY])(
+    'timeout_ms %s outside [100, 30000] → rejected',
+    async (timeout_ms) => {
+      const r = await runCodeTask('x', 'y', [], { timeout_ms })
+      expect(r.ok).toBe(false)
+      expect(r.stderr).toMatch(/timeout_ms must be in/i)
+    },
+  )
+
+  test.each([100, 30_000])('timeout_ms %s reaches dispatch', async (timeout_ms) => {
+    const promise = runCodeTask('x', 'y', [], { timeout_ms })
+    await Promise.resolve(); await Promise.resolve()
+    expect(worker.postedMessages).toHaveLength(1)
+    const posted = worker.postedMessages[0] as { requestId: string }
+    worker.emit({ type: 'result', requestId: posted.requestId, result: fakeRunResult() })
+    await promise
+  })
 })
 
 describe('runCodeTask — T6.8 timeout + worker invalidation', () => {

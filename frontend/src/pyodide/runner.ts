@@ -22,9 +22,37 @@ import {
 } from './loader'
 import type { RunResult } from './types'
 
-// PRD §FR-SBX-4 default — overridable via options.timeout_ms. T6.9
-// will clamp to [100, 30000] per §7.1; T6.8 just uses the value.
+// PRD §FR-SBX-4 default — overridable via options.timeout_ms.
 const DEFAULT_TIMEOUT_MS = 5000
+
+// PRD §7.1 input validation. UTF-16 code-unit length, not bytes —
+// over-permissive on multi-byte text by ~3x but Python source is
+// nearly always ASCII; the check exists to prevent the "user pastes
+// 5MB and freezes the worker" risk in PRD §8.
+const MAX_INPUT_CHARS = 50_000
+const MIN_TIMEOUT_MS = 100
+const MAX_TIMEOUT_MS = 30_000
+
+function validateInputs(
+  user_code: unknown, hidden_tests: unknown, timeout_ms: number,
+): string | null {
+  if (typeof user_code !== 'string') return 'user_code must be a string'
+  if (user_code.length > MAX_INPUT_CHARS) {
+    return `user_code exceeds ${MAX_INPUT_CHARS}-character limit (got ${user_code.length})`
+  }
+  if (typeof hidden_tests !== 'string') return 'hidden_tests must be a string'
+  if (hidden_tests.length > MAX_INPUT_CHARS) {
+    return `hidden_tests exceeds ${MAX_INPUT_CHARS}-character limit (got ${hidden_tests.length})`
+  }
+  if (
+    !Number.isFinite(timeout_ms) ||
+    timeout_ms < MIN_TIMEOUT_MS ||
+    timeout_ms > MAX_TIMEOUT_MS
+  ) {
+    return `timeout_ms must be in [${MIN_TIMEOUT_MS}, ${MAX_TIMEOUT_MS}], got ${timeout_ms}`
+  }
+  return null
+}
 
 function errorResult(message: string): RunResult {
   return {
@@ -91,6 +119,8 @@ export async function runCodeTask(
   options?: { timeout_ms?: number },
 ): Promise<RunResult> {
   const timeout_ms = options?.timeout_ms ?? DEFAULT_TIMEOUT_MS
+  const invalid = validateInputs(user_code, hidden_tests, timeout_ms)
+  if (invalid) return errorResult(invalid)
   try {
     await bootPyodideWorker()
   } catch (e) {
