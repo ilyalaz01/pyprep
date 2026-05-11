@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { RatingBar } from './RatingBar'
@@ -101,103 +101,14 @@ describe('RatingBar', () => {
     expect(btn).toHaveAttribute('title', title)
   })
 
-  // T5.10.5 round-2 Issue 1: discovery moved from per-button text
-  // captions to a single info-icon next to a visible "Rate this
-  // card" label. Tooltip lists all four rating meanings — primary
-  // discovery surface; per-button title remains the secondary
-  // refresher.
-  describe('rating-help tooltip', () => {
-    test('renders a visible "Rate this card" label above the buttons', () => {
-      render(<RatingBar onRate={vi.fn()} />)
-      // role="group" + visible label = screen-readable affordance
-      // without the buttons themselves having to encode it.
-      expect(screen.getByText(/rate this card/i)).toBeInTheDocument()
-    })
-
-    test('renders an info-icon button next to the label', () => {
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      expect(icon).toBeInTheDocument()
-      expect(icon).toHaveAttribute('type', 'button')
-    })
-
-    test('icon has aria-describedby pointing to the tooltip element', () => {
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      const tooltipId = icon.getAttribute('aria-describedby')
-      expect(tooltipId).toBeTruthy()
-      const tooltip = document.getElementById(tooltipId!)
-      expect(tooltip).not.toBeNull()
-      expect(tooltip).toHaveAttribute('role', 'tooltip')
-    })
-
-    test('tooltip content includes all four rating explanations', () => {
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      const tooltipId = icon.getAttribute('aria-describedby')!
-      const tooltip = document.getElementById(tooltipId)!
-      const text = tooltip.textContent ?? ''
-      expect(text.toLowerCase()).toContain("you didn't recall")
-      expect(text.toLowerCase()).toContain('struggled but recalled')
-      expect(text.toLowerCase()).toContain('with some effort')
-      expect(text.toLowerCase()).toContain('knew it cold')
-      // All four rating words appear too.
-      for (const w of ['Again', 'Hard', 'Good', 'Easy']) {
-        expect(text).toContain(w)
-      }
-    })
-
-    test('tooltip is hidden by default and shown on hover', async () => {
-      const user = userEvent.setup()
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      const tooltipId = icon.getAttribute('aria-describedby')!
-      const tooltip = document.getElementById(tooltipId)!
-      expect(tooltip).toHaveAttribute('data-open', 'false')
-      await user.hover(icon)
-      expect(tooltip).toHaveAttribute('data-open', 'true')
-      await user.unhover(icon)
-      expect(tooltip).toHaveAttribute('data-open', 'false')
-    })
-
-    test('tooltip opens on focus and closes on blur', async () => {
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      const tooltipId = icon.getAttribute('aria-describedby')!
-      const tooltip = document.getElementById(tooltipId)!
-      expect(tooltip).toHaveAttribute('data-open', 'false')
-      // fireEvent + act → React processes the state update before the
-      // next assertion. icon.focus() alone races with React's batched
-      // re-render in jsdom.
-      act(() => { fireEvent.focus(icon) })
-      expect(tooltip).toHaveAttribute('data-open', 'true')
-      act(() => { fireEvent.blur(icon) })
-      expect(tooltip).toHaveAttribute('data-open', 'false')
-    })
-
-    test('clicking the icon opens the tooltip (touch fallback)', async () => {
-      // On touch devices there is no hover. A tap focuses the icon
-      // (browsers do this for buttons) which is what triggers open;
-      // we just pin the user-observable result here.
-      const user = userEvent.setup()
-      render(<RatingBar onRate={vi.fn()} />)
-      const icon = screen.getByRole('button', {
-        name: /what do these ratings mean/i,
-      })
-      const tooltipId = icon.getAttribute('aria-describedby')!
-      const tooltip = document.getElementById(tooltipId)!
-      await user.click(icon)
-      expect(tooltip).toHaveAttribute('data-open', 'true')
-    })
+  // Integration smoke test: the RatingHelp cluster (visible label +
+  // info-icon + tooltip) renders inside RatingBar. Per-affordance
+  // behaviour lives in RatingHelp.test.tsx.
+  test('integrates the RatingHelp cluster above the buttons', () => {
+    render(<RatingBar onRate={vi.fn()} />)
+    expect(screen.getByText(/rate this card/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /what do these ratings mean/i }),
+    ).toBeInTheDocument()
   })
 })
