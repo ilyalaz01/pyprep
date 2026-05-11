@@ -148,7 +148,7 @@ export function RatingBar({ onRate, disabled = false }: RatingBarProps) {
                   <span className="font-semibold text-[color:var(--color-fg)]">
                     {e.label}
                   </span>
-                  {' — '}{e.body}
+                  {': '}{e.body}
                 </li>
               ))}
             </ul>
