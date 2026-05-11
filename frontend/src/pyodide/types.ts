@@ -20,3 +20,15 @@ export interface RunResult {
   timed_out: boolean
   total_duration_ms: number
 }
+
+// Cold-start instrumentation (T6.1 / Phase 6). loader.ts is the single
+// source of truth — both stop #2 verification and the T6.11 CI gate
+// read these via getColdStartMetrics(). Segments are null before boot,
+// numbers (ms) once measured. total_ms is recorded with the final
+// ready signal and equals the sum of the segments within rounding.
+export interface ColdStartMetrics {
+  pyodide_load_ms: number | null  // new Worker() → pyodide ready
+  pytest_load_ms: number | null   // pyodide ready → pytest loaded
+  harness_init_ms: number | null  // pytest loaded → first runCodeTask-ready
+  total_ms: number | null
+}
