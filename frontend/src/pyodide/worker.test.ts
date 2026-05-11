@@ -8,6 +8,9 @@ const fakePyodide = (loadOk = true) => ({
   loadPackage: vi.fn(async () => {
     if (!loadOk) throw new Error('pytest fetch failed')
   }),
+  // T6.4: bootPyodide installs the harness via runPython after pytest
+  // loads. The fake records the calls so tests can pin the install.
+  runPython: vi.fn(),
 })
 
 const fakeLoad = (pyodide: ReturnType<typeof fakePyodide>) =>
@@ -74,6 +77,18 @@ describe('bootPyodide — happy path', () => {
     _setBootEnvForTests(load, 'https://cdn.test/pyodide/')
     await bootPyodide(vi.fn())
     expect(load).toHaveBeenCalledWith({ indexURL: 'https://cdn.test/pyodide/' })
+  })
+
+  test('T6.4: installs pytest_harness.py via runPython after pytest loads', async () => {
+    const py = fakePyodide()
+    _setBootEnvForTests(fakeLoad(py), 'about:test')
+    await bootPyodide(vi.fn())
+    expect(py.runPython).toHaveBeenCalledTimes(1)
+    const code = py.runPython.mock.calls[0][0] as string
+    // Pin the exported function name — runner.ts (T6.5) will call
+    // `pyodide.globals.get('run_code_task')(...)`; this assertion is
+    // the contract between harness and runner.
+    expect(code).toContain('def run_code_task')
   })
 })
 

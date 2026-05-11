@@ -20,6 +20,12 @@
 import type { ColdStartMetrics as _Metrics } from './types' // contract import
 void (null as unknown as _Metrics)
 
+// T6.4: the harness is bundled as a string asset via Vite's ?raw
+// query. After loadPackage('pytest'), the worker hands the source
+// to `pyodide.runPython(harness)` which installs `run_code_task`
+// in the Pyodide globals (T6.5 wires the JS-side call).
+import harnessSource from './pytest_harness.py?raw'
+
 export type WorkerInbound = { type: 'execute' } | { type: string }
 export type WorkerOutbound =
   | { type: 'pyodide-ready' }
@@ -30,6 +36,7 @@ export type WorkerOutbound =
 
 interface PyodideInstance {
   loadPackage(name: string | string[]): Promise<unknown>
+  runPython(code: string): unknown
 }
 type LoadPyodide = (opts: { indexURL: string }) => Promise<PyodideInstance>
 
@@ -56,9 +63,13 @@ export async function bootPyodide(
     await pyodide.loadPackage('pytest')
     post({ type: 'diagnostic', message: 'loadPackage(pytest) complete' })
     post({ type: 'pytest-ready' })
-    // T6.4 installs pytest_harness.py here. T6.3 ships ready signal
-    // without harness work so stop #2 measures cold-start (loader +
-    // pytest) cleanly.
+    // T6.4: install the harness module. The pytest-ready → ready
+    // segment of ColdStartMetrics now actually measures something
+    // (harness_init_ms was ~0ms in stop #2; will be small but
+    // non-zero post-T6.4).
+    post({ type: 'diagnostic', message: 'installing pytest_harness.py' })
+    pyodide.runPython(harnessSource)
+    post({ type: 'diagnostic', message: 'pytest_harness.py installed' })
     post({ type: 'ready' })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
