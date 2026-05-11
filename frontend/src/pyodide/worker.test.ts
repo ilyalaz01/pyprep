@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import {
-  bootPyodide, handleMessage, _setBootEnvForTests,
+  bootPyodide, handleMessage,
+  _setBootEnvForTests, _setPyodideForTests,
 } from './worker'
 
 const fakePyodide = (loadOk = true) => ({
@@ -11,6 +12,10 @@ const fakePyodide = (loadOk = true) => ({
   // T6.4: bootPyodide installs the harness via runPython after pytest
   // loads. The fake records the calls so tests can pin the install.
   runPython: vi.fn(),
+  // T6.5: handleMessage's execute branch uses globals.get. The base
+  // fake gives an empty stub; per-test fakes (handleMessage execute
+  // tests) substitute a richer mock.
+  globals: { get: vi.fn() },
 })
 
 const fakeLoad = (pyodide: ReturnType<typeof fakePyodide>) =>
@@ -29,6 +34,7 @@ afterEach(() => {
     vi.fn(async () => fakePyodide()),
     'about:test',
   )
+  _setPyodideForTests(null)
 })
 
 describe('handleMessage — post-boot runtime dispatch', () => {
@@ -57,6 +63,42 @@ describe('handleMessage — post-boot runtime dispatch', () => {
     const arg = post.mock.calls[0][0] as { type: string; message?: string }
     expect(arg.type).toBe('error')
     expect(arg.message).toMatch(/unknown message type/i)
+  })
+})
+
+describe('handleMessage — execute (T6.5)', () => {
+  const fakeResult = { ok: true, tests: [], stdout: '', stderr: '', timed_out: false, total_duration_ms: 5 }
+  const execMsg = (id: string) => ({
+    type: 'execute' as const, requestId: id, user_code: 'u', hidden_tests: 'h', allowlist: ['math'],
+  })
+
+  test('execute calls run_code_task and posts result with same requestId', () => {
+    const runFn = vi.fn(() => ({ toJs: vi.fn(() => fakeResult), destroy: vi.fn() }))
+    const py = { ...fakePyodide(), globals: { get: vi.fn(() => runFn) } }
+    _setPyodideForTests(py as unknown as never)
+    const post = vi.fn()
+    handleMessage(post, execMsg('r-7'))
+    expect(py.globals.get).toHaveBeenCalledWith('run_code_task')
+    expect(runFn).toHaveBeenCalledWith('u', 'h', ['math'])
+    expect(post.mock.calls.find((c) => (c[0] as { type: string }).type === 'result')?.[0])
+      .toEqual({ type: 'result', requestId: 'r-7', result: fakeResult })
+  })
+
+  test('execute before boot: error reply with the requestId', () => {
+    _setPyodideForTests(null)
+    const post = vi.fn()
+    handleMessage(post, execMsg('r-1'))
+    expect(post.mock.calls[0][0]).toEqual({
+      type: 'error', requestId: 'r-1', message: expect.stringMatching(/not initialized/i),
+    })
+  })
+
+  test('run_code_task throw: error reply correlated by requestId', () => {
+    const py = { ...fakePyodide(), globals: { get: vi.fn(() => { throw new Error('boom') }) } }
+    _setPyodideForTests(py as unknown as never)
+    const post = vi.fn()
+    handleMessage(post, execMsg('r-2'))
+    expect(post.mock.calls[0][0]).toEqual({ type: 'error', requestId: 'r-2', message: 'boom' })
   })
 })
 

@@ -1,34 +1,107 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
 import { runCodeTask, type RunResult, type TestResult } from './runner'
+import * as loader from './loader'
 
-describe('runCodeTask — Phase 5 stub', () => {
-  test('returns the documented stub shape, ok=false, no tests, helpful stderr', async () => {
-    const r: RunResult = await runCodeTask('print(1)', 'def test(): assert True', [])
-    expect(r.ok).toBe(false)
-    expect(r.tests).toEqual([])
-    expect(r.stdout).toBe('')
-    expect(r.stderr).toMatch(/phase 6/i)
-    expect(r.timed_out).toBe(false)
-    expect(r.total_duration_ms).toBe(0)
-  })
+vi.mock('./loader', () => ({
+  bootPyodideWorker: vi.fn(() => Promise.resolve()),
+  getPyodideWorker: vi.fn(),
+  getColdStartMetrics: vi.fn(),
+}))
 
-  test('does not throw on minimal args', async () => {
-    await expect(runCodeTask('', '', [])).resolves.toBeDefined()
-  })
-
-  test('does not throw on optional timeout_ms', async () => {
-    await expect(
-      runCodeTask('x', 'y', [], { timeout_ms: 5000 }),
-    ).resolves.toBeDefined()
-  })
-
-  test('TestResult type signature is exported (compile-time check)', () => {
-    // Constructing a TestResult literal pins the field set so Phase 6
-    // can swap the runner implementation without breaking the consumer
-    // contract pinned in PRD_code_sandbox §4.
-    const t: TestResult = {
-      name: 'test_x', passed: true, duration_ms: 1,
+// Fake Worker that retains addEventListener listeners so tests can
+// drive the request/response handshake deterministically.
+class FakeWorker {
+  private listeners: Array<(e: MessageEvent) => void> = []
+  postedMessages: Array<{ type?: string; requestId?: string }> = []
+  addEventListener(_type: string, l: (e: MessageEvent) => void): void {
+    if (_type === 'message') this.listeners.push(l)
+  }
+  removeEventListener(_type: string, l: (e: MessageEvent) => void): void {
+    this.listeners = this.listeners.filter((x) => x !== l)
+  }
+  postMessage(m: unknown): void {
+    this.postedMessages.push(m as { type?: string; requestId?: string })
+  }
+  emit(data: unknown): void {
+    for (const l of this.listeners) {
+      l(new MessageEvent('message', { data }))
     }
-    expect(t.name).toBe('test_x')
+  }
+  terminate(): void { /* no-op */ }
+}
+
+const fakeRunResult = (over: Partial<RunResult> = {}): RunResult => ({
+  ok: true, tests: [], stdout: '', stderr: '',
+  timed_out: false, total_duration_ms: 1, ...over,
+})
+
+let worker: FakeWorker
+beforeEach(() => {
+  worker = new FakeWorker()
+  vi.mocked(loader.bootPyodideWorker).mockResolvedValue(undefined)
+  vi.mocked(loader.getPyodideWorker).mockReturnValue(worker as unknown as Worker)
+})
+afterEach(() => { vi.clearAllMocks() })
+
+describe('runCodeTask — happy path', () => {
+  test('posts execute with the args and resolves with the matching result', async () => {
+    const promise = runCodeTask('def f(): pass\n', 'def test(): pass\n', ['math'])
+    await Promise.resolve(); await Promise.resolve()
+    const posted = worker.postedMessages[0]
+    expect(posted.type).toBe('execute')
+    expect(posted.requestId).toMatch(/^pyprep-req-/)
+    const expected = fakeRunResult({ total_duration_ms: 42 })
+    worker.emit({
+      type: 'result', requestId: posted.requestId, result: expected,
+    })
+    const r = await promise
+    expect(r).toEqual(expected)
   })
+
+  test('ignores results destined for a different requestId', async () => {
+    const promise = runCodeTask('x', 'y', [])
+    await Promise.resolve(); await Promise.resolve()
+    worker.emit({ type: 'result', requestId: 'foreign', result: fakeRunResult() })
+    const posted = worker.postedMessages[0]
+    const mine = fakeRunResult({ ok: false })
+    worker.emit({ type: 'result', requestId: posted.requestId, result: mine })
+    const r = await promise
+    expect(r).toEqual(mine)
+  })
+})
+
+describe('runCodeTask — error paths', () => {
+  test('boot failure: returns non-ok RunResult with stderr message', async () => {
+    vi.mocked(loader.bootPyodideWorker).mockRejectedValue(new Error('cdn down'))
+    const r = await runCodeTask('x', 'y', [])
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toBe('cdn down')
+    expect(r.tests).toEqual([])
+  })
+
+  test('no worker after boot: returns non-ok RunResult', async () => {
+    vi.mocked(loader.getPyodideWorker).mockReturnValue(null)
+    const r = await runCodeTask('x', 'y', [])
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toMatch(/worker unavailable/i)
+  })
+
+  test('worker error reply: stderr carries the message', async () => {
+    const promise = runCodeTask('x', 'y', [])
+    await Promise.resolve(); await Promise.resolve()
+    const posted = worker.postedMessages[0]
+    worker.emit({
+      type: 'error', requestId: posted.requestId, message: 'pyodide blew up',
+    })
+    const r = await promise
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toBe('pyodide blew up')
+  })
+})
+
+test('TestResult + RunResult types stay exported from runner', () => {
+  const t: TestResult = { name: 'test_x', passed: true, duration_ms: 1 }
+  const r: RunResult = fakeRunResult({ tests: [t] })
+  expect(r.tests[0].name).toBe('test_x')
 })

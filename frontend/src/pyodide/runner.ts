@@ -1,22 +1,71 @@
-// Pyodide runner — Phase 5 stub. Phase 6 swaps the body; the signature
-// is pinned by PRD_code_sandbox §4 and by T5.9's ADR so CodeTaskCard
-// ships testable in Phase 5. The renderer wires against (user_code,
-// hidden_tests, allowlist, options) and consumes RunResult/TestResult
-// exactly as the Phase-6 worker-driven path will produce them.
+// Pyodide runner — main-thread API surface (T6.5 worker-driven).
 //
-// T6.0 split: TestResult + RunResult moved to ./types.ts. This module
-// re-exports them so the existing import path
-// `import { runCodeTask, type RunResult } from '../pyodide/runner'`
-// keeps working for consumers. Phase-6 work happens in loader.ts /
-// worker.ts; this file's body is the last thing to change.
+// Public signature is pinned by PRD_code_sandbox §4 (and Phase-5
+// T5.9 ADR): consumer (CodeTaskCard) is untouched across this swap.
+// The body now drives the worker:
+//   1. await bootPyodideWorker() — singleton boot, idempotent.
+//   2. Post an 'execute' message with a unique requestId.
+//   3. Attach a message listener that filters by requestId; resolve
+//      on 'result', resolve-with-error on matching 'error'.
+//   4. Listener detaches itself on first match.
 //
-// The Web Worker isolation rule (FR-SBX-5) and the per-run namespace
-// reset (FR-SBX-6, mirrors ADR-016 React isolation) are Phase-6
-// concerns. The stub returns a deterministic "not yet wired" payload
-// that the Results panel renders as guidance to copy the snippet into
-// local Python.
+// Errors are returned as a non-ok RunResult rather than rejected —
+// the consumer (CodeTaskCard) renders stderr verbatim, so wrapping
+// boot/worker failures into RunResult.stderr keeps the UI path
+// uniform whether the failure was code or infrastructure.
+//
+// Timeout (T6.8) and input validation (T6.9, parallel) layer on top
+// of this; both modify the dispatch shell, not the worker contract.
 export type { RunResult, TestResult } from './types'
+import { bootPyodideWorker, getPyodideWorker } from './loader'
 import type { RunResult } from './types'
+
+function errorResult(message: string): RunResult {
+  return {
+    ok: false,
+    tests: [],
+    stdout: '',
+    stderr: message,
+    timed_out: false,
+    total_duration_ms: 0,
+  }
+}
+
+let _nextRequestId = 0
+
+interface ExecuteReply {
+  type?: string
+  requestId?: string
+  result?: RunResult
+  message?: string
+}
+
+function dispatch(
+  worker: Worker,
+  user_code: string,
+  hidden_tests: string,
+  allowlist: string[],
+): Promise<RunResult> {
+  const requestId = `pyprep-req-${++_nextRequestId}`
+  return new Promise<RunResult>((resolve) => {
+    const handler = (e: MessageEvent): void => {
+      const d = e.data as ExecuteReply
+      if (d.requestId !== requestId) return
+      worker.removeEventListener('message', handler)
+      if (d.type === 'result' && d.result) {
+        resolve(d.result)
+      } else if (d.type === 'error') {
+        resolve(errorResult(d.message ?? 'pyodide execute error'))
+      } else {
+        resolve(errorResult(`unexpected reply: ${d.type ?? '(no type)'}`))
+      }
+    }
+    worker.addEventListener('message', handler)
+    worker.postMessage({
+      type: 'execute', requestId, user_code, hidden_tests, allowlist,
+    })
+  })
+}
 
 export async function runCodeTask(
   user_code: string,
@@ -24,16 +73,13 @@ export async function runCodeTask(
   allowlist: string[],
   options?: { timeout_ms?: number },
 ): Promise<RunResult> {
-  void user_code
-  void hidden_tests
-  void allowlist
-  void options
-  return {
-    ok: false,
-    tests: [],
-    stdout: '',
-    stderr: 'Pyodide not yet wired (Phase 6). Try this in your local Python.',
-    timed_out: false,
-    total_duration_ms: 0,
+  void options // T6.8 wires the timeout layer
+  try {
+    await bootPyodideWorker()
+  } catch (e) {
+    return errorResult(e instanceof Error ? e.message : String(e))
   }
+  const worker = getPyodideWorker()
+  if (!worker) return errorResult('pyodide worker unavailable')
+  return dispatch(worker, user_code, hidden_tests, allowlist)
 }

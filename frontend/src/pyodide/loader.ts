@@ -99,6 +99,12 @@ export function getColdStartMetrics(): Readonly<ColdStartMetrics> {
   return { ..._metrics }
 }
 
+// Worker accessor for runner.ts (T6.5). After bootPyodideWorker() resolves,
+// the worker is ready for 'execute' messages. Returns null pre-boot.
+export function getPyodideWorker(): Worker | null {
+  return _worker
+}
+
 // Test-only escape hatch. Resets the singleton so the test suite can
 // drive boot() multiple times against fresh mock workers. Underscore-
 // prefixed to mark non-production; not re-exported via index/barrel.

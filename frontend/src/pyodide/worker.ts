@@ -1,51 +1,60 @@
-// Pyodide Web Worker entry (Phase 6 / T6.3 — self-bootstrapping).
-//
-// Stop-#2 retry diagnosis: with Vite ES-module workers + TLA +
-// dynamic CDN import, the browser's "queue postMessage until
-// onmessage attaches" guarantee broke in practice. The main thread
-// posted 'boot' before the worker's top-level finished, and the
-// worker never observed the message. Owner's fix: drop the boot
-// handshake entirely. The worker self-initializes at top-level;
-// the main thread just listens for 'ready'.
-//
-// Boot path now:
-//   1. CodeTaskCard mount → bootPyodideWorker() creates worker.
-//   2. Worker imports pyodide.mjs, calls loadPyodide, then
-//      loadPackage('pytest'), emits pyodide-ready / pytest-ready /
-//      ready signals along the way — all at module top-level.
-//   3. Main-thread loader.ts captures the timestamps as before.
-//   4. After boot, worker attaches onmessage for future runtime
-//      requests (T6.5 'execute' etc). By that point onmessage
-//      semantics are reliable.
+// Pyodide Web Worker (Phase 6). Self-bootstrapping at module top-level:
+// dynamic-imports pyodide.mjs from the CDN, calls loadPyodide +
+// loadPackage('pytest'), installs pytest_harness.py via runPython,
+// then attaches onmessage for runtime 'execute' requests. Drops the
+// boot handshake — stop-#2 retry showed Vite ESM-workers + TLA can
+// lose pre-attach postMessages. Harness install at T6.4; namespace
+// bridge for execute at T6.5.
 import type { ColdStartMetrics as _Metrics } from './types' // contract import
+import type { RunResult } from './types'
 void (null as unknown as _Metrics)
-
-// T6.4: the harness is bundled as a string asset via Vite's ?raw
-// query. After loadPackage('pytest'), the worker hands the source
-// to `pyodide.runPython(harness)` which installs `run_code_task`
-// in the Pyodide globals (T6.5 wires the JS-side call).
 import harnessSource from './pytest_harness.py?raw'
 
-export type WorkerInbound = { type: 'execute' } | { type: string }
+export interface ExecuteRequest {
+  type: 'execute'
+  requestId: string
+  user_code: string
+  hidden_tests: string
+  allowlist: string[]
+}
+export type WorkerInbound = ExecuteRequest
+
 export type WorkerOutbound =
   | { type: 'pyodide-ready' }
   | { type: 'pytest-ready' }
   | { type: 'ready' }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; requestId?: string }
   | { type: 'diagnostic'; message: string }
+  | { type: 'result'; requestId: string; result: RunResult }
 
+// PyProxy: globals.get('run_code_task') returns a callable proxy that,
+// invoked, returns a dict proxy whose .toJs({dict_converter}) yields
+// a plain JS object matching RunResult.
+interface PyProxy {
+  (...args: unknown[]): PyProxy
+  toJs(opts?: { dict_converter?: unknown }): unknown
+  destroy(): void
+}
 interface PyodideInstance {
   loadPackage(name: string | string[]): Promise<unknown>
   runPython(code: string): unknown
+  globals: { get(name: string): PyProxy }
 }
 type LoadPyodide = (opts: { indexURL: string }) => Promise<PyodideInstance>
 
 let _loadPyodide: LoadPyodide | null = null
 let _indexURL = ''
+// T6.5: post-boot reference to the loaded Pyodide instance, used by
+// handleMessage's 'execute' branch to call into the harness.
+let _pyodide: PyodideInstance | null = null
 
 export function _setBootEnvForTests(load: LoadPyodide, indexURL: string): void {
   _loadPyodide = load
   _indexURL = indexURL
+}
+
+export function _setPyodideForTests(py: PyodideInstance | null): void {
+  _pyodide = py
 }
 
 export async function bootPyodide(
@@ -69,6 +78,7 @@ export async function bootPyodide(
     // non-zero post-T6.4).
     post({ type: 'diagnostic', message: 'installing pytest_harness.py' })
     pyodide.runPython(harnessSource)
+    _pyodide = pyodide  // T6.5: handleMessage's execute branch uses this
     post({ type: 'diagnostic', message: 'pytest_harness.py installed' })
     post({ type: 'ready' })
   } catch (e) {
@@ -79,21 +89,30 @@ export async function bootPyodide(
   }
 }
 
-export function handleMessage(
-  post: (m: WorkerOutbound) => void,
-  data: unknown,
-): void {
-  // Post-boot runtime messages only — T6.5 'execute' lands here.
-  // 'boot' is no longer a valid inbound (worker self-bootstraps).
+export function handleMessage(post: (m: WorkerOutbound) => void, data: unknown): void {
   if (typeof data !== 'object' || data === null) {
-    post({ type: 'error', message: 'unknown message: not an object' })
-    return
+    post({ type: 'error', message: 'unknown message: not an object' }); return
   }
-  const msg = data as { type?: unknown }
-  post({
-    type: 'error',
-    message: `unknown message type: ${String(msg.type ?? 'undefined')}`,
-  })
+  const msg = data as { type?: unknown; requestId?: unknown }
+  if (msg.type === 'execute') { handleExecute(post, data as ExecuteRequest); return }
+  const requestId = typeof msg.requestId === 'string' ? msg.requestId : undefined
+  post({ type: 'error', message: `unknown message type: ${String(msg.type ?? 'undefined')}`, requestId })
+}
+
+function handleExecute(post: (m: WorkerOutbound) => void, req: ExecuteRequest): void {
+  const { requestId } = req
+  if (!_pyodide) {
+    post({ type: 'error', requestId, message: 'pyodide not initialized' }); return
+  }
+  try {
+    const fn = _pyodide.globals.get('run_code_task')
+    const py = fn(req.user_code, req.hidden_tests, req.allowlist)
+    const result = py.toJs({ dict_converter: Object.fromEntries }) as RunResult
+    py.destroy()
+    post({ type: 'result', requestId, result })
+  } catch (e) {
+    post({ type: 'error', requestId, message: e instanceof Error ? e.message : String(e) })
+  }
 }
 
 interface WorkerLikeSelf {
