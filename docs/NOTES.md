@@ -699,3 +699,49 @@ distinguish session-completion rate from retention curve. Until
 then: no change to queue construction.
 
 This note is a marker, not an action item — do not file a TODO.
+
+---
+
+## N036 — DevTools network throttle does not propagate to Web Worker fetch [Phase 6 T6.11]
+
+**Phase:** 6 (stop #2 findings) · **Date:** 2026-05-11 · **Status:** open
+
+During Phase 6 stop #2 verification of the Pyodide cold-start path,
+the owner's three measurement runs produced:
+
+| Condition          | total_ms |
+|--------------------|----------|
+| Cold cache         | 9685     |
+| Warm cache         | 5118     |
+| 3G throttle        | 3455     |
+
+The 3G number is smaller than cold cache. Reading the trace, the
+likely cause is a documented Chromium quirk: DevTools network
+throttling settings configured on the main thread are NOT
+consistently applied to fetch requests issued from inside a
+DedicatedWorker. Our Pyodide worker fetches `pyodide.mjs` + the
+WASM blob + `pytest` package from within the worker; those
+requests bypass the main-thread throttle and complete at unthrottled
+speed.
+
+**Implication:** the "slow-network" cold-start number from stop #2
+is invalid for budget-setting purposes. The cold-cache run (9685ms)
+is the real worst-case we have measured.
+
+**Resolution:** at T6.11 (CI cold-start gate), use protocol-level
+throttling rather than DevTools throttling. Concrete options:
+- Playwright with `context.route(...)` adding a deliberate delay
+  before passing through the request, OR
+- `chrome.debugger` CDP `Network.emulateNetworkConditions` applied
+  to the worker target (not just the main page target), OR
+- A local stub server that serves Pyodide assets with a configurable
+  delay; CI swaps the CDN to the stub.
+
+Whichever path T6.11 chooses, the gate MUST measure under controlled
+slow-network conditions, not "DevTools 3G + hope".
+
+ADR-020 currently caps CI at 8s. Owner-machine cold-cache at 9.7s
+puts that threshold under pressure already; the gate threshold will
+be re-decided at T6.11 once we have CI-runner numbers. Tentative
+revision: 12s (2s headroom over observed cold worst case).
+
