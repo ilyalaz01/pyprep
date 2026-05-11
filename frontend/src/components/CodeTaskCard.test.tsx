@@ -8,6 +8,12 @@ import {
 import { expectAnswerHidden } from '../test/expect-answer-hidden'
 import { CodeTaskCard } from './CodeTaskCard'
 import * as runner from '../pyodide/runner'
+import * as loader from '../pyodide/loader'
+
+vi.mock('../pyodide/loader', () => ({
+  bootPyodideWorker: vi.fn(() => Promise.resolve()),
+  getColdStartMetrics: vi.fn(),
+}))
 
 vi.mock('./CodeMirrorEditor', () => ({
   CodeMirrorEditor: ({ initialDoc, onChange, onRun }: {
@@ -135,6 +141,12 @@ describe('CodeTaskCard — empty editor', () => {
     expect(btn).toBeDisabled()
     expect(screen.getByText(/editor is empty/i)).toBeInTheDocument()
   })
+})
+
+test('T6.3 lazy Pyodide boot: mount calls bootPyodideWorker (FR-SBX-1)', () => {
+  vi.mocked(loader.bootPyodideWorker).mockClear()
+  render(<CodeTaskCard card={card} onRate={vi.fn()} />)
+  expect(loader.bootPyodideWorker).toHaveBeenCalledTimes(1)
 })
 
 describe('CodeTaskCard — ADR-016 per-card React isolation', () => {

@@ -61,6 +61,11 @@ export function bootPyodideWorker(
           harness_init_ms: pytestAt === null ? null : now - pytestAt,
           total_ms: now - t0,
         }
+        // Stop #2 instrumentation (T6.3). Owner reads these three
+        // numbers off DevTools console under cold-cache / warm-cache /
+        // slow-3G conditions. One-shot per SPA session (boot is a
+        // singleton per ADR-018), so production noise is bounded.
+        console.info('[pyprep:pyodide] cold-start', _metrics)
         resolve()
       } else if (d.type === 'error') {
         reject(new Error(d.message ?? 'pyodide worker error'))

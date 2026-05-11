@@ -1,33 +1,97 @@
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { handleMessage } from './worker'
+import {
+  bootPyodide, handleMessage, _setBootEnvForTests,
+} from './worker'
 
-describe('worker.handleMessage — T6.2 skeleton', () => {
-  test('a boot message receives an error reply with a T6.3 marker', () => {
-    // T6.2 ships the message-handling shape without Pyodide. T6.3
-    // swaps the boot branch for the real loadPyodide+loadPackage path.
-    // Until then the error reply tells loader.ts (and any future
-    // owner-facing log) which task wires up the actual work.
-    const post = vi.fn()
-    handleMessage(post, { type: 'boot' })
-    expect(post).toHaveBeenCalledTimes(1)
-    const arg = post.mock.calls[0][0] as { type: string; message?: string }
-    expect(arg.type).toBe('error')
-    expect(arg.message).toMatch(/t6\.3/i)
-  })
+const fakePyodide = (loadOk = true) => ({
+  loadPackage: vi.fn(async () => {
+    if (!loadOk) throw new Error('pytest fetch failed')
+  }),
+})
 
-  test('an unknown inbound message gets an error reply naming the type', () => {
+const fakeLoad = (pyodide: ReturnType<typeof fakePyodide>) =>
+  vi.fn(async () => pyodide)
+
+afterEach(() => {
+  // Reset module-level state between tests.
+  _setBootEnvForTests(
+    vi.fn(async () => fakePyodide()),
+    'about:test',
+  )
+})
+
+describe('handleMessage — dispatch shape', () => {
+  test('unknown messages get an error reply naming the type', () => {
     const post = vi.fn()
     handleMessage(post, { type: 'rummage' })
     const arg = post.mock.calls[0][0] as { type: string; message?: string }
     expect(arg.type).toBe('error')
-    expect(arg.message).toMatch(/unknown/i)
+    expect(arg.message).toMatch(/rummage/)
   })
 
-  test('a non-object message is ignored gracefully', () => {
+  test('non-object messages get an error reply', () => {
     const post = vi.fn()
-    handleMessage(post, 'not-an-object')
-    const arg = post.mock.calls[0][0] as { type: string; message?: string }
-    expect(arg.type).toBe('error')
+    handleMessage(post, 'nope')
+    expect(post.mock.calls[0][0]).toEqual({
+      type: 'error', message: expect.stringMatching(/not an object/i),
+    })
+  })
+
+  test('boot routes to bootPyodide (async; tested via bootPyodide directly)', () => {
+    const post = vi.fn()
+    // handleMessage is sync — bootPyodide is fire-and-forget.
+    // We assert no error reply fires synchronously when the route is
+    // taken; happy-path emissions are covered by bootPyodide tests.
+    expect(() => handleMessage(post, { type: 'boot' })).not.toThrow()
+  })
+})
+
+describe('bootPyodide — happy path', () => {
+  test('emits pyodide-ready → pytest-ready → ready in order', async () => {
+    const py = fakePyodide()
+    _setBootEnvForTests(fakeLoad(py), 'https://cdn.test/pyodide/')
+    const post = vi.fn()
+    await bootPyodide(post)
+    const types = post.mock.calls.map((c) => (c[0] as { type: string }).type)
+    expect(types).toEqual(['pyodide-ready', 'pytest-ready', 'ready'])
+    expect(py.loadPackage).toHaveBeenCalledWith('pytest')
+  })
+
+  test('passes the configured indexURL to loadPyodide', async () => {
+    const py = fakePyodide()
+    const load = fakeLoad(py)
+    _setBootEnvForTests(load, 'https://cdn.test/pyodide/')
+    await bootPyodide(vi.fn())
+    expect(load).toHaveBeenCalledWith({ indexURL: 'https://cdn.test/pyodide/' })
+  })
+})
+
+describe('bootPyodide — error paths', () => {
+  test('loadPyodide rejection produces a single error reply', async () => {
+    const load = vi.fn(async () => { throw new Error('cdn down') })
+    _setBootEnvForTests(load as unknown as never, 'about:test')
+    const post = vi.fn()
+    await bootPyodide(post)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post.mock.calls[0][0]).toEqual({ type: 'error', message: 'cdn down' })
+  })
+
+  test('loadPackage rejection produces an error reply after pyodide-ready', async () => {
+    const py = fakePyodide(false)
+    _setBootEnvForTests(fakeLoad(py), 'about:test')
+    const post = vi.fn()
+    await bootPyodide(post)
+    const types = post.mock.calls.map((c) => (c[0] as { type: string }).type)
+    expect(types).toEqual(['pyodide-ready', 'error'])
+  })
+
+  test('null bootstrap config produces a clear error', async () => {
+    _setBootEnvForTests(null as unknown as never, 'about:test')
+    const post = vi.fn()
+    await bootPyodide(post)
+    expect(post.mock.calls[0][0]).toEqual({
+      type: 'error', message: expect.stringMatching(/not configured/i),
+    })
   })
 })

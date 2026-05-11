@@ -17,6 +17,13 @@ vi.mock('../components/CodeMirrorEditor', () => ({
     <textarea data-testid="codemirror-mock" defaultValue={initialDoc} />
   ),
 }))
+// T6.3: CodeTaskCard mount fires bootPyodideWorker (FR-SBX-1 lazy
+// load). jsdom doesn't define Worker, so we mock the loader at the
+// integration boundary — same shape as the CodeMirrorEditor mock.
+vi.mock('../pyodide/loader', () => ({
+  bootPyodideWorker: vi.fn(() => Promise.resolve()),
+  getColdStartMetrics: vi.fn(),
+}))
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s })
 const ME = { id: 'u1', email: 'me@example.com', created_at: '2026-05-09T00:00:00Z' }

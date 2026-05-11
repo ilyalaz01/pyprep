@@ -23,12 +23,13 @@
  * vs "stuck for 10 minutes" vs "peeked at the answer" all map to
  * different ratings the runner outcome cannot infer.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { CodeTaskCard as CodeTaskCardT } from '../lib/card-types'
 import type { Rating } from '../lib/session-queue'
+import { bootPyodideWorker } from '../pyodide/loader'
 import { runCodeTask, type RunResult } from '../pyodide/runner'
 import { Button } from './Button'
 import { CodeMirrorEditor } from './CodeMirrorEditor'
@@ -44,6 +45,13 @@ export function CodeTaskCard({ card, onRate }: Props) {
   const [result, setResult] = useState<RunResult | null>(null)
   const [running, setRunning] = useState(false)
   const isEmpty = code.trim().length === 0
+
+  // T6.3 lazy boot trigger (FR-SBX-1): the first code-task card the
+  // user sees in a session kicks off Pyodide load in the background.
+  // Singleton per ADR-018 — subsequent mounts are no-ops. The Run
+  // path still uses the runner stub in T6.3; T6.5 swaps it for the
+  // worker-driven path.
+  useEffect(() => { void bootPyodideWorker() }, [])
 
   const run = useCallback(async () => {
     if (isEmpty || running) return
