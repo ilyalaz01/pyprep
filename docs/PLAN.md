@@ -626,6 +626,110 @@ attacker only what they could guess from the deployment hostname).
 
 ---
 
+### ADR-018: Pyodide worker lifecycle — reuse-per-session, terminate-on-timeout
+
+**Status:** Accepted (added Phase 6, T6.0)
+
+**Context:** Code-task cards run user Python in a Pyodide WASM runtime hosted in a Web Worker (FR-SBX-5). Two lifecycle shapes are viable: (a) spin up a fresh worker per run and terminate on completion; (b) reuse one worker across all runs in the SPA session and terminate only on timeout or crash. Pyodide cold-load (loader + base + `pytest` package) is the dominant cost — NFR-SBX-1 budgets ≤ 6 s and NFR-SBX-2 budgets ≤ 1 s for subsequent runs.
+
+**Decision:** Reuse one worker per SPA session. Terminate only on FR-SBX-4 timeout or unrecoverable crash, then respawn lazily on the next `runCodeTask` call. Inter-task isolation is the per-run namespace reset (FR-SBX-6), not worker recycling.
+
+**Rationale:**
+- Per-task spin-up forces a fresh Pyodide load each time → trips NFR-SBX-1 every run, not just the first.
+- Namespace reset between tasks (FR-SBX-6) is cheap and sufficient for the only contamination vector that matters: leaked globals / fixtures between cards.
+- The PRD §5.1 binding already commits to this shape; the ADR is the formal record.
+
+**Trade-offs:**
+- Stuck-state risk between tasks is real if the reset is buggy — T6.6 explicitly verifies; T6.10 smoke matrix re-verifies against authored content.
+- Worker termination on timeout means the next run re-pays the cold-load cost. Acceptable: owner reports `while True: pass` once and learns; not a hot path.
+
+**Mirrors ADR-016 mental model.** Per-card React isolation and per-task Pyodide isolation are the same idea at different layers — fresh state by construction, not by convention.
+
+**Revisit when:** Mobile becomes in-scope (iOS Safari worker termination is historically flaky — out of scope per PRD §5), OR cross-task contamination bugs reach owner from the smoke matrix.
+
+---
+
+### ADR-019: Allowlist enforcement via Python import hook
+
+**Status:** Proposed (added Phase 6, T6.0). Flips to **Accepted** at T6.7 when the hook is live and the error-message format is verified end-to-end.
+
+**Context:** Each `code_task` card carries an `allowlist: string[]` of permitted modules (PRD §3 schema). The worker MUST reject imports outside that set with a clean, actionable error. Two enforcement layers are viable: (a) a Python import hook (`builtins.__import__` wrapper) that checks the allow-set *before* delegating to the real import; (b) a runtime audit (e.g. inspect `sys.modules` after `pytest.main()` returns and fail post-hoc).
+
+**Decision:** Import-hook (option a) in `pytest_harness.py`. The hook installs once per worker lifetime; the per-task harness call sets the active allow-set before running the user code, restores the previous set after.
+
+**Rationale:**
+- **Fail at import time, not at first attribute access.** Python-canonical: a denied module looks like an `ImportError`, which the user already knows how to read.
+- **One chokepoint to audit.** The hook is the only place enforcement lives, and the test suite (T6.7 + T6.12) targets it directly.
+- **Stdlib re-imports work.** The hook always permits modules already loaded at worker boot (`builtins`, `sys`, `_frozen_importlib`, ...) and the curated set from the active task.
+- **The error message is the user-facing affordance.** Format pinned by test:
+
+  ```
+  ImportError: 'socket' is not allowed in this code task.
+  Allowed modules: math, collections, itertools, pytest
+  ```
+
+  Not a Python stack trace. Actionable, names the rejected module, lists what *is* allowed so the user can pivot.
+
+**Trade-offs:**
+- The hook must passthrough imports from pytest itself + its deps (`pluggy`, `iniconfig`, `packaging`) regardless of the per-task allowlist. Solved by snapshotting `sys.modules.keys()` at worker boot and always allowing those plus the current task's set.
+- Transitive deps inside the task's allowlist need to be allowed too (e.g. allowing `collections` should allow `collections.abc`). Hook treats `pkg.subpkg` as allowed if `pkg` is in the allow-set.
+
+**Revisit when:** A card legitimately needs a runtime-loaded import path our hook can't cover (e.g. dynamic `importlib.import_module` from string-typed names) — at which point the card's allowlist gets the extra entry, not the hook.
+
+---
+
+### ADR-020: Pyodide CDN load with pinned version, no auto-upgrade
+
+**Status:** Accepted (added Phase 6, T6.0)
+
+**Context:** Pyodide assets (base runtime + `pytest` package + deps) ship as ~80 MB compressed. Three delivery options: (a) CDN (jsdelivr) at a pinned version; (b) self-host alongside our static assets; (c) build-bundle via a Vite plugin. Cold-start budget NFR-SBX-1 is ≤ 6 s on 50 Mbps.
+
+**Decision:** Option (a). Pinned jsdelivr CDN, version sourced from env var `VITE_PYODIDE_VERSION` (currently `0.26.4`) and CDN base from `VITE_PYODIDE_CDN`. No auto-upgrade — any version change is a deliberate `.env-example` diff that touches harness tests. Self-hosted fallback is Phase 10 polish (NFR-SBX-4).
+
+**Rationale:**
+- Zero ops. Zero bundle cost on every push (assets aren't in our dist).
+- Version pinning protects against silent breakage when Pyodide ships a new minor.
+- jsdelivr's track record on long-lived asset URLs is strong enough for MVP-1.
+
+**Performance budget — CI gate vs aspiration:**
+- **NFR-SBX-1 (PRD):** ≤ 6 s on baseline desktop / 50 Mbps. This is the user-facing target.
+- **CI gate (T6.11):** **8 s** ceiling on the headless cold-start measurement. CI runners are typically slower than baseline desktop and may simulate throttled networks; 8 s absorbs that variance without going flaky.
+- **Internal aspiration:** owner-machine measurements consistently < 4 s would justify tightening the CI gate to 5 s in a later phase. Track informally — don't gate.
+- The gap (8 s gate vs 6 s PRD target vs 5 s aspiration) is deliberate. Smaller gap = flakier gate, no information gain. Larger gap = a real regression slips by undetected.
+
+**Trade-offs (accepted explicitly):**
+- CDN outage → code_task cards visibly fail in MVP-1. Acceptable per PRD §8 risk table.
+- jsdelivr could in theory swap the bytes behind a version tag. Vanishingly unlikely for a published Pyodide release; Phase 10 self-host pins the bytes too.
+
+**Revisit when:** CDN reliability becomes a real owner complaint, OR multi-user deployment makes the bandwidth bill / latency tail visible (Phase 10).
+
+---
+
+### ADR-021: Pytest sourcing via `loadPackage` + hand-rolled JSON adapter
+
+**Status:** Accepted (added Phase 6, T6.0)
+
+**Context:** The worker needs `pytest` and a way to emit per-test structured output (name, pass/fail, message, traceback, duration_ms — see `TestResult` in PRD §4). Three sourcing paths: (a) `pyodide.loadPackage("pytest")` if bundled at the pinned version; (b) `micropip.install("pytest")` if not bundled; (c) ship a hand-rolled minimal test runner. Three output paths: (i) `pytest-json-report` plugin; (ii) `pytest --junitxml` + a parser; (iii) a hand-rolled pytest plugin in `pytest_harness.py` that hooks `pytest_runtest_logreport`.
+
+**T6.0 spot-check on Pyodide 0.26.4 `pyodide-lock.json` confirmed:** `pytest 8.1.1`, `pluggy 1.5.0`, `iniconfig 2.0.0`, `packaging 23.2` are bundled. `pytest-json-report` is **not** bundled.
+
+**Decision:**
+- **Sourcing:** path (a) — `pyodide.loadPackage("pytest")`. Canonical, no `micropip` round-trip (one less subsystem to load, lower cold-start tail).
+- **Output:** path (iii) — hand-rolled adapter in `pytest_harness.py` that registers a small plugin and collects `pytest_runtest_logreport` outcomes into a list, then writes JSON after `pytest.main()` returns.
+
+**Rationale:**
+- `loadPackage` is faster, dep-free, and already part of Pyodide's first-class API.
+- The hand-rolled adapter is ~30 LOC of stable pytest hooks, gives us exactly the `TestResult` shape we want, and avoids parsing junit XML (more code) or shipping `pytest-json-report` via `micropip` (slower).
+- Output format is **our** concern; coupling it to pytest plugins we don't own is more risk than the adapter.
+
+**Trade-offs:**
+- We own the adapter — if pytest 8.x changes its report-hook surface, we update one file.
+- No timing per-fixture (just per-test). Sufficient for the UI; richer telemetry was never an MVP requirement.
+
+**Revisit when:** Pyodide ships `pytest-json-report` bundled, OR a card design demands telemetry our hook doesn't capture.
+
+---
+
 ## 7. API Surface (preview)
 
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:

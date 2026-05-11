@@ -1,32 +1,22 @@
-/**
- * Pyodide runner — Phase 5 stub. Phase 6 swaps the body, NOT the
- * signature. Keeping the contract pinned per PRD_code_sandbox §4 so
- * CodeTaskCard ships testable in Phase 5: the renderer wires against
- * (user_code, hidden_tests, allowlist, options) and consumes
- * RunResult/TestResult exactly as Phase 6 will produce them.
- *
- * The Web Worker isolation rule (FR-SBX-5 main-thread) and the
- * per-run namespace reset (FR-SBX-6, mirrors ADR-016 React isolation)
- * are Phase-6 concerns. The stub returns a deterministic "not yet
- * wired" payload that the Results panel renders as guidance to copy
- * the snippet into local Python.
- */
-export interface TestResult {
-  name: string
-  passed: boolean
-  message?: string
-  traceback?: string
-  duration_ms: number
-}
-
-export interface RunResult {
-  ok: boolean
-  tests: TestResult[]
-  stdout: string
-  stderr: string
-  timed_out: boolean
-  total_duration_ms: number
-}
+// Pyodide runner — Phase 5 stub. Phase 6 swaps the body; the signature
+// is pinned by PRD_code_sandbox §4 and by T5.9's ADR so CodeTaskCard
+// ships testable in Phase 5. The renderer wires against (user_code,
+// hidden_tests, allowlist, options) and consumes RunResult/TestResult
+// exactly as the Phase-6 worker-driven path will produce them.
+//
+// T6.0 split: TestResult + RunResult moved to ./types.ts. This module
+// re-exports them so the existing import path
+// `import { runCodeTask, type RunResult } from '../pyodide/runner'`
+// keeps working for consumers. Phase-6 work happens in loader.ts /
+// worker.ts; this file's body is the last thing to change.
+//
+// The Web Worker isolation rule (FR-SBX-5) and the per-run namespace
+// reset (FR-SBX-6, mirrors ADR-016 React isolation) are Phase-6
+// concerns. The stub returns a deterministic "not yet wired" payload
+// that the Results panel renders as guidance to copy the snippet into
+// local Python.
+export type { RunResult, TestResult } from './types'
+import type { RunResult } from './types'
 
 export async function runCodeTask(
   user_code: string,
