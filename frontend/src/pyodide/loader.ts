@@ -86,8 +86,11 @@ export function bootPyodideWorker(
     }
     _worker.onerror = (ev: ErrorEvent) =>
       reject(new Error(ev.message || 'pyodide worker onerror'))
-    _worker.postMessage({ type: 'boot' })
-    console.info('[pyprep:pyodide] boot message posted to worker')
+    // No postMessage('boot') — the worker self-bootstraps at top-level
+    // and emits 'ready' autonomously. Stop-#2 retry diagnosed that the
+    // browser's "queue postMessage until onmessage attaches" guarantee
+    // broke in practice with Vite ES-module workers + TLA + dynamic
+    // CDN import; messages posted in that window were dropped.
   })
   return _readyPromise
 }

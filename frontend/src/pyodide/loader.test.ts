@@ -32,12 +32,13 @@ describe('getColdStartMetrics — pre-boot', () => {
 })
 
 describe('bootPyodideWorker — happy path', () => {
-  test('creates the worker, sends boot, populates all three segments + total', async () => {
+  test('creates the worker, listens for self-boot signals, populates all three segments + total', async () => {
     const worker = new StepWorker()
     const factory = vi.fn(() => worker as unknown as Worker)
     const ready = bootPyodideWorker(factory)
     expect(factory).toHaveBeenCalledTimes(1)
-    expect(worker.postedMessages).toEqual([{ type: 'boot' }])
+    // T6.3 self-bootstrap: no 'boot' post — worker drives its own init.
+    expect(worker.postedMessages).toEqual([])
     await wait(5); worker.emit({ type: 'pyodide-ready' })
     await wait(15); worker.emit({ type: 'pytest-ready' })
     await wait(25); worker.emit({ type: 'ready' })
