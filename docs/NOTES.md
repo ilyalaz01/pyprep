@@ -745,3 +745,46 @@ puts that threshold under pressure already; the gate threshold will
 be re-decided at T6.11 once we have CI-runner numbers. Tentative
 revision: 12s (2s headroom over observed cold worst case).
 
+---
+
+## N037 — Pyodide-actual e2e coverage for code_task smoke matrix [Phase 10]
+
+**Phase:** 6 (T6.10) · **Date:** 2026-05-12 · **Status:** open
+
+T6.10's smoke matrix (`tests/unit/test_module1_code_tasks.py`)
+iterates every Module 1 code_task and asserts `solution_code` passes
+its hidden `tests` via the harness. The test runs under **CPython**,
+not Pyodide. This catches content/harness drift (broken solution,
+mis-spelled allowlist, harness regression) but cannot catch
+Pyodide-specific bugs that arise from CPython-vs-Pyodide
+divergences in:
+- The pytest version bundled with Pyodide vs the host's pip pytest
+  (Pyodide ships pytest 8.1.1 fixed; host may diverge).
+- Emscripten filesystem behaviour for `tempfile.mkdtemp` and
+  `sys.path` interaction.
+- Module preloading at Pyodide boot (the original ADR-019 first cut
+  was bitten by this — the runtime hook was switched to static AST
+  precisely because static-allowlisting of internals isn't portable).
+
+The stop-#3 regression that the original T6.10 spec was meant to
+catch (xml.etree rejection) is now structurally impossible because
+the AST-based gate cannot mis-classify pytest internals. Other
+Pyodide-only bugs in the same shape remain uncovered.
+
+**Resolution path:** owner's manual stop-#4 verification covers the
+Pyodide-actual happy path interactively. For automated regression
+coverage, Phase 10 (or later) should add either:
+- A Playwright test that drives the SPA in a headless browser,
+  enters each card's `solution_code`, clicks Run, asserts the pass
+  indicator renders. Heaviest but most realistic.
+- A `pyodide` npm package test that runs in Node (Pyodide-in-Node
+  is supported), loads the harness, iterates Module 1 cards. ~80MB
+  devDep, ~10s cold-start per process. Practical alternative.
+
+**Tentatively:** Pyodide-in-Node test, lives in `frontend/test/` as
+a slow-suite vitest (`vi.setConfig({ testTimeout: 60_000 })`), runs
+on-demand in CI rather than every push.
+
+Not blocking Phase 6 close — manual stop-#4 covers the gap until
+then.
+
