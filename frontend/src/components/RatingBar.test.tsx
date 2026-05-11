@@ -72,4 +72,31 @@ describe('RatingBar', () => {
       expect(aria).toContain(String(rating))
     }
   })
+
+  // T5.10.5 Issue 2: low-friction caption + hover tooltip teach the
+  // FSRS rating semantics without an Anki-style minute table (which
+  // misleads — our scheduler doesn't produce those exact intervals).
+  // Caption is for at-a-glance reading; title is the longer hover-text.
+  // Both affordances are independent and must coexist.
+  test.each([
+    ['Again', 'soon'],
+    ['Hard', 'tougher'],
+    ['Good', 'default'],
+    ['Easy', 'knew it'],
+  ] as const)('%s renders the "%s" caption', (label, caption) => {
+    render(<RatingBar onRate={vi.fn()} />)
+    const btn = screen.getByRole('button', { name: new RegExp(label, 'i') })
+    expect(btn).toHaveTextContent(caption)
+  })
+
+  test.each([
+    ['Again', 'Show this card again soon'],
+    ['Hard', 'You struggled but recalled it'],
+    ['Good', 'You recalled it with some effort'],
+    ['Easy', 'Knew it cold, schedule further out'],
+  ] as const)('%s exposes its meaning via the title attribute', (label, title) => {
+    render(<RatingBar onRate={vi.fn()} />)
+    const btn = screen.getByRole('button', { name: new RegExp(label, 'i') })
+    expect(btn).toHaveAttribute('title', title)
+  })
 })

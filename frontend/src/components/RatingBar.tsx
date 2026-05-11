@@ -25,12 +25,20 @@ interface Choice {
   rating: Rating
   label: string
   digit: string
+  /** One-word at-a-glance hint (T5.10.5): teaches FSRS semantics
+   *  without an Anki-style minute table that would mislead. */
+  caption: string
+  /** Native browser tooltip on hover/focus — fuller phrasing of
+   *  the same idea as `caption`. */
+  title: string
   variant: string
 }
 
 const CHOICES: readonly Choice[] = [
   {
     rating: 1, label: 'Again', digit: '1',
+    caption: 'soon',
+    title: 'Show this card again soon',
     variant:
       'border border-[color:var(--color-danger)] ' +
       'text-[color:var(--color-danger)] ' +
@@ -38,6 +46,8 @@ const CHOICES: readonly Choice[] = [
   },
   {
     rating: 2, label: 'Hard', digit: '2',
+    caption: 'tougher',
+    title: 'You struggled but recalled it',
     variant:
       'border border-[color:var(--color-warn)] ' +
       'text-[color:var(--color-warn)] ' +
@@ -45,6 +55,8 @@ const CHOICES: readonly Choice[] = [
   },
   {
     rating: 3, label: 'Good', digit: '3',
+    caption: 'default',
+    title: 'You recalled it with some effort',
     variant:
       'border border-[color:var(--color-good-muted)] ' +
       'text-[color:var(--color-good-muted)] ' +
@@ -52,6 +64,8 @@ const CHOICES: readonly Choice[] = [
   },
   {
     rating: 4, label: 'Easy', digit: '4',
+    caption: 'knew it',
+    title: 'Knew it cold, schedule further out',
     variant:
       'border border-[color:var(--color-good)] ' +
       'text-[color:var(--color-good)] ' +
@@ -69,9 +83,10 @@ export function RatingBar({ onRate, disabled = false }: RatingBarProps) {
           disabled={disabled}
           onClick={() => onRate(c.rating)}
           aria-label={`${c.label} (key ${c.digit})`}
+          title={c.title}
           className={[
-            'flex flex-col items-center justify-center gap-1 rounded',
-            'h-14 px-3 text-sm font-medium bg-transparent',
+            'flex flex-col items-center justify-center gap-0.5 rounded',
+            'h-16 px-3 text-sm font-medium bg-transparent',
             'transition-[color,background-color,border-color] ' +
               'duration-120 ease-(--ease-out-quart)',
             'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
@@ -81,6 +96,9 @@ export function RatingBar({ onRate, disabled = false }: RatingBarProps) {
           ].join(' ')}
         >
           <span>{c.label}</span>
+          <span className="text-[10px] text-[color:var(--color-fg-subtle)]">
+            {c.caption}
+          </span>
           <span
             aria-hidden="true"
             className="font-mono text-[10px] text-[color:var(--color-fg-subtle)]"
