@@ -88,39 +88,51 @@ def test_run_code_task_returns_runresult_shape() -> None:
             assert key in t
 
 
+def test_real_solution_code_passes_with_representative_allowlist() -> None:
+    """Stop-#3 happy-path regression. Pre-fix the hook intercepted
+    pytest's internal `xml.etree.ElementTree` import (junitxml plugin)
+    and rejected it as a non-allowlisted module — blocking every
+    code_task. Post-fix the hook uses stack-frame inspection to only
+    enforce allowlist on imports originating from user code; pytest
+    internals + stdlib pass through unconditionally."""
+    h = _load_harness()
+    r = h.run_code_task(
+        user_code="def add(a, b):\n    return a + b\n",
+        hidden_tests=(
+            "from solution import add\n"
+            "def test_add(): assert add(2, 3) == 5\n"
+        ),
+        allowlist=["pytest"],  # representative card allowlist
+    )
+    assert r["ok"] is True, (
+        f"happy path must succeed; "
+        f"got stdout={r['stdout']!r} stderr={r['stderr']!r}"
+    )
+    assert len(r["tests"]) == 1
+    assert r["tests"][0]["passed"] is True
+
+
 def test_run_code_task_rejects_disallowed_import() -> None:
-    """T6.7 / ADR-019: user code importing a module outside its
-    allowlist (and outside the harness baseline) raises a clean
-    ImportError. PRD's canonical denied example is `socket`, but
-    under CPython pytest pulls `socket` into sys.modules transitively
-    so we use `smtplib` (not in CPython pytest baseline; exists in
-    Pyodide). T6.10 will exercise socket-rejection against real
-    Pyodide where socket is not auto-loaded."""
+    """T6.7 / ADR-019: static AST extraction flags imports outside
+    the allowlist with the documented error format. `smtplib` is the
+    test target — `socket` is the PRD canonical example but the AST
+    treats them identically; either would fail the gate."""
     h = _load_harness()
     r = h.run_code_task(
         user_code="import smtplib\ndef f(): return 1\n",
-        hidden_tests=(
-            "from solution import f\ndef test(): assert f() == 1\n"
-        ),
+        hidden_tests="from solution import f\ndef test(): assert f() == 1\n",
         allowlist=["math"],
     )
     assert r["ok"] is False
     combined = (r["stdout"] + r["stderr"]).lower()
-    assert "smtplib" in combined
-    assert "not allowed" in combined
-    # Per ADR-019 format: includes the user's allowlist verbatim.
+    assert "smtplib" in combined and "not allowed" in combined
     assert "allowed modules: math" in combined
 
 
 def test_run_code_task_allowlist_entry_imports_cleanly() -> None:
-    """Allowed modules per the task's allowlist pass through the
-    hook even if the harness baseline didn't include them."""
     h = _load_harness()
     r = h.run_code_task(
-        user_code=(
-            "import math\n"
-            "def double_pi(): return 2 * math.pi\n"
-        ),
+        user_code="import math\ndef double_pi(): return 2 * math.pi\n",
         hidden_tests=(
             "from solution import double_pi\n"
             "def test(): assert double_pi() > 6.28\n"

@@ -1,4 +1,4 @@
-"""Pytest harness for Pyodide-hosted code execution (T6.4).
+"""Pytest harness for Pyodide-hosted code execution (T6.4 / T6.7).
 
 Writes user_code + hidden_tests to a tmp dir, runs pytest, captures
 per-test outcomes into a JSON-serializable dict matching the TS
@@ -7,12 +7,11 @@ RunResult shape in `./types.ts`.
 The harness lives as a raw string asset that the worker imports via
 Vite's `?raw` query (`import harness from './pytest_harness.py?raw'`);
 worker.ts calls `pyodide.runPython(harness)` after
-`loadPackage('pytest')` (T6.3 → T6.4) to install `run_code_task` in
-the Pyodide globals. T6.5 wires the JS-side call from runner.ts.
+`loadPackage('pytest')` (T6.3 → T6.4). T6.5 wires the JS-side call
+from runner.ts via `pyodide.globals.get('run_code_task')`.
 
 Per ADR-021: hand-rolled JSON adapter via pytest_runtest_logreport
-hook — `pytest-json-report` is not bundled in Pyodide 0.26.4 and
-loading it via `micropip` would inflate cold-start.
+hook — `pytest-json-report` is not bundled in Pyodide 0.26.4.
 
 The module uses only portable stdlib so backend pytest can exercise
 the orchestration under CPython (tests/unit/test_pytest_harness.py).
@@ -21,7 +20,7 @@ T6.10 covers the real-Pyodide integration path.
 
 from __future__ import annotations
 
-import builtins
+import ast
 import contextlib
 import io
 import shutil
@@ -31,44 +30,61 @@ import time
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-# Allowlist import-hook (T6.7 / ADR-019). The hook is installed once
-# per worker lifetime — the baseline `sys.modules` snapshot at that
-# moment captures whatever pytest pulled in to start up, plus this
-# harness itself; per-run user code can additionally import from the
-# task's `allowlist`. `solution` / `test_solution` are always allowed
-# (the tmpdir module names the harness writes).
-_REAL_IMPORT = builtins.__import__
-_BASELINE_TOP: set[str] = set()
-_ALLOWED_TOP: set[str] = set()
-_HOOK_INSTALLED = False
+# T6.7 / ADR-019 (amended): allowlist enforcement is a static AST
+# extraction of imports from user_code + hidden_tests. We discover
+# every top-level package the user explicitly references and check
+# against the per-task allowlist BEFORE running pytest. A runtime
+# `builtins.__import__` hook was the first cut at stop #3 but failed
+# fatally — Python's internal bootstrap puts user-code frames in the
+# stack during module load, and pytest lazy-loads plugins like
+# junitxml that import xml.etree mid-run. Static AST avoids the
+# whole class of false positive: pytest internals, stdlib bootstrap,
+# and the harness itself are never subject to the gate.
+#
+# `solution` / `test_solution` are always allowed (the tmpdir module
+# names the harness writes). Dynamic imports (importlib.import_module
+# from a string-typed name) are not statically detectable and will
+# pass — see ADR-019 "revisit when".
 _ALWAYS_ALLOWED = frozenset({"solution", "test_solution"})
 
 
-def _gated_import(name, globals_=None, locals_=None, fromlist=(), level=0):
-    if level != 0:
-        return _REAL_IMPORT(name, globals_, locals_, fromlist, level)
-    top = name.split(".")[0]
-    if top in _BASELINE_TOP or top in _ALLOWED_TOP or top in _ALWAYS_ALLOWED:
-        return _REAL_IMPORT(name, globals_, locals_, fromlist, level)
-    user_list = ", ".join(sorted(_ALLOWED_TOP)) or "(none)"
-    raise ImportError(
-        f"'{name}' is not allowed in this code task. "
-        f"Allowed modules: {user_list}",
+def _extract_top_imports(code: str) -> set[str]:
+    """Return the set of top-level package names imported by `code`."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                names.add(alias.name.split(".")[0])
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module
+        ):
+            names.add(node.module.split(".")[0])
+    return names
+
+
+def _check_allowlist(
+    user_code: str, hidden_tests: str, allowlist: list,
+) -> str | None:
+    """Return a clean ImportError-style message if user code imports
+    something outside the allowlist; otherwise return None."""
+    requested = (
+        _extract_top_imports(user_code) | _extract_top_imports(hidden_tests)
     )
-
-
-def _install_import_hook() -> None:
-    global _HOOK_INSTALLED, _BASELINE_TOP
-    if _HOOK_INSTALLED:
-        return
-    # Pre-import pytest so its transitive deps land in baseline before
-    # the snapshot. Without this, the first run_code_task call would
-    # widen baseline mid-pytest and confuse the gate.
-    import pytest
-    del pytest
-    _BASELINE_TOP = {m.split(".")[0] for m in sys.modules}
-    builtins.__import__ = _gated_import
-    _HOOK_INSTALLED = True
+    allowed = set(allowlist) | _ALWAYS_ALLOWED
+    forbidden = sorted(requested - allowed)
+    if not forbidden:
+        return None
+    user_list = ", ".join(sorted(allowlist)) or "(none)"
+    return (
+        f"ImportError: '{forbidden[0]}' is not allowed in this code task. "
+        f"Allowed modules: {user_list}"
+    )
 
 
 def run_code_task(
@@ -78,13 +94,13 @@ def run_code_task(
 
     Returns a dict matching the TS `RunResult` shape:
       ok, tests[], stdout, stderr, timed_out, total_duration_ms.
-
-    `allowlist` gates user imports via the install-once
-    `_install_import_hook` (T6.7 / ADR-019).
     """
-    global _ALLOWED_TOP
-    _install_import_hook()
-    _ALLOWED_TOP = set(allowlist)
+    error = _check_allowlist(user_code, hidden_tests, allowlist)
+    if error is not None:
+        return {
+            "ok": False, "tests": [], "stdout": "", "stderr": error,
+            "timed_out": False, "total_duration_ms": 0,
+        }
 
     tmp = Path(tempfile.mkdtemp(prefix="pyprep_"))
     (tmp / "solution.py").write_text(user_code)
@@ -123,7 +139,6 @@ def run_code_task(
         with contextlib.suppress(ValueError):
             sys.path.remove(str(tmp))
         shutil.rmtree(tmp, ignore_errors=True)
-        _ALLOWED_TOP = set()  # reset per-task gate
 
     total_ms = int((time.monotonic() - t0) * 1000)
     ok = len(results) > 0 and all(r["passed"] for r in results)

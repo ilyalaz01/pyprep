@@ -649,9 +649,27 @@ attacker only what they could guess from the deployment hostname).
 
 ---
 
-### ADR-019: Allowlist enforcement via Python import hook
+### ADR-019: Allowlist enforcement via static AST extraction
 
-**Status:** Accepted (T6.7, 2026-05-11). Hook installed once per worker lifetime; baseline snapshot captures pytest's transitive imports so internal machinery passes through; per-task allowlist gates user-code imports. Error-message format verified end-to-end against the documented example.
+**Status:** Accepted (T6.7, 2026-05-11). Amended after stop #3 regression.
+
+**Implementation amendment (T6.7 fix-up):** The first T6.7 cut used a runtime `builtins.__import__` hook with a baseline-snapshot allowlist. It failed fatally at stop #3 — pytest lazy-loads the `junitxml` plugin during `pytest.main`, which imports `xml.etree.ElementTree` *after* the baseline snapshot. The hook rejected pytest's own infrastructure and every code_task failed at startup with `ImportError: 'xml.etree.ElementTree' is not allowed in this code task`. CPython and Pyodide also have different pre-import sets which made static allow-listing of stdlib internals unreliable from the harness side.
+
+Owner's first proposed fix was caller-frame inspection (walk the stack at `__import__` time and only enforce on user-code frames). On implementation, Python's bootstrap machinery puts user-code frames in the call stack during module load even for implicit imports the user did not write (e.g. `import builtins` while pytest is collecting `test_solution.py`), producing a different class of false positive.
+
+**Final implementation: static AST extraction.** At `run_code_task` entry, parse `user_code` and `hidden_tests` with `ast.parse`, walk the tree for `ast.Import` and `ast.ImportFrom` nodes, collect the set of top-level package names the user explicitly imports. Check against the per-task allowlist (plus `_ALWAYS_ALLOWED = {"solution", "test_solution"}` for the tmpdir module names). If anything is outside the allowed set, return a non-ok RunResult with the documented error message before pytest runs at all. No runtime `__import__` hook; pytest's internals and stdlib lazy-loads run untouched.
+
+**Why this works:**
+- User-facing semantics are unchanged: the user sees `ImportError: 'X' is not allowed in this code task. Allowed modules: ...` when they import outside the allowlist.
+- Pytest internals are never subject to the gate. No false positives on `xml.etree`, `faulthandler`, `builtins`, etc.
+- Implementation is portable across CPython (backend tests) and Pyodide (T6.10 runtime) — `ast` is stdlib everywhere.
+- Static analysis is faster: rejected tasks never spin up pytest.
+
+**Trade-offs:**
+- Dynamic imports via `importlib.import_module(name_string)` are not detectable by AST. A user can technically evade the gate. Accepted: Pyodide's WASM sandbox is the real safety boundary; the allowlist is a UX clarity affordance, not a security control (see PRD §3.1 visibility model). If a card legitimately needs dynamic import surfaces, the card's allowlist gets the entry.
+- A user could write `import socket` inside a syntactically-invalid file, the AST parse fails, the empty set is returned, and the import slips through. Subsequent pytest run would fail collection on the syntax error anyway — net: no silent acceptance.
+
+**Revisit when:** a card legitimately needs `importlib.import_module` evasion-equivalent semantics (then we add the runtime hook back, narrowly scoped via lineno/AST cross-check on user-code frames).
 
 **Context:** Each `code_task` card carries an `allowlist: string[]` of permitted modules (PRD §3 schema). The worker MUST reject imports outside that set with a clean, actionable error. Two enforcement layers are viable: (a) a Python import hook (`builtins.__import__` wrapper) that checks the allow-set *before* delegating to the real import; (b) a runtime audit (e.g. inspect `sys.modules` after `pytest.main()` returns and fail post-hoc).
 
