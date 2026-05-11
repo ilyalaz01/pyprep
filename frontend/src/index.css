@@ -49,19 +49,18 @@
   --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Type scale.
-     T5.10.5 Issue 3: bumped each tier by +2px (relative to 16px root)
-     after owner reported the app reading "as if a FullHD site is opened
-     on a 4K monitor" on a 1440p+ display. The biggest relative gain
-     goes to --text-xs (12 → 14px, the RatingBar caption / Card N of M
-     eyebrow / FormField helper-text tier — visibly cramped pre-bump).
-     Hierarchy spacing is preserved (+2px per step). */
-  --text-xs: 0.875rem;   /* was 0.75  (12 → 14) */
-  --text-sm: 1rem;       /* was 0.875 (14 → 16) */
-  --text-base: 1.125rem; /* was 1     (16 → 18) */
-  --text-lg: 1.25rem;    /* was 1.125 (18 → 20) */
-  --text-xl: 1.5rem;     /* was 1.375 (22 → 24) */
-  --text-2xl: 1.875rem;  /* was 1.75  (28 → 30) */
-  --text-3xl: 2.375rem;  /* was 2.25  (36 → 38) */
+     T5.10.5 round-2: re-bumped after owner reported the +2px/tier
+     round still felt small (perceived as ~+25% when ~+75% was wanted).
+     Body (--text-base) gets the biggest jump (+4px, 18 → 22) since
+     it carries every read surface; other tiers move proportionally.
+     Hierarchy preserved (each step still +2 to +4). */
+  --text-xs: 1rem;       /* was 0.875 (14 → 16) */
+  --text-sm: 1.125rem;   /* was 1     (16 → 18) */
+  --text-base: 1.375rem; /* was 1.125 (18 → 22) — primary read surface */
+  --text-lg: 1.5rem;     /* was 1.25  (20 → 24) */
+  --text-xl: 1.75rem;    /* was 1.5   (24 → 28) */
+  --text-2xl: 2.125rem;  /* was 1.875 (30 → 34) */
+  --text-3xl: 2.625rem;  /* was 2.375 (38 → 42) */
 }
 
 /* Light variant override — flips lightness, keeps hue + chroma. State
@@ -138,14 +137,14 @@ body {
 .prose h1 { display: none; }                  /* page header carries the title */
 .prose h2 {
   margin-top: 2.25rem;
-  font-size: 1.5rem;                            /* T5.10.5: 1.375 → 1.5 (matches new --text-xl) */
+  font-size: 1.75rem;                           /* T5.10.5 round-2: re-bumped to match new --text-xl (28px). */
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--color-fg);
 }
 .prose h3 {
   margin-top: 1.75rem;
-  font-size: 1.25rem;                           /* T5.10.5: 1.125 → 1.25 (matches new --text-lg). Without this bump, h3 would collide with body text size after the type-scale bump. */
+  font-size: 1.5rem;                            /* T5.10.5 round-2: re-bumped to match new --text-lg (24px). */
   font-weight: 600;
   color: var(--color-fg);
 }
@@ -191,7 +190,7 @@ body {
   padding: 1rem 1.25rem;
   border-radius: 6px;
   overflow-x: auto;
-  font-size: 1rem;                              /* T5.10.5: 0.875 → 1 (matches new --text-sm). */
+  font-size: 1.125rem;                          /* T5.10.5 round-2: re-bumped to match new --text-sm (18px). */
   line-height: 1.55;
 }
 .prose pre code {
@@ -214,7 +213,7 @@ body {
 .prose table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 1rem;                              /* T5.10.5: 0.9 → 1 (matches new --text-sm). */
+  font-size: 1.125rem;                          /* T5.10.5 round-2: re-bumped to match new --text-sm (18px). */
 }
 .prose th, .prose td {
   border: 1px solid var(--color-border);
