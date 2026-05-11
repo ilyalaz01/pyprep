@@ -581,3 +581,121 @@ spec, these don't belong in PyPrep's tone register.
 about the `🐍` Unicode codepoint), grant a per-line waiver via a NOTES
 amendment and update `_check_no_emoji` to skip it. Do not relax the
 rule globally.
+
+---
+
+## N031 — "Practice anyway" override after daily cap reached [Phase 7]
+
+**Phase:** 7 · **Date:** 2026-05-11 · **Status:** open
+
+Today, when the user has exhausted today's review-due cards and
+`daily_new_card_cap` has gating effect, `SessionPage`'s
+`EmptySession` shows "You're caught up. Come back tomorrow for new
+cards." (`frontend/src/pages/SessionPage.tsx:120`) and offers only
+"Back to module."
+
+Owner wants the option to override the cap and practice the same
+content again — useful for the day-of-interview "warm pass" use case
+and for the user who simply wants more reps. Surface as a secondary
+CTA on the caught-up empty state ("Practice anyway"), distinct from
+the "no cards authored" empty state which has no override.
+
+**Open question:** does "practice anyway" record Reviews against
+FSRS state? Two reasonable answers — (a) yes, FSRS handles dense
+revisits via decreasing-difficulty signals; (b) no, dry-run mode
+that doesn't perturb scheduling. Lean (a) per ADR-015 (FSRS owns
+scheduling); confirm with owner at Phase 7 entry.
+
+A `TODO(phase-7)` comment already sits on `EmptySession` in
+SessionPage.tsx pointing at this note.
+
+---
+
+## N032 — Review history view [Phase 7 / Phase 8]
+
+**Phase:** 7 or 8 · **Date:** 2026-05-11 · **Status:** open
+
+Owner wants a surface to browse past answered cards with their
+recorded answers — for re-study without going through the rating
+loop. Read-only counterpart to the active-session card flow.
+
+Phase placement depends on how the stats dashboard scopes:
+- If the Phase 7 stats UI grows a "drill-down on a sphere" view
+  that lists recent reviews, the history view rides that surface.
+- Otherwise it lands as a standalone Phase 8 page.
+
+Backend has the data (`Review` rows carry `card_id`, `rating`,
+`response_ms`, `created_at`); a paginated `GET /api/reviews` (or
+`/api/users/me/reviews`) is the natural API. Worth aggregating with
+N017 (time-spent) so a single endpoint serves both surfaces.
+
+---
+
+## N033 — Custom session from rated-hard cards across modules [Phase 7]
+
+**Phase:** 7 · **Date:** 2026-05-11 · **Status:** open
+
+"Exam mode": pull a session of all cards the user marked Again or
+Hard recently (across modules and spheres), regardless of FSRS due
+date. Stats-driven session generator. Useful as a focused weakness
+pass before an interview.
+
+Cross-references **N016** (per-tag stats aggregation) — both share
+the same need for cross-sphere aggregation queries on `Review` rows.
+The "rated-hard" filter is a thin layer on top of N016's machinery.
+
+API shape sketch: `POST /api/sessions { mode: 'custom',
+filter: { recent_ratings: [1, 2], window_days: 7, limit: N } }`.
+The existing custom-session params on `api.sessions.start` already
+include `difficulty_min/max` and `count` — the rating filter is the
+new field.
+
+---
+
+## N034 — MC option shuffle on AGAIN re-insertion [Phase 6 or 7]
+
+**Phase:** 6 or 7 · **Date:** 2026-05-11 · **Status:** open
+
+When a `MultipleChoiceCard` returns to the queue via AGAIN, the
+session today re-renders the same options in the same order. The
+user's recall is partly position memory ("the answer was the third
+one") rather than recognition.
+
+Fix: shuffle the options on the second presentation. Stable per
+mount via the ADR-016 `key={card.id}` rule won't help here because
+the same card key recurs — need to derive a per-attempt seed
+(e.g., `attempt_index` from `SessionQueue`) and use it to shuffle
+options deterministically. Tests pin: same card, two attempts,
+options render in different orders; no option duplicated/dropped;
+correct option still tracked.
+
+Small feature; can land in Phase 6 (polish pass on session
+mechanics) or as a sub-task of a Phase 7 stats-driven session
+upgrade — whichever phase boundary opens first.
+
+---
+
+## N035 — Mix vs grouping: card-type ordering within a session [discussion only]
+
+**Phase:** TBD · **Date:** 2026-05-11 · **Status:** discussion (defer)
+
+Owner question: should the five card types (Flip / MultipleChoice /
+FillIn / CodeTrap / CodeTask) intermix freely within a session, or
+group by complexity (simple recall first, code tasks last)?
+
+**Trade-off:**
+- **Intermix** (current behaviour, queue order = FSRS due-order):
+  better aligned with spaced-repetition interleaving research
+  (Bjork, Rohrer) — interleaving improves retention vs blocking
+  on identical task types. Higher cognitive load per session but
+  the load IS the learning signal.
+- **Grouped** (warm-up → ramp): lower cognitive load. Students
+  often *prefer* it. But the preference works against the
+  retention benefit; "feels easier" ≠ "learns better".
+
+**Defer decision** until we have ≥1 user generating real data.
+Worth A/B testing once the stats dashboard (Phase 7) can
+distinguish session-completion rate from retention curve. Until
+then: no change to queue construction.
+
+This note is a marker, not an action item — do not file a TODO.
