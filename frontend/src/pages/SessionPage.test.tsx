@@ -7,7 +7,9 @@ import { renderAt } from '../test/router-fixture'
 import * as useSessionModule from '../lib/use-session'
 import type { UseSessionResult } from '../lib/use-session'
 import { emptyDetails } from '../lib/session-details'
-import type { NextCard } from '../lib/types'
+import {
+  codeTaskRaw, codeTrapRaw, fillInRaw, flipRaw, mcRaw, next,
+} from '../test/card-fixtures'
 
 vi.mock('../lib/use-session', () => ({ useSession: vi.fn() }))
 vi.mock('../components/CodeMirrorEditor', () => ({
@@ -31,33 +33,6 @@ const mockSession = (over: Partial<UseSessionResult>): UseSessionResult => ({
   totalCardsInSphere: null, details: emptyDetails(),
   submitAnswer: vi.fn(), finish: vi.fn(),
   ...over,
-})
-
-const baseRaw = { topic: 't', difficulty: 1, tags: ['x'] }
-const flipRaw = { ...baseRaw, id: 'm1-s0-c1', type: 'flip',
-  question: 'Which built-in types are mutable?',
-  answer: 'list, dict, set, bytearray are mutable; rest are immutable.' }
-const mcRaw = { ...baseRaw, id: 'm1-s0-c5', type: 'multiple_choice',
-  question: 'Resolution order?',
-  options: ['L→G', 'L→E→G→B', 'B→G→L', 'L→M→C→B'],
-  correct_index: 1, option_explanations: ['', '', '', ''] }
-const codeTrapRaw = { ...baseRaw, id: 'm1-s0-c2', type: 'code_trap',
-  code_snippet: 'def f(x, items=[]):\n    items.append(x); return items',
-  question: 'What does f(1) print twice in a row?', correct_index: 1,
-  options: ['[1] [1]', '[1] [1, 2]', 'Error', '[]'],
-  explanation_md: 'The default is evaluated once at definition time and shared.' }
-const fillInRaw = { ...baseRaw, id: 'm1-s0-c3', type: 'fill_in',
-  code_snippet_with_blanks: 'def f(x, items=___):\n    pass',
-  accepted_answers: [['None']], explanation_md: 'Use None.' }
-const codeTaskRaw = { ...baseRaw, id: 'm1-s0-c4', type: 'code_task', difficulty: 3,
-  prompt_md: 'Implement make_counter(start=0) returning a closure.',
-  starter_code: 'def make_counter(start=0):\n    pass',
-  solution_code: 'def make_counter(start=0):\n    c = start\n    def step(): nonlocal c; c += 1; return c\n    return step',
-  tests: 'def test_counts_from_zero():\n    c = make_counter(); assert c() == 1', allowlist: ['pytest'] }
-const next = (raw: Record<string, unknown>): NextCard => ({
-  card_id: raw.id as string, type: raw.type as string,
-  topic: raw.topic as string, difficulty: raw.difficulty as number,
-  sphere_id: 'm1-s0', raw,
 })
 
 const SESSION_URL = '/modules/1/sphere/m1-s0/session'
@@ -132,11 +107,33 @@ describe('SessionPage — state machine', () => {
     expect(await screen.findByText(/card 1 of 3/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reveal/i })).toBeInTheDocument()
   })
+
+  // T5.12 keymap cheatsheet — visible during the session, hidden on summary.
+  test('keymap cheatsheet shows in active state, hides on finished state', async () => {
+    useSessionMock().mockReturnValue(mockSession({
+      status: 'active', currentCard: next(flipRaw), cardsTotal: 1,
+    }))
+    const { unmount } = renderAt(SESSION_URL)
+    const cs = await screen.findByTestId('keymap-cheatsheet')
+    expect(cs.textContent).toMatch(/⎵.*reveal.*1234.*rate.*esc.*exit/i)
+    unmount()
+    useSessionMock().mockReturnValue(mockSession({
+      status: 'finished', cardsTotal: 1, details: {
+        cardsReviewed: 1, elapsedMs: 1000, accuracy: null, nextDueBuckets: [],
+        ratings: { again: 0, hard: 0, good: 1, easy: 0 },
+      },
+    }))
+    renderAt(SESSION_URL)
+    await screen.findByTestId('session-summary')
+    expect(screen.queryByTestId('keymap-cheatsheet')).not.toBeInTheDocument()
+  })
 })
 
 describe('SessionPage — CardRenderer dispatches per type', () => {
   test.each([
-    ['flip', flipRaw, /reveal/i],
+    // T5.12: cheatsheet contains the word "reveal" too, so flip's marker
+    // pins the question text instead of the button label.
+    ['flip', flipRaw, /which built-in types/i],
     ['multiple_choice', mcRaw, /L→E→G→B/],
     ['code_trap', codeTrapRaw, /f\(1\) print twice/i],
     ['fill_in', fillInRaw, /check/i],
