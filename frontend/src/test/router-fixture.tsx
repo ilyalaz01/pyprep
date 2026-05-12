@@ -21,6 +21,7 @@ import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
 import { ModuleDetailPage } from '../pages/ModuleDetailPage'
 import { SessionPage } from '../pages/SessionPage'
+import { StatsPage } from '../pages/StatsPage'
 
 interface LoginSearch { from?: string }
 
@@ -71,10 +72,15 @@ export function buildRouter(initialUrl: string) {
     path: '/modules/$moduleId/sphere/$sphereId/session',
     component: SessionPage,
   })
+  const stats = createRoute({
+    getParentRoute: () => authed,
+    path: '/stats',
+    component: StatsPage,
+  })
   const tree = root.addChildren([
     indexRoute,
     login,
-    authed.addChildren([home, moduleDetail, lesson, session]),
+    authed.addChildren([home, moduleDetail, lesson, session, stats]),
   ])
   return createRouter({
     routeTree: tree,

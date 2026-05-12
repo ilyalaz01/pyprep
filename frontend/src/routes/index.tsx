@@ -26,6 +26,7 @@ import { LessonPage } from '../pages/LessonPage'
 import { LoginPage } from '../pages/LoginPage'
 import { ModuleDetailPage } from '../pages/ModuleDetailPage'
 import { SessionPage } from '../pages/SessionPage'
+import { StatsPage } from '../pages/StatsPage'
 
 interface LoginSearch {
   from?: string
@@ -92,11 +93,18 @@ const sessionRoute = createRoute({
   component: SessionPage,
 })
 
+// P7.T7.4 — /stats route. Auth-gated through _auth parent.
+const statsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/stats',
+  component: StatsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   authedLayoutRoute.addChildren([
-    homeRoute, moduleDetailRoute, lessonRoute, sessionRoute,
+    homeRoute, moduleDetailRoute, lessonRoute, sessionRoute, statsRoute,
   ]),
 ])
 
