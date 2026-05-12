@@ -36,15 +36,9 @@ function defaultFactory(): Worker {
 export function bootPyodideWorker(
   factory: WorkerFactory = defaultFactory,
 ): Promise<void> {
-  // T6.3 stop-#2 retry diagnostic — proves the call reached the loader.
-  console.info('[pyprep:pyodide] bootPyodideWorker called')
-  if (_readyPromise) {
-    // React 19 Strict Mode runs useEffect twice in dev; the cached
-    // promise should be returned on the second call. Loud log so the
-    // singleton-vs-double-create question is unambiguous.
-    console.info('[pyprep:pyodide] returning cached worker (singleton hit)')
-    return _readyPromise
-  }
+  // React 19 Strict Mode runs useEffect twice in dev; the cached
+  // promise is returned on the second call.
+  if (_readyPromise) return _readyPromise
   const t0 = performance.now()
   _worker = factory()
   _readyPromise = new Promise<void>((resolve, reject) => {
@@ -55,8 +49,10 @@ export function bootPyodideWorker(
       const now = performance.now()
       const d = e.data
       if (d.type === 'diagnostic') {
-        // Surface worker-internal trace to main-thread console.
-        console.info('[pyprep:pyodide-worker]', d.message)
+        // Worker-internal trace; dev-only surface.
+        if (import.meta.env.DEV) {
+          console.info('[pyprep:pyodide-worker]', d.message)
+        }
         return
       }
       if (d.type === 'pyodide-ready') {
@@ -74,11 +70,12 @@ export function bootPyodideWorker(
           harness_init_ms: pytestAt === null ? null : now - pytestAt,
           total_ms: now - t0,
         }
-        // Stop #2 instrumentation (T6.3). Owner reads these three
-        // numbers off DevTools console under cold-cache / warm-cache /
-        // slow-3G conditions. One-shot per SPA session (boot is a
-        // singleton per ADR-018), so production noise is bounded.
-        console.info('[pyprep:pyodide] cold-start', _metrics)
+        // Cold-start metrics: dev-only console surface; CI gate reads
+        // the same numbers via getColdStartMetrics(). Singleton boot
+        // (ADR-018) bounds the noise to one emission per SPA session.
+        if (import.meta.env.DEV) {
+          console.info('[pyprep:pyodide] cold-start', _metrics)
+        }
         resolve()
       } else if (d.type === 'error') {
         reject(new Error(d.message ?? 'pyodide worker error'))
