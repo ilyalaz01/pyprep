@@ -85,8 +85,19 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: node scripts/check-bundle-size.mjs
 
-  cold-start:
-    name: cold-start (Pyodide boot + first run within ADR-020 budget)
+  playwright:
+    # Runs both Playwright specs via `pnpm exec playwright test`
+    # (testMatch in playwright.config.ts picks up both files):
+    #   - cold-start.spec.ts (T6.11 + P6.5/P1-3) — gates cold-start
+    #     boot+first-execute ≤ 12 s (ADR-020) and NFR-SBX-2 hot path
+    #     ≤ 1.5 s per subsequent run.
+    #   - pyodide-e2e.spec.ts (P6.5/P1-2) — drives the T6.10 + T6.12
+    #     matrices and FR-SBX-6 against the real Pyodide WASM runtime.
+    #     Resolves N037 (Pyodide-actual coverage gap).
+    # One job rather than two because the dominant cost is the
+    # chromium install (~90 s) + the pnpm build (~30 s); splitting
+    # would double that for ~60 s of separate-spec savings.
+    name: playwright (cold-start + pyodide-e2e)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -115,5 +126,5 @@ jobs:
       - name: Build (production dist for vite preview)
         run: pnpm build
 
-      - name: Cold-start gate (T6.11; threshold 12s per ADR-020 amendment)
+      - name: Playwright gates (cold-start ADR-020 + NFR-SBX-2 + pyodide-e2e P6.5/P1-2)
         run: pnpm exec playwright test
