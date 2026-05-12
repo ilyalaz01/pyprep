@@ -33,6 +33,12 @@ export default defineConfig({
     command: 'pnpm preview --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    // 180s (was 60s) — GitHub Actions runners are reliably slower than
+    // local on cold disk cache + slower CPU; Playwright's 60s default
+    // for `vite preview` to bind 127.0.0.1:4173 was tripping in CI.
+    // If 180s ever proves tight, the right next step is adding startup
+    // logging to vite preview to see where the time is going, not
+    // bumping higher blind.
+    timeout: 180_000,
   },
 })
