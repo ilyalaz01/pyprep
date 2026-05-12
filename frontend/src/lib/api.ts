@@ -13,9 +13,9 @@
  */
 import { call } from './http'
 import type {
-  AccessToken, AnswerResult, Config, Health, Lesson, MockPrompt,
-  ModuleDetail, ModulesList, NextCard, Overview, ReviewQueue, Session,
-  SessionMode, SessionSummary, User, Weakness,
+  AccessToken, AnswerResult, Config, Daily, Health, Lesson, MockPrompt,
+  ModuleDetail, ModulesList, NextCard, Overview, PerModule, ReviewQueue,
+  Session, SessionMode, SessionSummary, User, Weakness,
 } from './types'
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -73,6 +73,10 @@ export const api = {
   stats: {
     me: () => call<Overview>('/api/stats/me'),
     weakness: (n = 3) => call<Weakness>(`/api/stats/me/weakness${qs({ n })}`),
+    // P7.T7.2 — both wrappers over existing SDK methods. `days` cap is
+    // 90 per the handler-side Query(le=90); UI default is 30.
+    perModule: () => call<PerModule>('/api/stats/me/per-module'),
+    daily: (days = 30) => call<Daily>(`/api/stats/me/daily${qs({ days })}`),
   },
 
   mock: {

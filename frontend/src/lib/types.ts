@@ -116,6 +116,22 @@ export interface SphereStats {
 }
 export interface Weakness { top: SphereStats[] }
 
+// P7.T7.2 — per-module + 30-day rolling chart.
+export interface ModuleStats {
+  module_id: number
+  reviews_total: number
+  retention: number
+}
+export interface PerModule { modules: ModuleStats[] }
+
+export interface DailyStat {
+  // ISO date string (YYYY-MM-DD); Pydantic serializes dt.date this way.
+  date: string
+  reviews_total: number
+  retention: number
+}
+export interface Daily { days: DailyStat[] }
+
 // --- Mock prompt --------------------------------------------------------
 export interface MockPrompt {
   text: string

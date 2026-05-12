@@ -144,13 +144,9 @@ describe('api.sessions', () => {
   })
 })
 
-describe('api.stats', () => {
-  test('me hits /api/stats/me', async () => {
-    mockJson({ reviews_total: 0, retention: 0, streak: 0, xp: 0, orphan_review_count: 0 })
-    await api.stats.me()
-    expect(lastCall().url).toContain('/api/stats/me')
-  })
-})
+// api.stats endpoint tests are siblings in api.stats.test.ts to keep
+// this file under the 150-LOC gate after P7.T7.2 added per-module +
+// daily endpoints.
 
 describe('api.mock', () => {
   test('prompt POSTs /api/mock/prompt with body', async () => {
