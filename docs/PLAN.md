@@ -748,6 +748,34 @@ Owner's first proposed fix was caller-frame inspection (walk the stack at `__imp
 
 ---
 
+### ADR-022: Bundle-size pre-push gate at 2 MB raw / 600 KB gzip
+
+**Status:** Accepted (T6.11, 2026-05-12).
+
+**Context:** Phase 5 (T5.9) added shiki for lesson code-block highlighting via `import('shiki')`. The default `shiki` entry exposes every bundled language as a separately-chunked dynamic import; Vite's lazy graph kept all 70+ language chunks in `dist/` even though only `python` / `json` / `bash` / `text` were reachable from app code. Measured at T6.11 entry: 10.15 MB raw / 2.06 MB gzipped on `frontend/dist`. No prior gate caught it.
+
+**Decision:** Add `scripts/check-bundle-size.mjs` to the pre-push hook (gate count 8 → 9). Sums raw + gzipped bytes across all shippable assets (`.js .css .html .svg .wasm .json`) in `frontend/dist/`. Hard fail above either ceiling:
+- Raw: 2 MB (2,097,152 bytes).
+- Gzip: 600 KB (614,400 bytes).
+- Today's bundle (post-T6.11.0 shiki polish): 1.29 MB raw / 390 KB gzipped — comfortable headroom for Phase 7 stats UI.
+
+**T6.11.0 polish (precondition):** `frontend/src/lib/shiki.ts` rewritten to use `shiki/core` + explicit `shiki/langs/python.mjs` etc. dynamic imports + `createJavaScriptRegexEngine` (skips 280 KB onig.wasm). File header documented the intended ~150 KB footprint long before this gate existed — implementation just didn't deliver. Gate codifies the promise.
+
+**Rationale:**
+- Gate runs on the actual built artifact, not a tooling proxy (rollup-plugin-visualizer would have caught the shiki bloat at Phase 5 if anyone had looked at the report — gates run, dashboards don't).
+- Counting shippable extensions only (not woff2 fonts, which are streamed from a separate cache origin and don't compete for the first-paint budget) avoids gate-flips from font-subset additions in unrelated commits.
+- Single pair of ceilings rather than per-file. Per-file budgets force premature code-splitting policy.
+- Ceiling is **measured against today + headroom**, not the PRD performance target. Pre-push gates protect against regression; aspirational targets belong in Lighthouse runs.
+
+**Trade-offs:**
+- Raising the ceiling requires editing this ADR + the script in the same commit. Friction is the point — silent bundle creep is the failure mode.
+- Pre-push runs `pnpm build` once more (~3 s incremental); annoying for tight push loops. Acceptable: a green build is the only way to certify the gate locally before CI sees it.
+- Doesn't catch over-fetch from CDNs (Pyodide assets, shiki theme JSON if we ever load them at runtime). Cold-start gate (also T6.11) catches that.
+
+**Revisit when:** Phase 7+ stats charting library (Recharts? Visx? Owner deferred per Phase 7 scope note) lands and legitimately pushes near the ceiling, OR Phase 10 self-hosted-Pyodide work moves heavy assets into `dist/`.
+
+---
+
 ## 7. API Surface (preview)
 
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:
