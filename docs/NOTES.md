@@ -704,7 +704,7 @@ This note is a marker, not an action item — do not file a TODO.
 
 ## N036 — DevTools network throttle does not propagate to Web Worker fetch [Phase 6 T6.11]
 
-**Phase:** 6 (stop #2 findings) · **Date:** 2026-05-11 · **Status:** open
+**Phase:** 6 (stop #2 findings) · **Date:** 2026-05-11 · **Status:** resolved 2026-05-12 (T6.11)
 
 During Phase 6 stop #2 verification of the Pyodide cold-start path,
 the owner's three measurement runs produced:
@@ -744,6 +744,15 @@ ADR-020 currently caps CI at 8s. Owner-machine cold-cache at 9.7s
 puts that threshold under pressure already; the gate threshold will
 be re-decided at T6.11 once we have CI-runner numbers. Tentative
 revision: 12s (2s headroom over observed cold worst case).
+
+**T6.11 resolution (2026-05-12):** Implemented option 1 — Playwright
+`context.route('https://cdn.jsdelivr.net/**', ...)` adds an 80 ms
+hop to every Pyodide CDN request. The route handler operates at the
+network stack level (below the worker boundary), so the throttle
+DOES propagate to fetches issued from inside the DedicatedWorker —
+exactly the property we needed and that DevTools throttle lacked.
+Spec: `frontend/test/cold-start.spec.ts`. ADR-020 amended: threshold
+8s → 12s with rationale.
 
 ---
 

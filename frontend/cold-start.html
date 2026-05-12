@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PyPrep cold-start fixture (CI-only — T6.11)</title>
+  </head>
+  <body>
+    <!--
+      Standalone Vite entry built into dist/cold-start.html. CI-only —
+      `frontend/test/cold-start.spec.ts` navigates here, awaits the
+      `window.__pyprepColdStart` promise, asserts the total_ms metric
+      vs the ADR-020 budget. Not linked from the SPA; safe to ship
+      since it just exercises the same worker the app would.
+    -->
+    <script type="module" src="/src/cold-start-fixture.ts"></script>
+  </body>
+</html>
