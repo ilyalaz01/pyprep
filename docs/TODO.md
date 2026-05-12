@@ -222,14 +222,31 @@
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T6.1 | `frontend/src/pyodide/loader.ts` — lazy load Pyodide on first code-task route. | Loaded once per session, reused | ⬜ |
-| T6.2 | `frontend/src/pyodide/runner.ts` — Web Worker wrapper, postMessage API. | Main thread non-blocked | ⬜ |
-| T6.3 | `frontend/src/pyodide/pytest_runner.ts` — load `pytest` in Pyodide, run with provided harness. | Returns structured results | ⬜ |
-| T6.4 | Wire `<CodeTaskCard />` to runner: user code + harness → run → display per-test pass/fail with diff for failures. | All Module 1 code tasks pass when answered correctly | ⬜ |
-| T6.5 | Failure UX: show stderr, highlight failing assert with line. | Manual QA | ⬜ |
-| T6.6 | Allowlist of safe modules in harness (stdlib subset). | Documented | ⬜ |
+| T6.0 | Pre-flight ADRs: worker lifecycle (ADR-018), CDN sourcing + cold-start budget (ADR-020), pytest sourcing + adapter (ADR-021). | Filed in PLAN.md | ✅ |
+| T6.1 | `frontend/src/pyodide/loader.ts` — singleton worker boot with cold-start metrics. | Loaded once per session, reused | ✅ (T6.1–T6.3 commits; stop-#2 handshake diagnostics + stop-#3 self-bootstrap fix landed mid-task) |
+| T6.2 | `frontend/src/pyodide/worker.ts` — top-level self-bootstrapping worker (Pyodide load + pytest load + harness install + 'ready' emit). | Main thread non-blocked | ✅ |
+| T6.3 | Cold-start instrumentation (`getColdStartMetrics()`); stop-#2 owner verification under cold/warm caches. | 3 segment timings + total reported | ✅ |
+| T6.4 | `pytest_harness.py` — Python-side runner + worker install via `?raw`. | Returns structured RunResult | ✅ |
+| T6.5 | `runner.ts` worker-driven path + namespace reset (FR-SBX-6). | Per-task isolation by construction | ✅ |
+| T6.6 | `<CodeTaskCard />` wired to runner; per-test pass/fail UI; RatingBar after success. | All Module 1 code tasks pass when answered correctly | ✅ |
+| T6.7 | Allowlist enforcement — static AST extraction (ADR-019 amended after stop #3). | Hidden denied imports return clean ImportError | ✅ |
+| T6.8 | Timeout + worker-crash recovery via `invalidateWorker`. | `while True: pass` recovers cleanly | ✅ |
+| T6.9 | Input validation per PRD §7.1 (≤50KB code, timeout bounds). | Oversized paste rejected before worker boot | ✅ |
+| T6.10 | Module 1 code_task smoke matrix (CPython-side, parametrized). | Every authored solution_code passes its own tests | ✅ (gap to Pyodide-actual filed as N037 → Phase 10) |
+| T6.11.0 | Shiki core-bundle polish — drop full-bundle lang pull. | Bundle 10.15 MB → 1.29 MB raw | ✅ |
+| T6.11 | Pre-push bundle-size gate (ADR-022) + CI-only cold-start gate (ADR-020 amended 8s→12s; N036 resolved). | Pre-push gates 8 → 9; cold-start runs in CI | ✅ |
+| T6.12 | Allowlist smoke matrix (parameterized over 7 cards × allow/deny). | Both sides of the gate verified per-card | ✅ |
 
-**Phase 6 exit gate:** Module 1 code tasks all run correctly in-browser. Lighthouse perf ≥ 80 on session route.
+**Phase 6 exit gate:** Module 1 code tasks all run correctly in-browser. Lighthouse perf ≥ 80 on session route. **Phase 6 code-closed 2026-05-12.** Owner-led stops #1–#4 all verified green (smoke / fail-path / allowlist / timeout / input-validation). Lighthouse pass deferred to owner's exit-gate session; not a code blocker.
+
+**Phase 6 close summary (2026-05-12):**
+- 13 task IDs across 13 commits (T6.0 pre-flight ADRs through T6.12 matrix).
+- New ADRs filed: ADR-018, ADR-019, ADR-020, ADR-021, ADR-022 (5).
+- NOTES filed in-phase: N036 (DevTools throttle vs Worker fetch — resolved T6.11), N037 (Pyodide-actual coverage gap — Phase 10).
+- Pre-push gates: 8 → 9 (bundle size added; cold-start CI-only).
+- Test counts at close: vitest ~280 (unchanged), pytest 299 (+15 from T6.12 matrix), Playwright 1 (cold-start CI gate).
+- Bundle: 10.15 MB raw / 2.06 MB gzip → 1.29 MB raw / 391 KB gzip (post-T6.11.0).
+- Cold-start ceiling: 12s (CI gate, ADR-020 amended).
 
 ---
 

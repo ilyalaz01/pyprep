@@ -6,6 +6,7 @@ import {
   parseCard, type CodeTaskCard as CodeTaskCardT,
 } from '../lib/card-types'
 import { expectAnswerHidden } from '../test/expect-answer-hidden'
+import { codeTaskDetailedRaw } from '../test/card-fixtures'
 import { CodeTaskCard } from './CodeTaskCard'
 import * as runner from '../pyodide/runner'
 import * as loader from '../pyodide/loader'
@@ -17,22 +18,14 @@ vi.mock('../pyodide/loader', () => ({
   invalidateWorker: vi.fn(),
 }))
 
-// T6.5 wired runner.ts to a real worker dispatch. UI tests don't
-// drive the worker; they verify the Results panel + RatingBar
-// integration. Mock runCodeTask to return a stable non-ok RunResult
-// whose stderr matches the legacy "Pyodide not yet wired" copy the
-// existing assertions look for.
+// T6.5 wired runner.ts to a real worker. UI tests stub the runner
+// so Results panel + RatingBar can be exercised without a worker.
 vi.mock('../pyodide/runner', () => ({
-  runCodeTask: vi.fn(() =>
-    Promise.resolve({
-      ok: false,
-      tests: [],
-      stdout: '',
-      stderr: 'Pyodide not yet wired — stub runner result',
-      timed_out: false,
-      total_duration_ms: 0,
-    }),
-  ),
+  runCodeTask: vi.fn(() => Promise.resolve({
+    ok: false, tests: [], stdout: '',
+    stderr: 'Pyodide not yet wired — stub runner result',
+    timed_out: false, total_duration_ms: 0,
+  })),
 }))
 
 vi.mock('./CodeMirrorEditor', () => ({
@@ -56,18 +49,7 @@ vi.mock('./CodeMirrorEditor', () => ({
   ),
 }))
 
-const fixture = {
-  id: 'm1-s0-c14', type: 'code_task',
-  topic: 'Implement make_counter using nonlocal',
-  difficulty: 3, tags: ['closures'],
-  prompt_md: 'Implement `make_counter(start=0)` returning a function that increments by 1 and returns the new value on each call.',
-  starter_code: 'def make_counter(start=0):\n    # your code here\n    pass\n',
-  solution_code: 'def make_counter(start=0):\n    c = start\n    def step():\n        nonlocal c; c += 1; return c\n    return step\n',
-  tests: 'def test_counts_from_zero():\n    c = make_counter()\n    assert c() == 1\n    assert c() == 2\n',
-  allowlist: ['pytest'],
-} as const
-
-const card = parseCard(fixture) as CodeTaskCardT
+const card = parseCard(codeTaskDetailedRaw) as CodeTaskCardT
 
 describe('CodeTaskCard — pre-run masking', () => {
   test('prompt_md, starter_code, and Run tests button are visible', () => {
@@ -172,7 +154,7 @@ test('T6.3 lazy Pyodide boot: mount calls bootPyodideWorker (FR-SBX-1)', () => {
 describe('CodeTaskCard — ADR-016 per-card React isolation', () => {
   test('swapping card.id resets the editor to the new starter_code', () => {
     const cardB = parseCard({
-      ...fixture,
+      ...codeTaskDetailedRaw,
       id: 'm1-s0-c99',
       starter_code: 'def make_counter(start=0):\n    raise NotImplementedError\n',
     }) as CodeTaskCardT
