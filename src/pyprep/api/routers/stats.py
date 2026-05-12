@@ -1,6 +1,12 @@
-"""/api/stats — overview + weakness top-N. Auth-gated, per-user."""
+"""/api/stats — overview + weakness top-N + per-module + 30-day chart.
+
+Auth-gated, per-user. T7.2 added the per-module and daily endpoints as
+thin wrappers over StatsService methods that have existed since Phase 2.
+"""
 
 from __future__ import annotations
+
+import datetime as dt
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -8,7 +14,7 @@ from pydantic import BaseModel
 from pyprep.api.deps import get_content_index, get_current_user, get_stats_service
 from pyprep.sdk.auth import User
 from pyprep.sdk.content_loader import ContentIndex
-from pyprep.sdk.stats import StatsService
+from pyprep.sdk.stats import DailyStat, ModuleStats, StatsService
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -34,6 +40,26 @@ class SphereStatsResponse(BaseModel):
 
 class WeaknessResponse(BaseModel):
     top: list[SphereStatsResponse]
+
+
+class ModuleStatsResponse(BaseModel):
+    module_id: int
+    reviews_total: int
+    retention: float
+
+
+class PerModuleResponse(BaseModel):
+    modules: list[ModuleStatsResponse]
+
+
+class DailyStatResponse(BaseModel):
+    date: dt.date
+    reviews_total: int
+    retention: float
+
+
+class DailyResponse(BaseModel):
+    days: list[DailyStatResponse]
 
 
 @router.get("/me", response_model=OverviewResponse)
@@ -72,4 +98,42 @@ def _to_sphere(s, index: ContentIndex) -> SphereStatsResponse:  # type: ignore[n
         retention=s.retention,
         weakness=s.weakness,
         lesson_title=title,
+    )
+
+
+@router.get("/me/per-module", response_model=PerModuleResponse)
+def get_per_module(
+    user: User = Depends(get_current_user),
+    stats: StatsService = Depends(get_stats_service),
+) -> PerModuleResponse:
+    rows = stats.per_module(user.id)
+    return PerModuleResponse(modules=[_to_module(m) for m in rows])
+
+
+# P7.T7.2: 90-day ceiling on `days` is the practical upper bound — UI
+# renders a 30-day chart by default; broader windows are a power-user
+# affordance, not a primary surface. Tighten or extend without an ADR.
+@router.get("/me/daily", response_model=DailyResponse)
+def get_daily(
+    days: int = Query(default=30, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    stats: StatsService = Depends(get_stats_service),
+) -> DailyResponse:
+    rows = stats.daily_chart(user.id, days=days)
+    return DailyResponse(days=[_to_daily(d) for d in rows])
+
+
+def _to_module(m: ModuleStats) -> ModuleStatsResponse:
+    return ModuleStatsResponse(
+        module_id=m.module_id,
+        reviews_total=m.reviews_total,
+        retention=m.retention,
+    )
+
+
+def _to_daily(d: DailyStat) -> DailyStatResponse:
+    return DailyStatResponse(
+        date=d.date,
+        reviews_total=d.reviews_total,
+        retention=d.retention,
     )

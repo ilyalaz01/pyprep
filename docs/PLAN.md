@@ -881,6 +881,8 @@ POST   /api/sessions/{session_id}/finish   # auth: Bearer    idempotent
 GET    /api/review/queue                   # auth: Bearer    today's FSRS queue
 GET    /api/stats/me                       # auth: Bearer    full stats
 GET    /api/stats/me/weakness              # auth: Bearer    top-N weakest spheres
+GET    /api/stats/me/per-module            # auth: Bearer    {modules: [{module_id, reviews_total, retention}]} (T7.2)
+GET    /api/stats/me/daily                 # auth: Bearer    ?days=30 (1-90); {days: [{date, reviews_total, retention}]} (T7.2)
 
 POST   /api/mock/prompt                    # auth: Bearer    body: {modules, spheres, ...}
                                            #                 returns: {text, cards_used, ...}
