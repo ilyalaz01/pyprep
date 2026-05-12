@@ -278,17 +278,37 @@
 
 ## Phase 7 — Stats & Weakness Dashboard
 
-**Goal:** Per-module / per-sphere stats. Weakness ranking. No Duolingo shaming.
+**Goal:** `/stats` page with overview, per-module breakdown, 30-day chart, and weakness widget. Plus the N031 "Practice anyway" override and N034 MC option shuffle. No Duolingo shaming.
+
+The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / streak / chart) was expanded after the Phase 7 planning chat to 10 tasks: backend extension, route scaffold, four UI components, two backlog roll-ins, and the close. Three stop points held: time-invested signal validation, anti-Duolingo compliance on rendered tiles, chart aesthetic gate. One bug discovered at stop point #2 (rating-as-proxy accuracy) triggered an out-of-band fix chain (3 commits) that landed before T7.6 started.
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T7.1 | `/stats` route: overview cards (total reviews, retention, streak, XP). | Numbers match SDK output | ⬜ |
-| T7.2 | Per-module breakdown table with retention bars. | Renders | ⬜ |
-| T7.3 | Top-3-weakness widget: ranked spheres with "Practice now" CTA. | Sorted by weakness score | ⬜ |
-| T7.4 | Streak counter: gentle copy, no guilt animations on break. | Manual review | ⬜ |
-| T7.5 | Time-invested chart (per day, last 30 days). | Renders | ⬜ |
+| T7.1 | Extend `Overview.total_seconds` via session wall-clock (ADR-027). `StatsRepository.list_finished_sessions` + service aggregation + `OverviewResponse` + frontend type. **Owner stop point #1** validated the wall-clock signal against a real session before any UI built on it. | Owner sees honest "time invested" matching their internal sense | ✅ (`fb0c6f4`) |
+| T7.2 | `GET /api/stats/me/per-module` + `GET /api/stats/me/daily?days=30`. Thin wrappers over existing SDK methods (`per_module`, `daily_chart`). | New endpoints documented in PLAN §7; 6 integration tests | ✅ (`6d1d764`) |
+| T7.3 | Frontend types + api client (`api.stats.perModule`, `api.stats.daily`). Split `api.stats.test.ts` from `api.test.ts` to stay under 150-LOC gate. | api.test 14 + api.stats.test 6 tests; tsc green | ✅ (`7ff007b`) |
+| T7.4 | `/stats` route scaffold + 4-branch state machine (loading skeleton, error+Retry, empty calm "Stats appear here..." CTA, ready placeholder). Empty state was owner-clarified must-design — anti-AI-slop discipline pinned by test guards. | 6 state-machine tests + route registered prod+fixture | ✅ (`d8cb546`) |
+| T7.5 | `<OverviewCards />` — 5 tiles initially (reviews, accuracy, time, streak, XP). Reduced to 4 at P7-fix (Accuracy tile dropped per N040). Anti-Duolingo discipline pinned by 25+ regression guards. **Owner stop point #2** validated tile framing. | Owner browser pass on neutral streak + restrained XP framing | ✅ (`63ac65b`) |
+| P7-fix | Stop point #2 surfaced misleading 100% accuracy. SessionSummary accuracy → in-memory outcome; Accuracy tile dropped from /stats; N040 filed. Outcome plumbing through `onRate(rating, outcome?)` across 4 objective card types. **Owner stop point #2 retry** validated honest 20% accuracy on a session with deliberate wrong-answer + Good rating. | Per-session accuracy honest; aggregate slot empty pending N040 backend work | ✅ (`ddc65a1`, `b7a5820`, `b641e48`) |
+| T7.6 | `<PerModuleTable />` — one row per PyPrep module, ModulesList aesthetic (divide-y, dimmed inert rows, hairline retention bar). | 9 tests; loading/error/empty/ready + anti-Duolingo guards | ✅ (`ea75a6b`) |
+| T7.7 | `<DailyChart />` — hand-rolled SVG, 30 bars + per-7-day labels + tooltips + 1px baseline for zero days (ADR-025). Reversibility clause in ADR for fallback to Recharts. **Owner stop point #3** validated chart aesthetic — ADR-025 unamended. | 11 tests including anti-Duolingo (monochrome bars, no shame copy); ADR-025 Accepted | ✅ (`fb07438`) |
+| T7.8 | Extract `<WeaknessWidget />` from `HomeDashboard`. Shared between /home (gated ≥10 reviews) and /stats (always shown). | 12 widget standalone tests + 10 existing HomeDashboard tests unchanged | ✅ (`7a1fc90`) |
+| T7.9 | N031 "Practice anyway" override + ADR-026. `build_queue` gains `override_daily_cap` param; `StartRequest` field; SessionPage reads `?practice=true` query param. Reviews persist normally per ADR-026 (FSRS absorbs dense revisits). | 3 SDK + 2 API + 4 frontend tests; ADR-026 Accepted | ✅ (`5436cd2`) |
+| T7.10 | N034 MC option shuffle on AGAIN. `SessionQueue.attemptCount(cardId)` increments on AGAIN re-insertion; `seeded-shuffle.ts` deterministic Fisher-Yates; MC + CodeTrap shuffle on attempt>0. Correctness preserved via `data-original-index` mapping. | 4 new shuffle tests; correct-answer-after-shuffle pinned | ✅ (`916068d`) |
+| T7.11 | Phase 7 close — TODO.md summary, CI green, owner push of full chain. | All 9 pre-push gates green; vitest 47 files / 431 tests; pytest 305+ | ✅ (this entry) |
 
-**Phase 7 exit gate:** Stats numerically match raw review history sampled manually.
+**Phase 7 exit gate:** Stats surface complete end-to-end. /stats renders OverviewCards + PerModuleTable + DailyChart + WeaknessWidget with honest framing throughout. N031 (Practice anyway) and N034 (MC shuffle) closed. N040 (cross-session accuracy backend) deferred with clear restoration path.
+
+**Phase 7 close summary (2026-05-12):**
+- 11 task IDs across 14 commits (T7.1-T7.10 + 3-commit P7-fix chain + T7.11 close).
+- New ADRs filed: ADR-025 (hand-rolled SVG chart, reversible), ADR-026 (Practice anyway persists Reviews), ADR-027 (time = wall-clock not Σ response_ms). 3 total.
+- NOTES resolved: N031 (Practice anyway), N034 (MC shuffle). N040 filed (cross-session accuracy needs backend outcome persistence — Phase 10 candidate).
+- Pre-push gates: 9 (unchanged). CI Playwright: 2 specs (unchanged).
+- Test counts at close: vitest 37 → 47 files (+10), 343 → 431 tests (+88). Pytest 300 → 305 (+5: SDK override tests + API integration). Both Playwright specs unchanged.
+- Bundle: 1.29 MB raw / 391.9 KB gzip → still 1.29 MB raw / ~395 KB gzip (Phase 7 added ~5-10 KB gzip across components). Comfortable headroom against 600 KB ceiling.
+- Three owner stop points held: signal validation, anti-Duolingo compliance, chart aesthetic. One bug surfaced (rating-as-proxy accuracy) and was unwound cleanly via the P7-fix chain.
+- File-size discipline: 5 sibling-test splits across the phase to keep individual files under 150 code-LOC (`api.stats.test.ts`, `use-session-details.test.ts`, `SessionPage.practice.test.tsx`, plus the P6.5-era `use-session-error-recovery.test.ts`).
+- **Owner action:** push the full Phase 7 chain (commits `fb0c6f4` through `916068d` + this close commit). CI exercises both Playwright specs; bundle gate stays green; no schema changes.
 
 ---
 
