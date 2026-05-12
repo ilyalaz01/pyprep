@@ -778,6 +778,40 @@ Owner's first proposed fix was caller-frame inspection (walk the stack at `__imp
 
 ---
 
+### ADR-024: Mid-session error recovery — Retry restarts the session, queue not persisted
+
+**Status:** Accepted (Phase 6.5, P1-4).
+
+**Context:** Audit P1-4 surfaced that any mid-session HTTP failure (POST /api/sessions/{id}/answer, GET /api/sessions/{id}/next, POST /api/sessions/{id}/finish) drops the user into `status='error'`. The SessionPage renders an error Banner + a Retry button; clicking Retry bumps `retryKey` on the parent which remounts SessionRunner and instantiates a fresh `useSession` — which immediately calls POST /api/sessions for a brand-new session. The in-memory queue (held in `queueRef.current` inside the failed `useSession` instance) is discarded.
+
+This was implemented this way under ADR-010 (client-owned progression) + ADR-017 (no MVP resumption) but never written down as its own decision. The audit reading was correct: "a transient /answer 500 on the 8th card loses the queue."
+
+**Decision:** Keep the current behaviour for MVP-1. Retry = fresh session. The queue is not persisted to localStorage and the server has no resume endpoint.
+
+**Rationale:**
+- **The data that matters is already safe.** Reviews for previously-rated cards are persisted server-side as soon as their /answer 200's. FSRS scheduling, retention math, and weakness ranking all read off `Review` rows. Only the in-flight queue *ordering* of the remaining cards is lost — and the FSRS scheduler will re-derive a comparable queue on the next mode='mixed' fetch (already-rated cards are filtered out by their updated next_due_at).
+- **Single-user MVP-1 cost of the loss is small.** Default queue is 20 cards; mid-session failure means re-deriving the remainder. Worst case, owner loses 5-15 cards of ordering, not progress.
+- **Resumption is non-trivial.** Two implementation paths exist:
+  - *Client-side* — persist `queueRef` + `cacheRef` + `sessionIdRef` to localStorage and rehydrate on remount. Cheap in code, but blurs ADR-010's "the SPA owns the loop" with "the SPA *and* its localStorage own the loop"; introduces stale-tab edge cases.
+  - *Server-side* — new `GET /api/sessions/{id}/state` endpoint returning the remaining queue and per-card status. Cleanly fits ADR-010 but is Phase 7+ work and touches the schema.
+- Neither path is justified for an MVP that hasn't yet shipped to a second user.
+
+**Trade-offs (accepted explicitly):**
+- A transient network blip mid-session means the user starts over (with their per-card Reviews preserved). User-visible cost = re-sorting cards they already saw in a different order.
+- No "queue checkpoint" — if the failure is on card N, there is no UI affordance to re-attempt card N specifically. Retry → fresh queue.
+- The in-flight session row stays open on the server (PR-API-3 session lifecycle: no automatic timeout); abandoned sessions accumulate as orphaned `Session` rows with `ended_at IS NULL`. Acceptable for single-user; revisit if multi-user.
+
+**Test contract (pinned 2026-05-12):**
+- `frontend/src/lib/use-session.test.ts` → `useSession — mid-session error recovery (P1-4 / ADR-024)`. Three tests pin: /answer 500 → status=error · /next 500 → status=error · re-rendered useSession after unmount fires a second POST /api/sessions (i.e. fresh-session contract).
+- `frontend/src/pages/SessionPage.test.tsx` already covered the UI surface in Phase 5 (`error shows a Banner alert + Retry button` · `Retry remounts SessionRunner — useSession is called again`).
+- A regression that introduces resumption (queue persistence, /state endpoint) MUST flip the third test deliberately, with this ADR superseded.
+
+**Revisit when:**
+- Multi-user deployment lands and abandoned sessions accumulate (orphan-row cost becomes real).
+- An owner-reported pattern of "I lost my session" becomes visible — at that point either the client-side localStorage path or the server-side `/state` endpoint is justified.
+
+---
+
 ## 7. API Surface (preview)
 
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:
