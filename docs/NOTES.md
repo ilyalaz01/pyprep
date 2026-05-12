@@ -915,3 +915,81 @@ post. Modules 2–4 not yet authored (Phase 9). Total estimated audit
 surface ≈ 25 code_task cards once all modules ship; doing the
 Module 1 sweep now means Phase 9 authoring has the checklist ready.
 
+---
+
+## N040 — Cross-session accuracy requires outcome persistence [Phase 10 / post-MVP]
+
+**Phase:** 7 (P7-fix, stop point #2) · **Date:** 2026-05-12 · **Status:** open
+
+The /stats "Accuracy" tile rendered "100% (5 of 5 objective cards)"
+during owner stop point #2, on a session where the owner had
+deliberately answered some MC cards wrong but rated them Good ("knew
+it but misclicked"). The pre-fix implementation used `rating >= Good`
+as a correctness proxy. Per ADR-015 the user is *explicitly allowed*
+to rate Good on a wrong answer — the metric was structurally lying.
+
+**What's resolved (frontend, P7-fix commit ddc65a1):**
+- `useSession.submitAnswer` signature widened to `(rating, outcome?)`.
+- All 4 objective card renderers (MultipleChoice / CodeTrap / FillIn /
+  CodeTask) compute outcome locally and pipe it through:
+  - MC / CodeTrap: `chosen === card.correct_index`
+  - FillIn: `every blank matched accepted_answers`
+  - CodeTask: `result.ok` (all hidden tests passed)
+- `objectiveLastOutcomeRef: Map<string, boolean>` replaces the
+  previous rating-as-proxy ref.
+- `buildDetails` computes accuracy from outcomes.
+- **SessionSummary's per-session accuracy is now correct** — the
+  renderer has the answer data in memory; aggregation is honest.
+
+**What's NOT resolved (server-side):**
+- `POST /api/sessions/{id}/answer` accepts `{card_id, rating,
+  response_ms, idempotency_key}` — no outcome field. The Reviews row
+  schema has no `outcome` column.
+- Therefore **cross-session accuracy** (the aggregate "your accuracy
+  across all sessions" tile) is structurally unavailable.
+
+**Why the Accuracy tile was dropped from OverviewCards (P7-fix commit
+b7a5820)** rather than backfilled with another metric: a placeholder
+would obscure the real gap. Empty space is honest. The slot stays
+empty until backend storage lands or until a clearly-honest
+alternative emerges.
+
+**Resolution path (if/when cross-session accuracy becomes priority):**
+1. **ADR-015 amendment** — declare that outcome IS now a persisted
+   signal alongside rating. Note the trust-model implication: outcome
+   is still client-reported (ADR-010 / ADR-013), but the server
+   stores what the client says without redaction.
+2. **Schema migration** — add `outcome: bool | None` to the `reviews`
+   table. Nullable because flip cards have no outcome. Backfill
+   existing rows as NULL.
+3. **`AnswerRequest` schema** — add optional `outcome: bool | None`
+   field. Frontend already computes and pipes — wire the field into
+   `api.sessions.answer` body.
+4. **`StatsService` per-sphere / per-module / overview** — add an
+   `accuracy_outcomes` aggregation: `count(outcome=true) /
+   count(outcome IS NOT NULL)`. Distinct from the rating-based
+   `retention` metric — both stay in the API, UI picks the honest one.
+5. **Restore the Accuracy tile** on OverviewCards (revert the data-tile
+   regression guard in OverviewCards.test.tsx), wire to the new
+   aggregate.
+
+**Effort estimate:** ≈ 1 day of focused work. Alembic migration is a
+small surface; SDK + API + frontend are mechanical given the
+frontend plumbing is already in place. Test surface adds ~6 cases
+(SDK aggregation, integration on new field, frontend tile re-add).
+
+**Timing recommendation:** **Phase 10 polish** — wait until the rest
+of MVP-1 has shipped and the owner has used it long enough to know
+whether the aggregate accuracy number is genuinely missed. Pre-flight
+intuition: probably yes (it's a natural progress signal), but adding
+a column to `reviews` is the kind of backend-shape decision worth
+sitting with before committing.
+
+**Until then:**
+- The OverviewCards 4-tile shape is locked by `OverviewCards.test`
+  asserting the Accuracy tile is absent. Any future re-add MUST flip
+  that test deliberately and reference this note in the commit.
+- SessionSummary's per-session accuracy stays — that's the honest
+  number the user sees during the loop. Aggregate accuracy is the
+  cross-session signal that needs the backend work.
+
