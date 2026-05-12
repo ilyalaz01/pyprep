@@ -12,9 +12,10 @@
  * self-rates with the RatingBar — correctness is shown, intent is
  * the user's to declare.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultipleChoiceCard as MCCardT } from '../lib/card-types'
+import { seededIndices } from '../lib/seeded-shuffle'
 import type { Rating } from '../lib/session-queue'
 import { RatingBar } from './RatingBar'
 
@@ -23,24 +24,40 @@ interface Props {
   // P7-fix: outcome = chosen-index === correct_index. Decoupled from
   // rating per ADR-015 (user may rate Good on a wrong answer).
   onRate: (rating: Rating, outcome?: boolean) => void
+  // P7.T7.10 / N034: 0-based AGAIN re-presentation counter from
+  // SessionQueue. attemptIndex > 0 → shuffle options deterministically
+  // so position memory doesn't carry across re-presentations.
+  attemptIndex?: number
 }
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 
-export function MultipleChoiceCard({ card, onRate }: Props) {
+export function MultipleChoiceCard({ card, onRate, attemptIndex = 0 }: Props) {
   const [chosen, setChosen] = useState<number | null>(null)
   const submitted = chosen !== null
   // P6.5/P2-2: focus first option on mount so keyboard users can
   // arrow/tab through choices without an intermediate hop.
   const firstOptionRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { firstOptionRef.current?.focus() }, [])
+  // P7.T7.10 / N034: identity order on first attempt; shuffled per
+  // (card.id, attemptIndex) on re-presentations. `displayOrder[pos]`
+  // maps display position → original option index, so correctness
+  // checks still use `card.correct_index`.
+  const displayOrder = useMemo(
+    () => attemptIndex > 0
+      ? seededIndices(card.options.length, `${card.id}#${attemptIndex}`)
+      : card.options.map((_, i) => i),
+    [card.id, card.options, attemptIndex],
+  )
   return (
     <div className="flex flex-col gap-5">
       <p className="text-lg leading-relaxed text-[color:var(--color-fg)]">
         {card.question}
       </p>
       <ul className="flex flex-col gap-2" role="list">
-        {card.options.map((opt, i) => {
+        {displayOrder.map((origIndex, pos) => {
+          const opt = card.options[origIndex]!
+          const i = origIndex
           const isCorrect = submitted && i === card.correct_index
           const isWrongChoice =
             submitted && i === chosen && i !== card.correct_index
@@ -54,9 +71,10 @@ export function MultipleChoiceCard({ card, onRate }: Props) {
           return (
             <li key={i}>
               <button
-                ref={i === 0 ? firstOptionRef : undefined}
+                ref={pos === 0 ? firstOptionRef : undefined}
                 type="button"
                 data-mc-option=""
+                data-original-index={i}
                 data-chosen={submitted ? String(i === chosen) : undefined}
                 data-correct={submitted ? String(isCorrect) : undefined}
                 disabled={submitted}
@@ -80,7 +98,7 @@ export function MultipleChoiceCard({ card, onRate }: Props) {
                     'text-[color:var(--color-fg-subtle)]',
                   ].join(' ')}
                 >
-                  {LETTERS[i]}
+                  {LETTERS[pos]}
                 </span>
                 <span className="flex-1 text-sm text-[color:var(--color-fg)]">
                   {opt}

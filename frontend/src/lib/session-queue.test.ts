@@ -93,4 +93,27 @@ describe('session-queue', () => {
     expect(snap).toEqual(['c1', 'c2'])
     expect(q.remaining()).toEqual(['c2'])
   })
+
+  // P7.T7.10 / N034: attempt count tracking for MC shuffle.
+  test('attemptCount starts at 0 and increments on AGAIN re-insertion', () => {
+    const q = createSessionQueue(['c1', 'c2'])
+    expect(q.attemptCount('c1')).toBe(0)
+    q.recordRating('c1', 1) // AGAIN → re-inserted at end
+    expect(q.attemptCount('c1')).toBe(1)
+    // Walk through c2, come back to c1, AGAIN again → attempt 2.
+    q.recordRating('c2', 3)
+    q.recordRating('c1', 1)
+    expect(q.attemptCount('c1')).toBe(2)
+  })
+
+  test('attemptCount stays at 0 when card is rated Good/Hard/Easy first time', () => {
+    const q = createSessionQueue(['c1'])
+    q.recordRating('c1', 3)
+    expect(q.attemptCount('c1')).toBe(0)
+  })
+
+  test('attemptCount is 0 for unknown cards (no entry yet)', () => {
+    const q = createSessionQueue(['c1'])
+    expect(q.attemptCount('unknown')).toBe(0)
+  })
 })

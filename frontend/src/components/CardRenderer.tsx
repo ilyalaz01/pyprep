@@ -26,16 +26,20 @@ interface CardRendererProps {
   // P7-fix: outcome (objective-card correctness) flows through cards
   // → CardRenderer → SessionPage → useSession.submitAnswer.
   onRate: (rating: Rating, outcome?: boolean) => void
+  // P7.T7.10 / N034: 0 on first presentation; SessionQueue bumps it
+  // on each AGAIN re-insertion. Only MC + CodeTrap consume it (option
+  // shuffle); other card types ignore it.
+  attemptIndex?: number
 }
 
-export function CardRenderer({ card, onRate }: CardRendererProps) {
+export function CardRenderer({ card, onRate, attemptIndex = 0 }: CardRendererProps) {
   switch (card.type) {
     case 'flip':
       return <FlipCard key={card.id} card={card} onRate={onRate} />
     case 'multiple_choice':
-      return <MultipleChoiceCard key={card.id} card={card} onRate={onRate} />
+      return <MultipleChoiceCard key={card.id} card={card} onRate={onRate} attemptIndex={attemptIndex} />
     case 'code_trap':
-      return <CodeTrapCard key={card.id} card={card} onRate={onRate} />
+      return <CodeTrapCard key={card.id} card={card} onRate={onRate} attemptIndex={attemptIndex} />
     case 'fill_in':
       return <FillInCard key={card.id} card={card} onRate={onRate} />
     case 'code_task':

@@ -34,6 +34,7 @@ const stubMe = () => vi.stubGlobal('fetch', vi.fn(async (input: string | URL | R
 }))
 const mockSession = (over: Partial<UseSessionResult>): UseSessionResult => ({
   status: 'loading', error: null, currentCard: null,
+  currentAttemptIndex: 0,
   cardsTotal: 0, completedCount: 0, summary: null,
   totalCardsInSphere: null, details: emptyDetails(),
   submitAnswer: vi.fn(), finish: vi.fn(),

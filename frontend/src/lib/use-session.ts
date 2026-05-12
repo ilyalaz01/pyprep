@@ -26,6 +26,11 @@ export interface UseSessionResult {
   status: SessionStatus
   error: Error | null
   currentCard: NextCard | null
+  // P7.T7.10 / N034: how many times the current card has been
+  // presented so far. 0 on first show; bumped to 1+ after AGAIN
+  // re-insertions. MC + CodeTrap renderers use it to shuffle options
+  // deterministically per attempt.
+  currentAttemptIndex: number
   cardsTotal: number
   completedCount: number
   summary: SessionSummary | null
@@ -60,6 +65,9 @@ export function useSession(params: UseSessionParams): UseSessionResult {
   const [status, setStatus] = useState<SessionStatus>('loading')
   const [error, setErr] = useState<Error | null>(null)
   const [currentCard, setCurrentCard] = useState<NextCard | null>(null)
+  // P7.T7.10 / N034: attemptIndex for the current card, captured at
+  // present() time so render-phase reads don't reach into queueRef.
+  const [currentAttemptIndex, setCurrentAttemptIndex] = useState(0)
   const [cardsTotal, setCardsTotal] = useState(0)
   const [completedCount, setCompletedCount] = useState(0)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
@@ -100,7 +108,8 @@ export function useSession(params: UseSessionParams): UseSessionResult {
     const now = Date.now()
     if (!sessionStartedAtRef.current) sessionStartedAtRef.current = now
     mountedAtRef.current = now
-    setCurrentCard(card); setStatus('active')
+    // attemptCount read in callback phase (not render) per react-hooks/refs.
+    setCurrentAttemptIndex(queueRef.current?.attemptCount(card.card_id) ?? 0); setCurrentCard(card); setStatus('active')
   }, [])
 
   // Finalize the session — called both when the queue empties (auto)
@@ -151,7 +160,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
         await advance()
       } catch (e) { fail(e) }
     })()
-  }, [advance, fail, params.limit, params.mode, params.moduleId, params.sphereId])
+  }, [advance, fail, params.limit, params.mode, params.moduleId, params.sphereId, params.overrideDailyCap])
 
   const submitAnswer = useCallback(
     async (rating: Rating, outcome?: boolean) => {
@@ -191,7 +200,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
   }, [finalize, status])
 
   return {
-    status, error, currentCard, cardsTotal, completedCount, summary,
-    totalCardsInSphere, details, submitAnswer, finish,
+    status, error, currentCard, currentAttemptIndex, cardsTotal,
+    completedCount, summary, totalCardsInSphere, details, submitAnswer, finish,
   }
 }

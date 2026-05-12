@@ -116,7 +116,11 @@ function SessionBody({
     <CardShell card={card} position={{
       index: session.completedCount + 1, total: session.cardsTotal,
     }}>
-      <CardRenderer card={card} onRate={session.submitAnswer} />
+      <CardRenderer
+        card={card}
+        onRate={session.submitAnswer}
+        attemptIndex={session.currentAttemptIndex}
+      />
     </CardShell>
   )
 }

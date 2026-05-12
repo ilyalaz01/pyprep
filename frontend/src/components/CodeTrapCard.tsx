@@ -18,11 +18,12 @@
  * the "three similar lines is better than a premature abstraction"
  * line). Extract <MCQuestion> only if a third consumer appears.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { CodeTrapCard as CodeTrapCardT } from '../lib/card-types'
+import { seededIndices } from '../lib/seeded-shuffle'
 import type { Rating } from '../lib/session-queue'
 import { RatingBar } from './RatingBar'
 import { ShikiCodeBlock } from './ShikiCodeBlock'
@@ -31,16 +32,26 @@ interface Props {
   card: CodeTrapCardT
   // P7-fix: outcome = chosen-index === correct_index.
   onRate: (rating: Rating, outcome?: boolean) => void
+  // P7.T7.10 / N034: same shape as MultipleChoiceCard — shuffle
+  // options on AGAIN re-presentation.
+  attemptIndex?: number
 }
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 
-export function CodeTrapCard({ card, onRate }: Props) {
+export function CodeTrapCard({ card, onRate, attemptIndex = 0 }: Props) {
   const [chosen, setChosen] = useState<number | null>(null)
   const submitted = chosen !== null
   // P6.5/P2-2: focus first option on mount (see MultipleChoiceCard).
   const firstOptionRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { firstOptionRef.current?.focus() }, [])
+  // P7.T7.10 / N034: shuffle on attemptIndex > 0; identity otherwise.
+  const displayOrder = useMemo(
+    () => attemptIndex > 0
+      ? seededIndices(card.options.length, `${card.id}#${attemptIndex}`)
+      : card.options.map((_, i) => i),
+    [card.id, card.options, attemptIndex],
+  )
   return (
     <div className="flex flex-col gap-5">
       <ShikiCodeBlock code={card.code_snippet} lang="python" />
@@ -48,7 +59,9 @@ export function CodeTrapCard({ card, onRate }: Props) {
         {card.question}
       </p>
       <ul className="flex flex-col gap-2" role="list">
-        {card.options.map((opt, i) => {
+        {displayOrder.map((origIndex, pos) => {
+          const opt = card.options[origIndex]!
+          const i = origIndex
           const isCorrect = submitted && i === card.correct_index
           const isWrongChoice =
             submitted && i === chosen && i !== card.correct_index
@@ -62,9 +75,10 @@ export function CodeTrapCard({ card, onRate }: Props) {
           return (
             <li key={i}>
               <button
-                ref={i === 0 ? firstOptionRef : undefined}
+                ref={pos === 0 ? firstOptionRef : undefined}
                 type="button"
                 data-mc-option=""
+                data-original-index={i}
                 data-chosen={submitted ? String(i === chosen) : undefined}
                 data-correct={submitted ? String(isCorrect) : undefined}
                 disabled={submitted}
@@ -88,7 +102,7 @@ export function CodeTrapCard({ card, onRate }: Props) {
                     'text-[color:var(--color-fg-subtle)]',
                   ].join(' ')}
                 >
-                  {LETTERS[i]}
+                  {LETTERS[pos]}
                 </span>
                 <span
                   className="flex-1 font-mono text-sm whitespace-pre-wrap text-[color:var(--color-fg)]"

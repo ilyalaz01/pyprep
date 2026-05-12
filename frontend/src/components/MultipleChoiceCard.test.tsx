@@ -136,6 +136,34 @@ describe('MultipleChoiceCard — post-submit reveal', () => {
     expect(onRate).toHaveBeenCalledExactlyOnceWith(3, false)
   })
 
+  // P7.T7.10 / N034: option shuffle on AGAIN re-presentation.
+  test.each([[0, true], [1, false]] as const)(
+    'attemptIndex=%i: identity-order=%s',
+    (attemptIndex, isIdentity) => {
+      const { container } = render(
+        <MultipleChoiceCard card={card} onRate={vi.fn()} attemptIndex={attemptIndex} />,
+      )
+      const origIndices = Array.from(container.querySelectorAll('[data-mc-option]'))
+        .map((b) => Number((b as HTMLElement).dataset.originalIndex))
+      expect([...origIndices].sort()).toEqual([0, 1, 2, 3])
+      if (isIdentity) expect(origIndices).toEqual([0, 1, 2, 3])
+      else expect(origIndices).not.toEqual([0, 1, 2, 3])
+    },
+  )
+
+  test('shuffled correct answer still resolves to original correct_index', async () => {
+    const onRate = vi.fn()
+    const { container } = render(
+      <MultipleChoiceCard card={card} onRate={onRate} attemptIndex={1} />,
+    )
+    const correctButton = container.querySelector(
+      `[data-mc-option][data-original-index="${card.correct_index}"]`,
+    ) as HTMLButtonElement
+    await userEvent.click(correctButton)
+    await userEvent.click(screen.getByRole('button', { name: /good/i }))
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(3, true)
+  })
+
   test('correct submission still requires self-rating (no auto-advance per ADR-015)', async () => {
     const onRate = vi.fn()
     render(<MultipleChoiceCard card={card} onRate={onRate} />)

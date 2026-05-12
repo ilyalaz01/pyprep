@@ -22,6 +22,14 @@ export interface SessionQueue {
   /** Distinct cards that have left the queue permanently (non-Again ratings). */
   completedCount(): number
   /**
+   * P7.T7.10 / N034: how many times this card has been the current
+   * card so far (0-based; the first time the user sees a card, this
+   * returns 0; after one AGAIN, the next presentation returns 1).
+   * Drives deterministic option shuffling in MC + CodeTrap renderers
+   * so a re-presented card doesn't reward position memory.
+   */
+  attemptCount(cardId: string): number
+  /**
    * Apply a rating to the current card. Again moves it to the end;
    * any other rating drops it. Throws if `cardId` is not the current
    * card or the queue is empty.
@@ -35,6 +43,9 @@ export function createSessionQueue(initial: readonly string[]): SessionQueue {
   const queue: string[] = [...initial]
   const original = initial.length
   let completed = 0
+  // P7.T7.10 / N034: increments on AGAIN re-insertion so renderers
+  // can derive a per-attempt shuffle seed. Keyed by card_id.
+  const attempts = new Map<string, number>()
 
   return {
     current: () => queue[0] ?? null,
@@ -42,6 +53,7 @@ export function createSessionQueue(initial: readonly string[]): SessionQueue {
     size: () => queue.length,
     originalSize: () => original,
     completedCount: () => completed,
+    attemptCount: (cardId) => attempts.get(cardId) ?? 0,
     remaining: () => Object.freeze([...queue]),
     recordRating(cardId, rating) {
       if (queue.length === 0) {
@@ -54,7 +66,10 @@ export function createSessionQueue(initial: readonly string[]): SessionQueue {
       }
       const head = queue.shift() as string
       if (rating === 1) {
+        // AGAIN: re-insert at end and bump attempt count so the
+        // next presentation of this card sees attemptCount + 1.
         queue.push(head)
+        attempts.set(head, (attempts.get(head) ?? 0) + 1)
       } else {
         completed += 1
       }
