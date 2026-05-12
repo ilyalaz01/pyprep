@@ -13,6 +13,26 @@ import * as loader from '../pyodide/loader'
 vi.mock('../pyodide/loader', () => ({
   bootPyodideWorker: vi.fn(() => Promise.resolve()),
   getColdStartMetrics: vi.fn(),
+  getPyodideWorker: vi.fn(() => null),
+  invalidateWorker: vi.fn(),
+}))
+
+// T6.5 wired runner.ts to a real worker dispatch. UI tests don't
+// drive the worker; they verify the Results panel + RatingBar
+// integration. Mock runCodeTask to return a stable non-ok RunResult
+// whose stderr matches the legacy "Pyodide not yet wired" copy the
+// existing assertions look for.
+vi.mock('../pyodide/runner', () => ({
+  runCodeTask: vi.fn(() =>
+    Promise.resolve({
+      ok: false,
+      tests: [],
+      stdout: '',
+      stderr: 'Pyodide not yet wired — stub runner result',
+      timed_out: false,
+      total_duration_ms: 0,
+    }),
+  ),
 }))
 
 vi.mock('./CodeMirrorEditor', () => ({

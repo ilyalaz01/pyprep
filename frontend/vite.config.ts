@@ -28,5 +28,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./src/test/setup.ts'],
+    // `test/` is the Playwright tree (T6.11 cold-start gate). Vitest
+    // only picks up unit specs under `src/`.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['test/**', 'node_modules', 'dist'],
   },
 })

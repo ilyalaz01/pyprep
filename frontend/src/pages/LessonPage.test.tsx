@@ -70,10 +70,16 @@ def add(a, b):
 describe('LessonPage — happy path', () => {
   test('renders headings, inline code, and a fenced code block', async () => {
     mockLesson(() => lessonOk(SAMPLE_MD))
-    renderAt('/modules/1/lesson/m1-s0')
+    const { container } = renderAt('/modules/1/lesson/m1-s0')
     expect(await screen.findByRole('heading', { name: /a heading/i })).toBeInTheDocument()
     expect(screen.getByText('inline code')).toBeInTheDocument()
-    expect(screen.getByText(/def add\(a, b\):/)).toBeInTheDocument()
+    // Shiki (post-T6.11.0 core-bundle polish) tokenizes synchronously
+    // enough that `def add(a, b):` is split across multiple highlight
+    // spans before this assertion runs; the contiguous-text matcher
+    // can't see it. Walk the fenced block instead and reassemble.
+    const codeBlock = container.querySelector('pre [data-lang="python"], [data-lang="python"]')
+    expect(codeBlock).not.toBeNull()
+    expect(codeBlock?.textContent).toMatch(/def add\(a, b\):/)
   })
 
   test('H1 reads from lesson_title (not the technical sphere_id)', async () => {
