@@ -34,6 +34,7 @@ async def test_stats_overview_for_new_user_returns_zeros(
     assert body["streak"] == 0
     assert body["xp"] == 0.0
     assert body["orphan_review_count"] == 0
+    assert body["total_seconds"] == 0  # P7.T7.1 / ADR-027
     assert "retention" in body
 
 

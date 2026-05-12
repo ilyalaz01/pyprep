@@ -102,6 +102,10 @@ export interface Overview {
   streak: number
   xp: number
   orphan_review_count: number
+  // P7.T7.1 / ADR-027: wall-clock session time, integer seconds.
+  // Sum of (ended_at - started_at) across finished sessions; abandoned
+  // sessions (ended_at IS NULL) excluded.
+  total_seconds: number
 }
 export interface SphereStats {
   sphere_id: string

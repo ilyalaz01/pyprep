@@ -19,6 +19,8 @@ class OverviewResponse(BaseModel):
     streak: int
     xp: float
     orphan_review_count: int
+    # P7.T7.1 / ADR-027: wall-clock session time, integer seconds.
+    total_seconds: int
 
 
 class SphereStatsResponse(BaseModel):
@@ -46,6 +48,7 @@ def get_overview(
         streak=o.streak,
         xp=o.xp,
         orphan_review_count=o.orphan_review_count,
+        total_seconds=o.total_seconds,
     )
 
 

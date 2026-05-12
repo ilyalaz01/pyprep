@@ -15,10 +15,31 @@ import pytest
 from pyprep.sdk.cards import CardService
 from pyprep.sdk.content_loader import Card, ContentIndex, SphereContent
 from pyprep.sdk.scheduler import Rating
-from pyprep.sdk.sessions import Review
+from pyprep.sdk.sessions import Review, Session
 from pyprep.sdk.stats import StatsService
 
 T0 = dt.datetime(2026, 5, 8, 12, 0, tzinfo=dt.UTC)
+
+
+def _session(
+    sid: str,
+    *,
+    started_at: dt.datetime = T0,
+    duration_s: int = 120,
+    abandoned: bool = False,
+    user: str = "u1",
+) -> Session:
+    """P7.T7.1: helper for ADR-027 wall-clock fixtures."""
+    return Session(
+        id=sid,
+        user_id=user,
+        mode="review",
+        started_at=started_at,
+        ended_at=None if abandoned else started_at + dt.timedelta(seconds=duration_s),
+        queue=(),
+        cards_total=0,
+        cards_correct=0,
+    )
 
 
 def _card(cid: str, sphere: str, *, module: int = 1, difficulty: int = 2) -> Card:
@@ -80,11 +101,25 @@ def cards() -> CardService:
 
 
 class _FakeStatsRepo:
-    def __init__(self, rows: list[Review] | None = None) -> None:
+    def __init__(
+        self,
+        rows: list[Review] | None = None,
+        sessions: list[Session] | None = None,
+    ) -> None:
         self.rows: list[Review] = list(rows or [])
+        self.sessions: list[Session] = list(sessions or [])
 
     def list_reviews(self, user_id: str) -> list[Review]:
         return [r for r in self.rows if r.user_id == user_id]
+
+    def list_finished_sessions(self, user_id: str) -> list[Session]:
+        # P7.T7.1 / ADR-027 contract: abandoned sessions (ended_at is None)
+        # are excluded by the repo, not the service. Mirrors the SQL
+        # `WHERE ended_at IS NOT NULL` filter on the real impl.
+        return [
+            s for s in self.sessions
+            if s.user_id == user_id and s.ended_at is not None
+        ]
 
 
 def test_overview_with_no_reviews(cards: CardService) -> None:
@@ -97,6 +132,79 @@ def test_overview_with_no_reviews(cards: CardService) -> None:
     assert o.streak == 0
     assert o.xp == 0.0
     assert o.orphan_review_count == 0
+    assert o.total_seconds == 0  # ADR-027
+
+
+# ---------------------------------------------------------------------------
+# P7.T7.1 / ADR-027 — time-invested = session wall-clock, not Σ response_ms.
+# Tests pin the new contract; abandoned sessions excluded; integer seconds.
+# ---------------------------------------------------------------------------
+
+
+def test_total_seconds_sums_finished_session_wall_clock(cards: CardService) -> None:
+    repo = _FakeStatsRepo(
+        sessions=[
+            _session("s1", duration_s=120),  # 2 min
+            _session("s2", duration_s=300, started_at=T0 + dt.timedelta(hours=2)),  # 5 min
+            _session("s3", duration_s=45, started_at=T0 + dt.timedelta(days=1)),  # 45 s
+        ],
+    )
+
+    o = StatsService(reviews=repo, cards=cards).overview("u1")
+
+    assert o.total_seconds == 120 + 300 + 45
+    assert isinstance(o.total_seconds, int)
+
+
+def test_total_seconds_excludes_abandoned_sessions(cards: CardService) -> None:
+    """Per ADR-027 + ADR-024: sessions with ended_at IS NULL are not summed."""
+    repo = _FakeStatsRepo(
+        sessions=[
+            _session("finished", duration_s=180),
+            _session("abandoned", abandoned=True),
+            _session("also-finished", duration_s=60, started_at=T0 + dt.timedelta(hours=1)),
+        ],
+    )
+
+    o = StatsService(reviews=repo, cards=cards).overview("u1")
+
+    assert o.total_seconds == 180 + 60
+
+
+def test_total_seconds_is_per_user(cards: CardService) -> None:
+    """Cross-user leakage check: u1's overview must not pick up u2's sessions."""
+    repo = _FakeStatsRepo(
+        sessions=[
+            _session("u1-s1", duration_s=100, user="u1"),
+            _session("u2-s1", duration_s=9999, user="u2"),
+        ],
+    )
+
+    o1 = StatsService(reviews=repo, cards=cards).overview("u1")
+    o2 = StatsService(reviews=repo, cards=cards).overview("u2")
+
+    assert o1.total_seconds == 100
+    assert o2.total_seconds == 9999
+
+
+def test_total_seconds_truncates_to_int_seconds(cards: CardService) -> None:
+    """Microsecond-level precision is meaningless for a UI display number;
+    the contract is `int` (per ADR-027 — second-level granularity)."""
+    sub_second = T0 + dt.timedelta(seconds=42, microseconds=750_000)
+    repo = _FakeStatsRepo(
+        sessions=[
+            Session(
+                id="s1", user_id="u1", mode="review",
+                started_at=T0, ended_at=sub_second,
+                queue=(), cards_total=0, cards_correct=0,
+            ),
+        ],
+    )
+
+    o = StatsService(reviews=repo, cards=cards).overview("u1")
+
+    # 42.75 s → 42 (int() truncates toward zero).
+    assert o.total_seconds == 42
 
 
 def test_stats_with_orphan_review_does_not_crash(cards: CardService) -> None:

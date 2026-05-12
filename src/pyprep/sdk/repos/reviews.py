@@ -1,8 +1,10 @@
 """ReviewRepository — SQLAlchemy impl of `ReviewStore` and `StatsRepository`.
 
 A single SQLAlchemy class satisfies both Protocols because the underlying
-data (the `reviews` table) is the source of truth for both the live
-review queue and the stats aggregates.
+data is shared: the `reviews` table is the source of truth for the live
+review queue, retention, weakness, and XP aggregates; the `sessions`
+table is the source of truth for wall-clock time-invested (ADR-027).
+Both queries flow through the same SQLAlchemy `Session`.
 """
 
 from __future__ import annotations
@@ -16,9 +18,11 @@ from sqlalchemy.orm import Session
 from pyprep.sdk.scheduler import CardState, Rating
 from pyprep.sdk.scheduler.fsrs_scheduler import StateName
 from pyprep.sdk.sessions import Review
+from pyprep.sdk.sessions import Session as DomainSession
 
 from .database import ensure_utc
-from .models import ReviewRow
+from .models import ReviewRow, SessionRow
+from .sessions import _to_domain as _session_row_to_domain
 
 
 class ReviewRepository:
@@ -113,6 +117,16 @@ class ReviewRepository:
             select(ReviewRow).where(ReviewRow.user_id == user_id)
         ).all()
         return [_to_review(r) for r in rows]
+
+    def list_finished_sessions(self, user_id: str) -> list[DomainSession]:
+        """P7.T7.1 / ADR-027: finished-only filter for wall-clock time."""
+        rows = self._s.scalars(
+            select(SessionRow).where(
+                SessionRow.user_id == user_id,
+                SessionRow.ended_at.is_not(None),
+            )
+        ).all()
+        return [_session_row_to_domain(r) for r in rows]
 
 
 def _to_state(row: ReviewRow) -> CardState:

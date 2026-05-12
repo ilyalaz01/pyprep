@@ -821,6 +821,44 @@ This was implemented this way under ADR-010 (client-owned progression) + ADR-017
 
 ---
 
+### ADR-027: Time-invested aggregation — session wall-clock, not Σ response_ms
+
+**Status:** Accepted (Phase 7, T7.1 — 2026-05-12).
+
+**Context:** PRD §3.5 / FR-STATS-3 calls for "total time invested" as a first-class number on the stats dashboard. Two viable sources exist in the schema today:
+
+1. **Σ Review.response_ms** — per-attempt latency, clamped to 10 min (T3.5.3, anti-DOS), captured on every `POST /api/sessions/{id}/answer`. Already persisted; no new query.
+2. **Σ (Session.ended_at − Session.started_at)** — wall-clock duration of *finished* sessions (those with `ended_at IS NOT NULL` after `POST /api/sessions/{id}/finish`). Already persisted on `SessionRow`; needs a new repo query.
+
+**Decision:** Source from session wall-clock (option 2). Aggregate only finished sessions; abandoned sessions (`ended_at IS NULL`) are excluded from the sum.
+
+**Rationale:**
+- `response_ms` is conceptually fuzzy as a "time invested" signal. It is **per-attempt**, **clamped at 10 min**, and captures only the last interaction window for any given card — not the user's actual continuous study time. A user who pauses 4 minutes between cards has those gaps invisible in `response_ms`; a user who walks away mid-card has the cap masking the abandonment. Summing it gives a number that's neither "time engaged" nor "time elapsed" — it's a clamped per-attempt sample.
+- Wall-clock `(ended_at − started_at)` on finished sessions is the honest signal: it answers the question a learner actually asks themselves — *"how long was I doing this session?"* — without estimation artefacts.
+- Abandoned sessions are correctly excluded: per ADR-024, the SPA does not persist the in-flight queue and the server does not heartbeat session state, so we don't *know* how long an abandoned session was engaged with. Excluding is honest; estimating would introduce noise the user can't validate.
+
+**Trade-offs (accepted):**
+- A user who closes the tab without `POST /finish` doesn't see those minutes counted. This is consistent with ADR-024 (we already accept the queue loss; the time loss is the same shape — both rooted in the no-resumption decision).
+- The signal is granular at the session level, not the per-card level. We cannot answer "how long do you spend on a flip card vs a code task?" with this source. Acceptable: that question is not on the MVP-1 surface (Phase 8 or post-MVP backlog).
+- Multi-session same-day usage (open session, close, reopen later) correctly counts the wall-clock of each finished segment, not the inter-session gap. This is the desired behaviour.
+
+**Implementation contract:**
+- `StatsRepository` Protocol gains `list_finished_sessions(user_id) -> list[Session]`. SQLAlchemy impl: `SELECT * FROM sessions WHERE user_id = ? AND ended_at IS NOT NULL`.
+- `Overview` dataclass gains `total_seconds: int`. Computed as `int(sum((s.ended_at - s.started_at).total_seconds() for s in finished_sessions))`. Integer seconds — UI displays as "Xh Ym" or "Mm Ss", second-level precision is more than enough.
+- `OverviewResponse` Pydantic model gains the matching field.
+- Frontend `Overview` type gains `total_seconds: number`.
+
+**Test contract (pinned at T7.1):**
+- SDK: synthesized finished + abandoned session fixtures; assert sum matches finished-only durations and excludes abandoned.
+- Integration: `/api/stats/me` for new user returns `total_seconds: 0`.
+- Owner stop point #1 after T7.1 commits: validate the wall-clock signal against a real session before any UI builds on it. If owner finds the signal counter-intuitive in practice, this ADR is amended or reverted before T7.5 renders the tile.
+
+**Revisit when:**
+- Multi-user deployment makes abandoned-session leakage a real reporting concern. At that point a periodic heartbeat persisting partial-session duration becomes justified — same shape as the abandoned-row cleanup work ADR-024 also points at.
+- A future PRD requires per-card-type time breakdown (Phase 8+). Either Σ response_ms returns as a secondary signal for that surface specifically, or per-card timing gets its own first-class column.
+
+---
+
 ## 7. API Surface (preview)
 
 Authoritative spec lives in OpenAPI auto-generated at `/api/docs`. High-level shape:

@@ -13,6 +13,10 @@ class Overview:
     streak: int
     xp: float
     orphan_review_count: int = 0
+    # P7.T7.1 / ADR-027: sum of (ended_at - started_at) across finished
+    # sessions only. Abandoned sessions excluded by the repo. Integer
+    # seconds — UI renders as "Xh Ym" or "Mm Ss".
+    total_seconds: int = 0
 
 
 @dataclass(frozen=True, slots=True)

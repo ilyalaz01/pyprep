@@ -9,8 +9,13 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pyprep.sdk.sessions import Review
+from pyprep.sdk.sessions import Review, Session
 
 
 class StatsRepository(Protocol):
     def list_reviews(self, user_id: str) -> list[Review]: ...
+
+    # P7.T7.1 / ADR-027: returns only finished sessions (ended_at IS NOT
+    # NULL). Abandoned-session filtering lives in the repo so the
+    # service can sum unconditionally.
+    def list_finished_sessions(self, user_id: str) -> list[Session]: ...

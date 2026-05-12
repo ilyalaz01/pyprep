@@ -55,12 +55,20 @@ class StatsService:
                 orphans += 1
                 continue
             xp += difficulty * _XP_MULT[r.rating]
+        # P7.T7.1 / ADR-027: wall-clock per finished session, summed to
+        # integer seconds. Repo filters abandoned sessions.
+        total_seconds = int(sum(
+            (s.ended_at - s.started_at).total_seconds()
+            for s in self._reviews.list_finished_sessions(user_id)
+            if s.ended_at is not None
+        ))
         return Overview(
             reviews_total=len(rows),
             retention=_retention(rows),
             streak=self.streak(user_id),
             xp=xp,
             orphan_review_count=orphans,
+            total_seconds=total_seconds,
         )
 
     def per_module(self, user_id: str) -> list[ModuleStats]:
