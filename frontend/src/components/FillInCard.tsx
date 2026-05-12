@@ -16,7 +16,7 @@
  * Empty input is graded wrong, NOT blocked — letting the user submit
  * with skipped blanks is the cheapest path to "show me the answer."
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -37,6 +37,10 @@ export function FillInCard({ card, onRate }: Props) {
   const [submitted, setSubmitted] = useState(false)
   const segments = card.code_snippet_with_blanks.split('___')
   const submit = () => setSubmitted(true)
+  // P6.5/P2-2: focus first blank on mount so the keyboard user is
+  // typing into the snippet immediately, no tab hop required.
+  const firstBlankRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { firstBlankRef.current?.focus() }, [])
 
   return (
     <div className="flex flex-col gap-5">
@@ -56,6 +60,7 @@ export function FillInCard({ card, onRate }: Props) {
               {seg}
               {isBlank ? (
                 <input
+                  ref={i === 0 ? firstBlankRef : undefined}
                   type="text"
                   data-blank-index={i}
                   data-correct={submitted ? String(correct) : undefined}

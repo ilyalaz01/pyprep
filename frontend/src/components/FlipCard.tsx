@@ -13,7 +13,7 @@
  * FlipCardFront in card-types.ts (consumed by future code that needs
  * it), and runtime via expectAnswerHidden in renderer tests.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -29,6 +29,12 @@ interface FlipCardProps {
 
 export function FlipCard({ card, onRate }: FlipCardProps) {
   const [revealed, setRevealed] = useState(false)
+  // P6.5/P2-2: keyboard continuity. Each card mounts fresh via
+  // CardRenderer's key={card.id} (ADR-016); focus the Reveal button so
+  // a user pressing Space lands on the right control without an
+  // intermediate tab traversal.
+  const revealRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { revealRef.current?.focus() }, [])
   return (
     <div className="flex flex-col gap-6">
       <p
@@ -45,7 +51,7 @@ export function FlipCard({ card, onRate }: FlipCardProps) {
 
       {!revealed ? (
         <div className="flex justify-center">
-          <Button variant="primary" onClick={() => setRevealed(true)}>
+          <Button ref={revealRef} variant="primary" onClick={() => setRevealed(true)}>
             Reveal answer
           </Button>
         </div>

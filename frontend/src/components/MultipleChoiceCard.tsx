@@ -12,7 +12,7 @@
  * self-rates with the RatingBar — correctness is shown, intent is
  * the user's to declare.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { MultipleChoiceCard as MCCardT } from '../lib/card-types'
 import type { Rating } from '../lib/session-queue'
@@ -28,6 +28,10 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 export function MultipleChoiceCard({ card, onRate }: Props) {
   const [chosen, setChosen] = useState<number | null>(null)
   const submitted = chosen !== null
+  // P6.5/P2-2: focus first option on mount so keyboard users can
+  // arrow/tab through choices without an intermediate hop.
+  const firstOptionRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { firstOptionRef.current?.focus() }, [])
   return (
     <div className="flex flex-col gap-5">
       <p className="text-lg leading-relaxed text-[color:var(--color-fg)]">
@@ -48,6 +52,7 @@ export function MultipleChoiceCard({ card, onRate }: Props) {
           return (
             <li key={i}>
               <button
+                ref={i === 0 ? firstOptionRef : undefined}
                 type="button"
                 data-mc-option=""
                 data-chosen={submitted ? String(i === chosen) : undefined}

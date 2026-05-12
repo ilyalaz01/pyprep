@@ -18,7 +18,7 @@
  * the "three similar lines is better than a premature abstraction"
  * line). Extract <MCQuestion> only if a third consumer appears.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -37,6 +37,9 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 export function CodeTrapCard({ card, onRate }: Props) {
   const [chosen, setChosen] = useState<number | null>(null)
   const submitted = chosen !== null
+  // P6.5/P2-2: focus first option on mount (see MultipleChoiceCard).
+  const firstOptionRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { firstOptionRef.current?.focus() }, [])
   return (
     <div className="flex flex-col gap-5">
       <ShikiCodeBlock code={card.code_snippet} lang="python" />
@@ -58,6 +61,7 @@ export function CodeTrapCard({ card, onRate }: Props) {
           return (
             <li key={i}>
               <button
+                ref={i === 0 ? firstOptionRef : undefined}
                 type="button"
                 data-mc-option=""
                 data-chosen={submitted ? String(i === chosen) : undefined}

@@ -7,7 +7,7 @@
  *
  * Each variant uses theme tokens — no magic Tailwind colors.
  */
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
 type Size = 'md' | 'sm'
@@ -16,6 +16,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
   children: ReactNode
+  // P6.5/P2-2: callers (FlipCard) attach a ref for mount-time focus.
+  // React 19 supports ref as a regular function-component prop.
+  ref?: Ref<HTMLButtonElement>
 }
 
 const VARIANT: Record<Variant, string> = {
@@ -42,10 +45,12 @@ export function Button({
   className = '',
   type = 'button',
   children,
+  ref,
   ...rest
 }: ButtonProps) {
   return (
     <button
+      ref={ref}
       type={type}
       className={[
         'inline-flex items-center justify-center gap-2 rounded font-medium',

@@ -28,6 +28,11 @@ interface CodeMirrorEditorProps {
   onRun: () => void
   minLines?: number
   maxLines?: number
+  // P6.5/P2-2: when true, focus the editor after mount via
+  // view.focus(). Mirrors the test mock's autoFocus pass-through so
+  // CardRenderer's card-transition focus contract reaches the real
+  // editor in production.
+  autoFocus?: boolean
 }
 
 const LINE_HEIGHT_PX = 20
@@ -38,6 +43,7 @@ export function CodeMirrorEditor({
   onRun,
   minLines = 12,
   maxLines = 30,
+  autoFocus = false,
 }: CodeMirrorEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -71,6 +77,7 @@ export function CodeMirrorEditor({
       parent: host,
     })
     viewRef.current = view
+    if (autoFocus) view.focus()
     return () => view.destroy()
     // initialDoc/onChange/onRun captured at mount; ADR-016 React
     // isolation (parent key={card.id}) guarantees a fresh mount per

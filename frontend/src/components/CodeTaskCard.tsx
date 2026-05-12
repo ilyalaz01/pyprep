@@ -82,6 +82,7 @@ export function CodeTaskCard({ card, onRate }: Props) {
           initialDoc={card.starter_code}
           onChange={setCode}
           onRun={run}
+          autoFocus
         />
       </div>
 
