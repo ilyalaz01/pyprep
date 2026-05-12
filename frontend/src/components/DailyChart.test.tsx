@@ -1,14 +1,6 @@
-/**
- * P7.T7.7 — DailyChart rendering tests.
- *
- * Pins: 30 bars rendered (one per day), bar heights proportional to
- * `reviews_total / max`, zero-review days render as a 1px baseline
- * (not invisible), 5 x-axis date labels at the per-7-day anchors,
- * SVG `<title>` tooltips with singular/plural review count, no
- * gamification glyphs.
- *
- * Skeleton/quiet states verified for loading/error.
- */
+// P7.T7.7 — DailyChart rendering tests. Pins 30 bars, proportional
+// heights, 1px baseline on zero days, 5 anchor x-axis labels,
+// tooltips, anti-Duolingo glyphs, async states.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 
@@ -45,6 +37,9 @@ function stubFetch(daily: { days: Array<{ date: string; reviews_total: number; r
     if (url.includes('/api/auth/me')) return json(ME)
     if (url.includes('/api/config')) return json(CONFIG)
     if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
+    // T7.8 sibling on /stats — return empty so it doesn't disturb
+    // this test's focus on the daily chart.
+    if (url.includes('/api/stats/me/weakness')) return json({ top: [] })
     if (url.includes('/api/stats/me/daily')) {
       if (daily === 'loading') return new Promise(() => {}) // never resolves
       return 'error' in daily
@@ -116,12 +111,10 @@ describe('DailyChart — structure', () => {
     }
   })
 
-  test('shorter window (<5 anchors) renders only the available labels', async () => {
+  test('shorter window renders only the available anchor labels', async () => {
     stubFetch(makeDays([1, 2, 3], '2026-05-10'))
     renderAt('/stats')
     await screen.findByTestId('daily-chart')
-    // Only the last index (2) qualifies among [0, 7, 14, 21, days.length-1].
-    // 0 and 2 are present; 7/14/21 are out of range.
     expect(screen.getByText('May 10')).toBeInTheDocument()
     expect(screen.getByText('May 12')).toBeInTheDocument()
   })

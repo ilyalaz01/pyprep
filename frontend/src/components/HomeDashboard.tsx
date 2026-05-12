@@ -4,6 +4,11 @@
  *   2. Today's review queue (always visible; "0 cards" is a real signal)
  *   3. Weakness top-3 (skipped if total reviews < 10 — premature signal)
  *
+ * T7.8: the weakness section is rendered via the shared
+ * `<WeaknessWidget />`. The /home gate (≥10 reviews) lives here in
+ * the parent — /stats mounts the same widget unconditionally for
+ * its own surface intent.
+ *
  * No streaks, XP, progress bars, or daily-goal indicators. PRODUCT.md
  * principle 1: honest signaling > motivational theatre.
  */
@@ -14,6 +19,7 @@ import { api } from '../lib/api'
 import { getLastActive } from '../lib/last-active'
 import { LinkButton } from './LinkButton'
 import { Section } from './Section'
+import { WeaknessWidget } from './WeaknessWidget'
 
 const WEAKNESS_MIN_REVIEWS = 10
 
@@ -22,11 +28,6 @@ export function HomeDashboard() {
 
   const queue = useQuery({ queryKey: ['review', 'queue'], queryFn: () => api.review.queue() })
   const overview = useQuery({ queryKey: ['stats', 'me'], queryFn: api.stats.me })
-  const weakness = useQuery({
-    queryKey: ['stats', 'weakness'],
-    queryFn: () => api.stats.weakness(3),
-    enabled: (overview.data?.reviews_total ?? 0) >= WEAKNESS_MIN_REVIEWS,
-  })
 
   const queueCount = queue.data?.card_ids.length ?? 0
   const showWeakness = (overview.data?.reviews_total ?? 0) >= WEAKNESS_MIN_REVIEWS
@@ -83,40 +84,7 @@ export function HomeDashboard() {
         </p>
       </Section>
 
-      {showWeakness && (
-        <Section title="Top 3 weakness areas">
-          {weakness.data?.top.length ? (
-            <ul className="space-y-2">
-              {weakness.data.top.map((s) => (
-                <li
-                  key={s.sphere_id}
-                  className="flex items-baseline justify-between gap-4 text-sm"
-                >
-                  <span className="min-w-0 flex-1">
-                    {/* T4.5.6: title primary, sphere_id as caption when
-                        we have a title; sphere_id alone otherwise. */}
-                    <span className="block text-[color:var(--color-fg)] truncate">
-                      {s.lesson_title ?? s.sphere_id}
-                    </span>
-                    {s.lesson_title && (
-                      <span className="block text-xs font-mono text-[color:var(--color-fg-subtle)]">
-                        {s.sphere_id}
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-xs text-[color:var(--color-fg-muted)] tabular-nums">
-                    {Math.round(s.retention * 100)}% retention
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[color:var(--color-fg-muted)]">
-              No weak spheres yet. Keep practicing.
-            </p>
-          )}
-        </Section>
-      )}
+      {showWeakness && <WeaknessWidget />}
     </div>
   )
 }

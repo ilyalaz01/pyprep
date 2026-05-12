@@ -24,6 +24,7 @@ import { LinkButton } from '../components/LinkButton'
 import { OverviewCards } from '../components/OverviewCards'
 import { PerModuleTable } from '../components/PerModuleTable'
 import { Section } from '../components/Section'
+import { WeaknessWidget } from '../components/WeaknessWidget'
 import { api } from '../lib/api'
 import type { Overview } from '../lib/types'
 
@@ -98,8 +99,9 @@ function StatsEmpty() {
 }
 
 function StatsReady({ data }: { data: Overview }) {
-  // T7.5 OverviewCards · T7.6 PerModuleTable · T7.7 DailyChart.
-  // T7.8 will add the weakness widget below.
+  // T7.5 OverviewCards · T7.6 PerModuleTable · T7.7 DailyChart ·
+  // T7.8 WeaknessWidget. /stats mounts the widget unconditionally
+  // (different surface intent than /home — Phase 7 brief §A).
   return (
     <div data-testid="stats-ready" className="space-y-10">
       <OverviewCards data={data} />
@@ -109,6 +111,7 @@ function StatsReady({ data }: { data: Overview }) {
       <Section title="Activity, last 30 days">
         <DailyChart />
       </Section>
+      <WeaknessWidget />
     </div>
   )
 }

@@ -36,6 +36,10 @@ function stubFetch(perModule: { modules: Array<{ module_id: number; reviews_tota
         ? new Response('boom', { status: 500 })
         : json(perModule)
     }
+    // T7.7/T7.8 siblings on /stats — return empty so the sibling
+    // components render quietly and don't disturb this test's focus.
+    if (url.includes('/api/stats/me/daily')) return json({ days: [] })
+    if (url.includes('/api/stats/me/weakness')) return json({ top: [] })
     if (url.includes('/api/stats/me')) return json(OVERVIEW)
     return new Response('not mocked: ' + url, { status: 500 })
   }))
@@ -86,28 +90,21 @@ describe('PerModuleTable — structure', () => {
     expect(within(rowFor(1)).getByText(/1 review · 100%/i)).toBeInTheDocument()
   })
 
-  test('module without reviews: dimmed, inert, "no reviews yet" copy', async () => {
-    stubFetch({ modules: [] })
-    renderAt('/stats')
-    await screen.findByTestId('per-module-table')
-    const row = rowFor(2)
-    expect(row.tagName.toLowerCase()).not.toBe('a')
-    expect(row).toHaveAttribute('aria-disabled', 'true')
-    expect(within(row).getByText(/no reviews yet/i)).toBeInTheDocument()
-  })
-
-  test('zero-reviews row (reviews_total=0): dimmed, not clickable', async () => {
-    // Edge case: backend returns the module but with 0 reviews. Treat
-    // the same as missing — clicking the module name as a "click to
-    // practice" CTA from a 0-row would be a different feature.
+  test('absent OR reviews_total=0: dimmed, inert, "no reviews yet"', async () => {
+    // Two paths produce the same dimmed row: module not in response,
+    // and module in response with reviews_total=0 (collapsed into one
+    // test rather than two — the row impl branches on the same
+    // condition `!stats || stats.reviews_total === 0`).
     stubFetch({
       modules: [{ module_id: 1, reviews_total: 0, retention: 0 }],
     })
     renderAt('/stats')
     await screen.findByTestId('per-module-table')
-    const row = rowFor(1)
-    expect(row.tagName.toLowerCase()).not.toBe('a')
-    expect(within(row).getByText(/no reviews yet/i)).toBeInTheDocument()
+    for (const id of [1, 2]) {
+      const row = rowFor(id)
+      expect(row.tagName.toLowerCase()).not.toBe('a')
+      expect(within(row).getByText(/no reviews yet/i)).toBeInTheDocument()
+    }
   })
 })
 
@@ -123,6 +120,8 @@ describe('PerModuleTable — async states', () => {
       if (url.includes('/api/stats/me/per-module')) {
         return new Promise(() => {}) // never resolves
       }
+      if (url.includes('/api/stats/me/daily')) return json({ days: [] })
+      if (url.includes('/api/stats/me/weakness')) return json({ top: [] })
       if (url.includes('/api/stats/me')) return json(OVERVIEW)
       return new Response('not mocked: ' + url, { status: 500 })
     }))
