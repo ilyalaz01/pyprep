@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Banner } from '../components/Banner'
 import { Button } from '../components/Button'
 import { LinkButton } from '../components/LinkButton'
+import { OverviewCards } from '../components/OverviewCards'
 import { api } from '../lib/api'
 import type { Overview } from '../lib/types'
 
@@ -64,7 +65,7 @@ function StatsBody({ isLoading, isError, data, error, onRetry }: BodyProps) {
     )
   }
   if (data.reviews_total === 0) return <StatsEmpty />
-  return <StatsReadyPlaceholder data={data} />
+  return <StatsReady data={data} />
 }
 
 function StatsSkeleton() {
@@ -93,14 +94,12 @@ function StatsEmpty() {
   )
 }
 
-function StatsReadyPlaceholder({ data }: { data: Overview }) {
-  // T7.4 placeholder. T7.5 replaces this with the real OverviewCards
-  // component; T7.6-T7.8 add the per-module table, daily chart, and
-  // weakness widget. Keeping a minimal visible signal here so the
-  // ready branch is testable end-to-end before component work lands.
+function StatsReady({ data }: { data: Overview }) {
+  // T7.5 lands OverviewCards. T7.6-T7.8 will compose additional
+  // sections below (per-module table, daily chart, weakness widget).
   return (
-    <div data-testid="stats-ready" className="text-sm text-[color:var(--color-fg-muted)]">
-      {data.reviews_total} reviews so far. Dashboard surfaces land in T7.5-T7.8.
+    <div data-testid="stats-ready" className="space-y-10">
+      <OverviewCards data={data} />
     </div>
   )
 }

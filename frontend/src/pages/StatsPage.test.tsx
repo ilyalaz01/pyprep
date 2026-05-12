@@ -111,11 +111,11 @@ describe('StatsPage — state machine', () => {
     expect(await screen.findByTestId('stats-ready')).toBeInTheDocument()
   })
 
-  test('ready state when reviews_total > 0 shows the dashboard surface', async () => {
+  test('ready state when reviews_total > 0 renders OverviewCards', async () => {
     stubFetch(OVERVIEW_FULL)
     renderAt('/stats')
     expect(await screen.findByTestId('stats-ready')).toBeInTheDocument()
-    // T7.4 placeholder shows the raw reviews_total; T7.5 swaps in cards.
-    expect(screen.getByText(/12 reviews so far/i)).toBeInTheDocument()
+    // T7.5: real OverviewCards landed.
+    expect(screen.getByTestId('overview-cards')).toBeInTheDocument()
   })
 })
