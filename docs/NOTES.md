@@ -852,3 +852,66 @@ contrast/em-dash/bundle gates: regression detection at push time
 instead of CI-failure time. Filed for Phase 10 polish; not
 blocking Phase 6.5 close.
 
+---
+
+## N039 — Phase 1 content may have Pyodide-vs-CPython divergences [Phase 10 audit]
+
+**Phase:** 6.5 (P6.5/P1-2 first green CI run) · **Date:** 2026-05-12 · **Status:** open
+
+T6.12's real-Pyodide matrix surfaced its first content bug: card
+`m1-s6-c11` (Implement a concurrent doubler with `asyncio.gather`)
+was authored in Phase 1 against CPython semantics. Its hidden tests
+call `asyncio.run(...)` from sync `def test_...` functions. CPython
+creates a fresh event loop on demand; Pyodide's event loop is the JS
+event loop and is always running — so `asyncio.run` raises
+`RuntimeError: asyncio.run() cannot be called from a running event
+loop`. Backend pytest passed because CPython, not Pyodide.
+
+This is **not a Phase 6 architecture issue**. The Pyodide worker,
+harness, allowlist, namespace reset, and timeout paths all worked
+correctly — the runtime correctly reported the runtime error to the
+test harness. The bug is in Phase 1's `code_task` authoring: tests
+assumed CPython-compatible event-loop semantics.
+
+**Resolution for m1-s6-c11 (P6.5):** reclassified `code_task` →
+`code_trap`. The canonical `asyncio.gather` pattern is now the trap's
+code_snippet (shown to the student); an MC question tests
+understanding of return order (gather preserves input order vs.
+as_completed) and return type (list, not tuple). The lesson is
+preserved; the runtime conflict is removed by not asking the harness
+to execute the code. Module 1 code_task count: 7 → 6, still well
+above the ≥ 5 sanity floor.
+
+**Phase 10 audit scope:** review all remaining `code_task` cards in
+PyPrep for Pyodide compatibility. Known-risky stdlib surfaces:
+- `asyncio` (entire module, especially `asyncio.run`, `Loop.run_*`)
+- `threading`, `_thread`, `multiprocessing` (Pyodide is single-
+  threaded; webworkers don't give Python threads)
+- `subprocess`, `os.system`, `os.fork` (no process spawning)
+- `socket`, `urllib.request`, `http.client` (no raw network; only
+  `pyfetch`, currently disabled per SEC-SBX-2)
+- File I/O outside `/tmp` (Emscripten in-memory FS quirks; mount
+  points differ from real Linux)
+- `time.sleep` in tests (works but blocks the JS event loop, which
+  blocks worker message processing — surprising semantics)
+- C-extension state that survives `sys.modules.pop` (numpy random
+  seed, etc.)
+
+**Timing recommendation:** audit before **Phase 8** (Module 2
+content authoring) so the Pyodide-compatibility checklist is
+established before more cards land. Each module's code_task cards
+should be authored knowing the Pyodide constraints from day one,
+not retrofitted after the CI test fires.
+
+**Audit deliverable:** a short doc — `docs/PYODIDE_AUTHORING.md` or
+similar — listing the risky surfaces above + a one-line "what to do
+instead" for each (e.g. async lessons → `code_trap` showing the
+canonical pattern; threading lessons → `flip` card on GIL
+explanation; etc.). Plus a fresh sweep of Module 1's remaining 6
+code_task cards to confirm none have latent divergences.
+
+**Counts at filing:** 7 code_task cards in Module 1 pre-reclass, 6
+post. Modules 2–4 not yet authored (Phase 9). Total estimated audit
+surface ≈ 25 code_task cards once all modules ship; doing the
+Module 1 sweep now means Phase 9 authoring has the checklist ready.
+

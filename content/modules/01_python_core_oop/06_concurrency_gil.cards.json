@@ -170,16 +170,21 @@
 
     {
       "id": "m1-s6-c11",
-      "type": "code_task",
-      "topic": "Implement a concurrent doubler with `asyncio.gather`",
-      "topic_ru": "Реализовать конкурентный удвоитель через `asyncio.gather`",
+      "type": "code_trap",
+      "topic": "`asyncio.gather` preserves input order, returns a list",
+      "topic_ru": "`asyncio.gather` сохраняет порядок ввода и возвращает список",
       "difficulty": 3,
       "tags": ["asyncio", "gather", "patterns"],
-      "prompt_md": "Implement two functions:\n\n- `async def fetch(x: int) -> int` — yield control once with `await asyncio.sleep(0)`, then return `x * 2`.\n- `async def gather_doubles(items: list[int]) -> list[int]` — given a list of ints, run `fetch` concurrently on each via `asyncio.gather`, and return the list of doubled values **in input order**.\n\nThe synchronous entry point for the test harness will be `asyncio.run(gather_doubles(items))`.",
-      "starter_code": "import asyncio\n\nasync def fetch(x: int) -> int:\n    ...\n\nasync def gather_doubles(items):\n    ...\n",
-      "solution_code": "import asyncio\n\nasync def fetch(x: int) -> int:\n    await asyncio.sleep(0)\n    return x * 2\n\nasync def gather_doubles(items):\n    return await asyncio.gather(*(fetch(x) for x in items))\n",
-      "tests": "import asyncio\nimport pytest\nfrom solution import fetch, gather_doubles\n\ndef test_fetch_doubles_a_value():\n    assert asyncio.run(fetch(5)) == 10\n\ndef test_gather_returns_in_input_order():\n    result = asyncio.run(gather_doubles([3, 1, 2]))\n    assert result == [6, 2, 4]\n\ndef test_gather_handles_empty_input():\n    assert asyncio.run(gather_doubles([])) == []\n\ndef test_gather_returns_a_list_not_a_tuple():\n    result = asyncio.run(gather_doubles([1, 2, 3]))\n    assert isinstance(result, list)\n",
-      "allowlist": ["pytest", "asyncio"]
+      "code_snippet": "import asyncio\n\nasync def fetch(x: int) -> int:\n    await asyncio.sleep(0)\n    return x * 2\n\nasync def gather_doubles(items):\n    return await asyncio.gather(*(fetch(x) for x in items))\n\n# Called from an async context:\n#   result = await gather_doubles([3, 1, 2])",
+      "question": "What does `await gather_doubles([3, 1, 2])` return?",
+      "options": [
+        "[6, 2, 4]",
+        "[2, 4, 6]",
+        "(6, 2, 4)",
+        "The order depends on which coroutine completes first"
+      ],
+      "correct_index": 0,
+      "explanation_md": "`asyncio.gather(*aws)` schedules every awaitable concurrently but **preserves the input order** in its results list — `result[i]` is whatever `aws[i]` returned, regardless of which one finished first. So `gather_doubles([3, 1, 2])` gives `[6, 2, 4]`, not `[2, 4, 6]` (that'd be sorted) and not a tuple.\n\n**Don't confuse with `asyncio.as_completed`**, which yields results in *completion* order — that's option D's behaviour, and it returns an iterator of futures, not a list.\n\n**Note on this card's format:** earlier drafts asked you to *run* this code in the in-browser sandbox. Pyodide's event loop is always running (it's the JS event loop), so `asyncio.run(...)` raises at runtime — exactly the divergence between CPython and Pyodide that the in-browser harness can't paper over. The lesson stayed; the card shape moved to a code-trap so you read the canonical pattern and answer about its behaviour. See `NOTES.md` N039 for the broader Pyodide-compatibility audit this surfaced."
     },
 
     {
