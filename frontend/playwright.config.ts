@@ -30,15 +30,28 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: 'pnpm preview --port 4173 --strictPort',
+    // **Explicit --host 127.0.0.1**: vite preview's default binding
+    // behaviour differs in headless CI (TTY-less) vs local dev. The
+    // url check below is `http://127.0.0.1:4173`; explicit binding
+    // guarantees the bound interface matches what Playwright polls,
+    // closing one of the suspect paths for the CI hang.
+    command: 'pnpm preview --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
-    // 180s (was 60s) — GitHub Actions runners are reliably slower than
-    // local on cold disk cache + slower CPU; Playwright's 60s default
-    // for `vite preview` to bind 127.0.0.1:4173 was tripping in CI.
-    // If 180s ever proves tight, the right next step is adding startup
-    // logging to vite preview to see where the time is going, not
-    // bumping higher blind.
+    // **stdout/stderr 'pipe'**: by default Playwright swallows
+    // webServer output, which is exactly why the CI hang has no
+    // diagnostic signal. Piping surfaces the vite banner ("Local:
+    // http://...") and any error stack in the Playwright job log, so
+    // the next failure tells us where preview actually wedges instead
+    // of just "timed out waiting on 127.0.0.1:4173".
+    // Ref: https://playwright.dev/docs/test-webserver#configuration
+    stdout: 'pipe',
+    stderr: 'pipe',
+    // 180s (was 60s) — GitHub Actions runners are slower than local
+    // on cold disk cache + slower CPU. 180s also failed in CI, but
+    // that's now diagnosed via the piped output rather than papered
+    // over with a higher timeout. Don't bump again without reading
+    // the surfaced stdout/stderr first.
     timeout: 180_000,
   },
 })

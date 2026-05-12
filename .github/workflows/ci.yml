@@ -126,5 +126,17 @@ jobs:
       - name: Build (production dist for vite preview)
         run: pnpm build
 
+      - name: Verify dist/ artifacts before Playwright
+        # If `pnpm build` silently produced an empty or wrong-location
+        # dist/, `vite preview` would hang serving nothing — failure
+        # mode would be indistinguishable from a slow bind. List the
+        # tree explicitly so the job log shows what preview has to
+        # serve before Playwright even starts.
+        run: |
+          ls -la dist/
+          test -f dist/index.html
+          test -f dist/cold-start.html
+          test -f dist/pyodide-e2e.html
+
       - name: Playwright gates (cold-start ADR-020 + NFR-SBX-2 + pyodide-e2e P6.5/P1-2)
         run: pnpm exec playwright test
