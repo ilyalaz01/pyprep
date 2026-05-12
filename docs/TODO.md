@@ -250,6 +250,31 @@
 
 ---
 
+## Phase 6.5 — Audit fixes (post-Phase-6 independent audit triage)
+
+**Goal:** address the 6 audit findings owner triaged from the independent Phase 5+6 audit (4 P1 + 2 P2; 5 P3 + remaining P2s deferred). Each task TDD where applicable; commit per task; ADR-024 filed; one auditor measurement mistake (P1-1) caught during pre-flight and re-scoped to a doc clarification.
+
+| ID | Task | DoD | Status |
+|---|---|---|---|
+| P6.5/P1-1 | Clarify PRD §5.2 + Acceptance Criterion 6: 150-LOC ceiling is **code-LOC** per `scripts/check_file_size.py` (non-blank, non-comment), not raw `wc -l`. Audit had counted raw lines (worker.ts 174, pytest_harness.py 153); gate-counted values are 137 and 116 — both well under the ceiling. No ADR-023 filed (the "violation" wasn't one). | PRD §5.2 + §9 amended; file-size gate stays green | ✅ (`12f1b1f`) |
+| P6.5/P2-1 | Strip stop-driven `console.*` diagnostics from shipped code. CodeTaskCard.tsx:56 (stop-#2 useEffect log) and loader.ts:40/45 (boot-called, singleton-hit) removed. loader.ts:59/81 (worker diagnostic forwarder + cold-start metrics emission) wrapped in `import.meta.env.DEV`. worker.ts:146/171 (env-not-set + top-level boot-fail console.error) kept — both fire only on unrecoverable paths and are user/owner actionable. | All 333 vitest tests still green; no production console noise on happy path | ✅ (`61f4649`) |
+| P6.5/P2-2 | Card-transition focus management. Each card-type renderer focuses its primary actionable element on mount via `useEffect` + ref: FlipCard → Reveal button · MC/CodeTrap → first option · FillIn → first blank · CodeTask → editor (via new `CodeMirrorEditor.autoFocus` prop calling `view.focus()` in production, autoFocus HTML attr in the jsdom mock). Button now accepts a `ref` prop (React 19 native). Combined with `key={card.id}` (ADR-016), keyboard-only users no longer get dropped to body between cards. | New `card-transition-focus.test.tsx`: 7 tests pin focus per card type + 2 transition paths (same-type id change, cross-type transition). All green. | ✅ (`18496d2`) |
+| P6.5/P1-4 | Mid-session error recovery contract pinned. Current behavior (Retry = fresh-session via SessionPage's retryKey remount, queue not persisted) was implicit in ADR-010 + ADR-017; ADR-024 makes it explicit. New `use-session-error-recovery.test.ts`: 3 tests pin /answer 500 → error, /next 500 → error, and re-rendering useSession after unmount fires a second POST /api/sessions (the regression alarm if a future change adds resumption). | ADR-024 filed; tests green; future resumption work has a clear flip-the-test contract | ✅ (`b5b3496`) |
+| P6.5/P1-3 | Realistic cold-start workload + NFR-SBX-2 hot-path gate. Replaced trivial `def add` with m1-s1-c12 (Date.from_string) Module 1 code_task verbatim — 3 tests, `import pytest`, classmethod constructor + subclass-instance check. Fixture also runs 2 subsequent in-session calls; spec asserts cold ≤ 12 s (ADR-020 unchanged — workload swap stays inside existing 2.3 s headroom over owner baseline) AND max(subsequent) ≤ 1.5 s (NFR-SBX-2 + 500 ms CI variance headroom). Separate `expect()` calls so failures point at the right gate. | ADR-020 amended with P6.5/P1-3 sub-section; CI gate count 1 → 2 (still one Playwright file); pre-push unchanged | ✅ (`c0cd655`) |
+| P6.5/P1-2 | Real-Pyodide e2e Playwright spec — resolves N037. New `pyodide-e2e-fixture.ts` + `pyodide-e2e.html` (third Vite build entry, CI-only) + `pyodide-e2e.spec.ts` (serial mode, shared page so the ~10 s boot is amortized across ~22 cases). Drives T6.10 (every Module 1 code_task's solution_code passes its own tests in real Pyodide), T6.12 (per-card allow + deny matrices in real Pyodide), and FR-SBX-6 (task A defines `foo`; task B without `foo` must fail — regression alarm for sys.modules leakage). | N037 closed; pyodide-actual coverage gap removed before Phase 7 | ✅ (`799aab0`) |
+
+**Phase 6.5 close summary (2026-05-12):**
+- 6 task IDs across 6 commits (P6.5/P1-1 through P6.5/P1-2).
+- New ADRs filed: ADR-024 (mid-session error recovery — Retry = fresh-session, queue not persisted). ADR-023 was the originally-triaged 150-LOC carve-out; **not filed** because P1-1 pre-flight showed the audit had miscounted raw lines and the gate was already green. PRD clarified instead.
+- New NOTES: none. N037 (Pyodide-actual coverage gap) **resolved** by P6.5/P1-2.
+- Pre-push gates: 9 (unchanged). CI gates: 1 → 2 Playwright specs (cold-start now gates two budgets + new e2e spec).
+- Test counts at close: vitest 35 → 37 files, 333 → 343 tests (+7 card-transition focus, +3 mid-session error recovery, +3 from P1-4 file split). Pytest 299 (unchanged). Playwright 1 → 2 specs (cold-start + e2e); e2e contributes ≥ 1 sanity + 7 T6.10 + 7 T6.12-allow + 7 T6.12-deny + 1 FR-SBX-6 = ≥ 23 cases.
+- Bundle: 1.29 MB raw / 391 KB gzip → 1.29 MB raw / 391.9 KB gzip (e2e entry adds 0.1 KB raw / 0.6 KB gzip, well inside ceiling).
+- Cold-start ceiling: 12 s (unchanged); NFR-SBX-2 ceiling: 1.5 s (new).
+- **Owner action:** push the 6 P6.5 commits + the on-disk audit report at `~/.claude/plans/you-are-an-independent-deep-acorn.md`. CI will exercise the new Playwright e2e spec (`pnpm exec playwright install chromium` is the local prereq, same as T6.11). Lighthouse pass on session route still pending (owner action; not a code blocker).
+
+---
+
 ## Phase 7 — Stats & Weakness Dashboard
 
 **Goal:** Per-module / per-sphere stats. Weakness ranking. No Duolingo shaming.
