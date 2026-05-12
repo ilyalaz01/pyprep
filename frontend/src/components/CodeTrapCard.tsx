@@ -29,7 +29,8 @@ import { ShikiCodeBlock } from './ShikiCodeBlock'
 
 interface Props {
   card: CodeTrapCardT
-  onRate: (rating: Rating) => void
+  // P7-fix: outcome = chosen-index === correct_index.
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
@@ -112,7 +113,7 @@ export function CodeTrapCard({ card, onRate }: Props) {
               {card.explanation_md}
             </ReactMarkdown>
           </div>
-          <RatingBar onRate={onRate} />
+          <RatingBar onRate={(r) => onRate(r, chosen === card.correct_index)} />
         </div>
       ) : null}
     </div>

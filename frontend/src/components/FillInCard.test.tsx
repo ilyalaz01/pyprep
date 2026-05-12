@@ -128,7 +128,8 @@ describe('FillInCard — post-submit', () => {
     await check()
     expect(onRate).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: /good/i }))
-    expect(onRate).toHaveBeenCalledExactlyOnceWith(3)
+    // P7-fix: outcome=true when every blank matches accepted_answers.
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(3, true)
   })
 
   test('Check button hides after submit (no double-fire)', async () => {

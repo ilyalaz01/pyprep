@@ -35,7 +35,12 @@ export interface UseSessionResult {
   // T5.11 client-side aggregation for SessionSummary. Always present;
   // values reflect the partial session before status='finished'.
   details: SessionDetails
-  submitAnswer: (rating: Rating) => Promise<void>
+  // P7-fix (stop point #2): outcome is the objective-card correctness
+  // signal (MC index match, fill-in all-blanks match, code-task tests
+  // passed). Decoupled from rating per ADR-015 — the user can rate
+  // Good on a wrong answer. Undefined for flip cards (no objective
+  // outcome). Accuracy aggregates only from defined outcomes.
+  submitAnswer: (rating: Rating, outcome?: boolean) => Promise<void>
   finish: () => Promise<void>
 }
 
@@ -66,7 +71,8 @@ export function useSession(params: UseSessionParams): UseSessionResult {
   // Wall-clock session timer + per-card aggregations for SessionDetails.
   const sessionStartedAtRef = useRef<number>(0)
   const ratingsRef = useRef({ again: 0, hard: 0, good: 0, easy: 0 })
-  const objectiveLastRatingRef = useRef<Map<string, Rating>>(new Map())
+  // P7-fix: outcome tracking replaces the rating-as-proxy approach.
+  const objectiveLastOutcomeRef = useRef<Map<string, boolean>>(new Map())
   const nextDueByCardRef = useRef<Map<string, string>>(new Map())
 
   const fail = useCallback((e: unknown) => {
@@ -81,7 +87,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
       completedCount: queueRef.current?.completedCount() ?? 0,
       startedAt: sessionStartedAtRef.current,
       ratings: ratingsRef.current,
-      objectiveLastRating: objectiveLastRatingRef.current,
+      objectiveLastOutcome: objectiveLastOutcomeRef.current,
       nextDueByCard: nextDueByCardRef.current,
     }))
   }, [])
@@ -143,7 +149,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
   }, [advance, fail, params.limit, params.mode, params.moduleId, params.sphereId])
 
   const submitAnswer = useCallback(
-    async (rating: Rating) => {
+    async (rating: Rating, outcome?: boolean) => {
       const queue = queueRef.current
       const sessionId = sessionIdRef.current
       if (!queue || !sessionId || !currentCard) return
@@ -156,10 +162,13 @@ export function useSession(params: UseSessionParams): UseSessionResult {
           idempotency_key: makeIdempotencyKey(),
         })
         // T5.11 tally: rating bucket, objective-card outcome (latest
-        // rating wins on AGAIN-then-rerate), and next-due ISO.
+        // wins on AGAIN-then-rerate), and next-due ISO. P7-fix:
+        // accuracy now comes from `outcome` (correctness), NOT rating
+        // — fixes the "100% accuracy on Good-rated wrong answers"
+        // bug surfaced at stop point #2.
         tallyRating(ratingsRef.current, rating)
-        if (OBJECTIVE_TYPES.has(currentCard.type)) {
-          objectiveLastRatingRef.current.set(currentCard.card_id, rating)
+        if (OBJECTIVE_TYPES.has(currentCard.type) && outcome !== undefined) {
+          objectiveLastOutcomeRef.current.set(currentCard.card_id, outcome)
         }
         nextDueByCardRef.current.set(currentCard.card_id, result.next_due_at)
         queue.recordRating(currentCard.card_id, rating)

@@ -119,7 +119,9 @@ describe('CodeTaskCard — Run tests', () => {
     )
     expect(onRate).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: /good/i }))
-    expect(onRate).toHaveBeenCalledExactlyOnceWith(3)
+    // P7-fix: outcome=false because the stub runner returns ok:false.
+    // The contract is that outcome = result.ok regardless of rating.
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(3, false)
   })
 
   test('Cmd-Enter in editor triggers Run (per-card keymap, not global)', async () => {

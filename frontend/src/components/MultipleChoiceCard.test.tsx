@@ -116,12 +116,24 @@ describe('MultipleChoiceCard — post-submit reveal', () => {
     }
   })
 
-  test('rating click forwards to onRate', async () => {
+  test('rating click forwards rating + outcome=true (correct answer)', async () => {
     const onRate = vi.fn()
     render(<MultipleChoiceCard card={card} onRate={onRate} />)
-    await pick('L→E→G→B')
+    await pick('L→E→G→B') // correct option
     await userEvent.click(screen.getByRole('button', { name: /easy/i }))
-    expect(onRate).toHaveBeenCalledExactlyOnceWith(4)
+    // P7-fix: outcome (correctness) flows alongside rating.
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(4, true)
+  })
+
+  // P7-fix regression guard: a wrong MC pick + Good rating must report
+  // outcome=false. Pre-fix the rating-as-proxy approach would have
+  // showed this as correct on the stats accuracy tile.
+  test('wrong answer + Good rating: outcome=false (ADR-015 / P7-fix)', async () => {
+    const onRate = vi.fn()
+    render(<MultipleChoiceCard card={card} onRate={onRate} />)
+    await pick('L→G→E→B') // WRONG option
+    await userEvent.click(screen.getByRole('button', { name: /good/i }))
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(3, false)
   })
 
   test('correct submission still requires self-rating (no auto-advance per ADR-015)', async () => {

@@ -102,25 +102,34 @@ export function tallyRating(into: Ratings, rating: Rating): void {
   else into.easy += 1
 }
 
-/** Pure assembly of the SessionDetails snapshot from hook refs. */
+/** Pure assembly of the SessionDetails snapshot from hook refs.
+ *
+ * P7-fix (stop point #2 bug): accuracy is computed from the
+ * **outcome** of each objective card (did the user actually answer
+ * correctly?), NOT from the rating distribution. Per ADR-015 the user
+ * may rate Good on a wrong-but-knew-it answer; using rating>=Good as
+ * a correctness proxy reads "100% accuracy" on sessions where the
+ * user got things wrong. See NOTES N040 for the cross-session
+ * counterpart (currently impossible without backend changes).
+ */
 export function buildDetails(args: {
   completedCount: number
   startedAt: number  // ms epoch; 0 means session has not started
   ratings: Ratings
-  objectiveLastRating: ReadonlyMap<string, Rating>
+  objectiveLastOutcome: ReadonlyMap<string, boolean>
   nextDueByCard: ReadonlyMap<string, string>
   now?: number
 }): SessionDetails {
   const now = args.now ?? Date.now()
   let correct = 0
-  for (const r of args.objectiveLastRating.values()) if (r >= 3) correct += 1
+  for (const ok of args.objectiveLastOutcome.values()) if (ok) correct += 1
   return {
     cardsReviewed: args.completedCount,
     elapsedMs: args.startedAt ? now - args.startedAt : 0,
     ratings: { ...args.ratings },
-    accuracy: args.objectiveLastRating.size === 0
+    accuracy: args.objectiveLastOutcome.size === 0
       ? null
-      : { correct, total: args.objectiveLastRating.size },
+      : { correct, total: args.objectiveLastOutcome.size },
     nextDueBuckets: computeNextDueBuckets(args.nextDueByCard, now),
   }
 }

@@ -131,25 +131,9 @@ describe('useSession — AGAIN re-insertion (ADR-010 client-owned loop)', () => 
   })
 })
 
-describe('useSession — T5.11 details snapshot wires through', () => {
-  // Hook-level wiring only — pure logic in session-details.test.ts.
-  test('submitAnswer updates details.ratings and details.nextDueBuckets', async () => {
-    const due = new Date(Date.now() + 2 * 86_400_000).toISOString()
-    mockFetch((url) => {
-      if (url.endsWith('/api/sessions')) return json(sess('s1', ['c1', 'c2']))
-      if (url.includes('/next')) return json(card('c1'))
-      if (url.includes('/answer')) return json({ next_due_at: due, new_state: 'review' })
-      if (url.includes('/finish')) return json({ cards_total: 2, cards_correct: 2, retention: 1.0 })
-      return new Response('not mocked: ' + url, { status: 500 })
-    })
-    const { result } = renderHook(() => useSession({ mode: 'review', sphereId: 'm1-s0' }))
-    await waitFor(() => expect(result.current.currentCard?.card_id).toBe('c1'))
-    await act(async () => { await result.current.submitAnswer(3) })
-    await waitFor(() => expect(result.current.details.ratings.good).toBe(1))
-    expect(result.current.details.nextDueBuckets.find((b) => b.label === 'In 3 days')?.count).toBe(1)
-    expect(result.current.details.accuracy).toBeNull() // flip-only session
-  })
-})
+// T5.11 details-snapshot wiring + P7-fix accuracy regression guard
+// live in a sibling file (use-session-details.test.ts) to keep this
+// file under the 150-LOC gate.
 
 describe('useSession — error handling', () => {
   test('start failure surfaces as status=error', async () => {

@@ -37,7 +37,8 @@ import { RatingBar } from './RatingBar'
 
 interface Props {
   card: CodeTaskCardT
-  onRate: (rating: Rating) => void
+  // P7-fix: outcome = runner result.ok (all hidden tests passed).
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 export function CodeTaskCard({ card, onRate }: Props) {
@@ -147,7 +148,7 @@ export function CodeTaskCard({ card, onRate }: Props) {
 
       {result ? (
         <div className="animate-fade-up">
-          <RatingBar onRate={onRate} />
+          <RatingBar onRate={(r) => onRate(r, result.ok)} />
         </div>
       ) : null}
     </div>

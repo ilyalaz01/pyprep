@@ -87,7 +87,8 @@ describe('buildDetails', () => {
       completedCount: 3,
       startedAt: NOW - 5 * 60_000, // 5 min ago
       ratings: { again: 1, hard: 0, good: 2, easy: 0 },
-      objectiveLastRating: new Map([['mc1', 3], ['mc2', 1]]),
+      // P7-fix: outcomes (correctness), not ratings. One correct, one wrong.
+      objectiveLastOutcome: new Map([['mc1', true], ['mc2', false]]),
       nextDueByCard: new Map([['mc1', days(2)], ['mc2', days(0.5)]]),
       now: NOW,
     })
@@ -104,7 +105,7 @@ describe('buildDetails', () => {
       completedCount: 2,
       startedAt: NOW - 60_000,
       ratings: { again: 0, hard: 0, good: 2, easy: 0 },
-      objectiveLastRating: new Map(),
+      objectiveLastOutcome: new Map(),
       nextDueByCard: new Map(),
       now: NOW,
     })
@@ -116,11 +117,28 @@ describe('buildDetails', () => {
       completedCount: 0,
       startedAt: 0,
       ratings: { again: 0, hard: 0, good: 0, easy: 0 },
-      objectiveLastRating: new Map(),
+      objectiveLastOutcome: new Map(),
       nextDueByCard: new Map(),
       now: NOW,
     })
     expect(d.elapsedMs).toBe(0)
+  })
+
+  // P7-fix regression guard (stop point #2 bug): a user can rate Good
+  // on a wrong answer per ADR-015. Accuracy must reflect the outcome,
+  // NOT the rating.
+  test('accuracy from outcome, NOT rating (ADR-015 / P7-fix)', () => {
+    const d = buildDetails({
+      completedCount: 1,
+      startedAt: NOW - 10_000,
+      // User rated Good (3) on a card they got wrong (outcome=false).
+      // Pre-fix code computed accuracy from rating>=3 → 100%. Wrong.
+      ratings: { again: 0, hard: 0, good: 1, easy: 0 },
+      objectiveLastOutcome: new Map([['mc1', false]]),
+      nextDueByCard: new Map(),
+      now: NOW,
+    })
+    expect(d.accuracy).toEqual({ correct: 0, total: 1 })
   })
 })
 

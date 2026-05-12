@@ -20,7 +20,9 @@ import { RatingBar } from './RatingBar'
 
 interface Props {
   card: MCCardT
-  onRate: (rating: Rating) => void
+  // P7-fix: outcome = chosen-index === correct_index. Decoupled from
+  // rating per ADR-015 (user may rate Good on a wrong answer).
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
@@ -100,7 +102,7 @@ export function MultipleChoiceCard({ card, onRate }: Props) {
       </ul>
       {submitted ? (
         <div className="animate-fade-up">
-          <RatingBar onRate={onRate} />
+          <RatingBar onRate={(r) => onRate(r, chosen === card.correct_index)} />
         </div>
       ) : null}
     </div>

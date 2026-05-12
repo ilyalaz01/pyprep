@@ -109,7 +109,8 @@ describe('CodeTrapCard — post-submit', () => {
     await pickByText('[1] [1, 2] [1, 2, 3]') // correct, but still requires self-rate
     expect(onRate).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: /hard/i }))
-    expect(onRate).toHaveBeenCalledExactlyOnceWith(2)
+    // P7-fix: outcome=true for the correct pick.
+    expect(onRate).toHaveBeenCalledExactlyOnceWith(2, true)
   })
 
   test('chosen-but-wrong option is marked wrong; correct option still highlighted', async () => {

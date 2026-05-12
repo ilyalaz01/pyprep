@@ -28,7 +28,8 @@ import { RatingBar } from './RatingBar'
 
 interface Props {
   card: FillInCardT
-  onRate: (rating: Rating) => void
+  // P7-fix: outcome = every blank matched accepted_answers.
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 export function FillInCard({ card, onRate }: Props) {
@@ -126,7 +127,12 @@ export function FillInCard({ card, onRate }: Props) {
               </ReactMarkdown>
             </div>
           ) : null}
-          <RatingBar onRate={onRate} />
+          <RatingBar
+            onRate={(r) => onRate(
+              r,
+              blanks.every((acc, i) => matchBlank(values[i] ?? '', acc)),
+            )}
+          />
         </div>
       ) : (
         <div className="flex justify-end">

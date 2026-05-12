@@ -24,7 +24,10 @@ import { RatingBar } from './RatingBar'
 
 interface FlipCardProps {
   card: FlipCardT
-  onRate: (rating: Rating) => void
+  // P7-fix: flip cards have no objective outcome. Pass-through type
+  // matches the rest of the family but FlipCard never supplies an
+  // outcome — accuracy aggregation skips undefined values.
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 export function FlipCard({ card, onRate }: FlipCardProps) {

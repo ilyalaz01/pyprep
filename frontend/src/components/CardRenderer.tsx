@@ -23,7 +23,9 @@ import { MultipleChoiceCard } from './MultipleChoiceCard'
 
 interface CardRendererProps {
   card: Card
-  onRate: (rating: Rating) => void
+  // P7-fix: outcome (objective-card correctness) flows through cards
+  // → CardRenderer → SessionPage → useSession.submitAnswer.
+  onRate: (rating: Rating, outcome?: boolean) => void
 }
 
 export function CardRenderer({ card, onRate }: CardRendererProps) {
