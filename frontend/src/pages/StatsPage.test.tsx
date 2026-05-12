@@ -33,10 +33,11 @@ function stubFetch(overview: unknown, opts: { fail?: boolean } = {}) {
     const url = typeof input === 'string' ? input : input.toString()
     if (url.includes('/api/auth/me')) return json(ME)
     if (url.includes('/api/config')) return json(CONFIG)
-    // T7.6 — PerModuleTable mounts inside StatsReady, so /per-module
-    // is fetched whenever StatsPage reaches the ready branch. Match
-    // it BEFORE the broader /api/stats/me match.
+    // T7.6/T7.7 — PerModuleTable + DailyChart mount inside StatsReady,
+    // each with their own query. Match the more-specific paths BEFORE
+    // the broader /api/stats/me match.
     if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
+    if (url.includes('/api/stats/me/daily')) return json({ days: [] })
     if (url.includes('/api/stats/me')) {
       return opts.fail
         ? new Response('boom', { status: 500 })
@@ -102,6 +103,7 @@ describe('StatsPage — state machine', () => {
       if (url.includes('/api/auth/me')) return json(ME)
       if (url.includes('/api/config')) return json(CONFIG)
       if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
+      if (url.includes('/api/stats/me/daily')) return json({ days: [] })
       if (url.includes('/api/stats/me')) {
         meCalls += 1
         return meCalls === 1

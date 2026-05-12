@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { Banner } from '../components/Banner'
 import { Button } from '../components/Button'
+import { DailyChart } from '../components/DailyChart'
 import { LinkButton } from '../components/LinkButton'
 import { OverviewCards } from '../components/OverviewCards'
 import { PerModuleTable } from '../components/PerModuleTable'
@@ -97,13 +98,16 @@ function StatsEmpty() {
 }
 
 function StatsReady({ data }: { data: Overview }) {
-  // T7.5 OverviewCards · T7.6 PerModuleTable. T7.7-T7.8 add daily
-  // chart + weakness widget below.
+  // T7.5 OverviewCards · T7.6 PerModuleTable · T7.7 DailyChart.
+  // T7.8 will add the weakness widget below.
   return (
     <div data-testid="stats-ready" className="space-y-10">
       <OverviewCards data={data} />
       <Section title="By module">
         <PerModuleTable />
+      </Section>
+      <Section title="Activity, last 30 days">
+        <DailyChart />
       </Section>
     </div>
   )

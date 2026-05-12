@@ -821,6 +821,48 @@ This was implemented this way under ADR-010 (client-owned progression) + ADR-017
 
 ---
 
+### ADR-025: 30-day stats chart — hand-rolled SVG, not Recharts / Visx
+
+**Status:** Accepted (Phase 7, T7.7 — 2026-05-12). **Reversible** — see "Revisit when" below.
+
+**Context:** PRD §3.5 / FR-STATS-4 calls for a 30-day rolling chart of per-day review counts on /stats. Two viable rendering paths:
+
+1. **Charting library** — Recharts (~80 KB raw / ~40 KB gz), Visx (~60 KB raw / ~30 KB gz), or similar. Declarative API; many sensible defaults; theming layer required to fit DESIGN.md.
+2. **Hand-rolled SVG** — 30 `<rect>` elements inside a viewBox-sized container, x-axis labels via separate `<div>` row. ~120 LOC.
+
+**Decision:** Option 2. Hand-rolled SVG.
+
+**Rationale:**
+- **Bundle cost.** Recharts adds ~40 KB gz that nothing else in PyPrep needs. Today's bundle is 391 KB gz against a 600 KB ceiling (ADR-022); 40 KB is 10 % of total — meaningful headroom for Phase 7+ work.
+- **Design fit.** DESIGN.md anti-references include cards-in-cards, drop shadows, rounded chrome, motion-easing bounce. Every charting library ships defaults in exactly those directions; theming them out is a *fight*, not a few overrides. Tooltips, axis ticks, gridlines, legend layout — all have opinionated styles that read as generic chart UI. The "Peer's Notebook" lane wants restraint that's hard to retrofit.
+- **Scope.** 30 vertical bars + per-7-day x-axis labels is a tiny chart. Hand-roll is ~120 LOC, including the labels, tooltips, and empty-day baseline. A library adds dependency surface for a problem that's already in our grasp.
+- **Owner-quality target.** PRODUCT.md "honest signaling > motivational theatre" — a stats chart that looks like every other dashboard's stats chart erodes the product's voice.
+
+**Trade-offs (accepted):**
+- Future drill-down charts (per-tag, per-difficulty) re-pay this cost — would need their own SVG. **Acceptable** because: (a) the drill-down charts may not land in MVP-1, (b) extracting a tiny `<MiniBarChart>` primitive at 2 consumers is cheap, (c) once the primitive exists, future charts cost the same as adopting Recharts would have.
+- No interactive zoom/pan/legend toggling. **Acceptable** — 30 bars is below the threshold where interaction adds value.
+- Date-axis math is ours to own (tick spacing, label format). **Bounded** — 30 days is the only horizon today; if range becomes user-selectable, revisit.
+
+**Reversibility — the explicit clause owner asked for:**
+> "If hand-rolled aesthetic fails at the T7.7 stop point, back out to Recharts with an ADR-025 amendment — decision is reversible."
+
+The hand-rolled implementation lives in one component (`frontend/src/components/DailyChart.tsx`) with no internal dependencies on the SVG approach. Swapping to Recharts is a single-file rewrite. The ADR amendment is the doc trail; no schema, contract, or test outside `DailyChart.test.tsx` needs to change.
+
+**Test contract (pinned at T7.7):**
+- Renders 30 bars (one per `daily.days[]` entry).
+- Bar heights proportional to `reviews_total` against the max in the window.
+- Zero-review days render as a 1 px baseline indicator (not invisible — empty space vs no-data must be distinguishable).
+- Per-7-day x-axis labels render (5 labels: days 0, 7, 14, 21, 29 by default).
+- No gamification glyphs (anti-Duolingo guard mirroring OverviewCards).
+- Tooltips via SVG `<title>` so screen readers + hover both work.
+
+**Revisit when:**
+- Stop point #3 owner review fails (then: switch to Recharts with this ADR superseded).
+- A second chart of the same shape (per-tag, per-difficulty trend) lands in the codebase — extract a primitive at that point; don't speculate.
+- Bundle budget gets tight enough that ~40 KB gz of Recharts genuinely costs us, AND the chart becomes a separate route (lazy-load is then the deciding factor; if loaded lazily and only on /stats, the cost is hidden from first paint).
+
+---
+
 ### ADR-027: Time-invested aggregation — session wall-clock, not Σ response_ms
 
 **Status:** Accepted (Phase 7, T7.1 — 2026-05-12).
