@@ -33,6 +33,10 @@ function stubFetch(overview: unknown, opts: { fail?: boolean } = {}) {
     const url = typeof input === 'string' ? input : input.toString()
     if (url.includes('/api/auth/me')) return json(ME)
     if (url.includes('/api/config')) return json(CONFIG)
+    // T7.6 — PerModuleTable mounts inside StatsReady, so /per-module
+    // is fetched whenever StatsPage reaches the ready branch. Match
+    // it BEFORE the broader /api/stats/me match.
+    if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
     if (url.includes('/api/stats/me')) {
       return opts.fail
         ? new Response('boom', { status: 500 })
@@ -90,15 +94,17 @@ describe('StatsPage — state machine', () => {
   })
 
   test('Retry refetches /api/stats/me — recovers from transient failure', async () => {
-    // First call fails, second succeeds. Mock fetch to flip behavior.
-    let calls = 0
+    // First /me call fails, second succeeds. /per-module is unrelated
+    // — return empty so the ready branch renders cleanly.
+    let meCalls = 0
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.includes('/api/auth/me')) return json(ME)
       if (url.includes('/api/config')) return json(CONFIG)
+      if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
       if (url.includes('/api/stats/me')) {
-        calls += 1
-        return calls === 1
+        meCalls += 1
+        return meCalls === 1
           ? new Response('transient', { status: 500 })
           : json(OVERVIEW_FULL)
       }

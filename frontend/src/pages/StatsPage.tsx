@@ -21,6 +21,8 @@ import { Banner } from '../components/Banner'
 import { Button } from '../components/Button'
 import { LinkButton } from '../components/LinkButton'
 import { OverviewCards } from '../components/OverviewCards'
+import { PerModuleTable } from '../components/PerModuleTable'
+import { Section } from '../components/Section'
 import { api } from '../lib/api'
 import type { Overview } from '../lib/types'
 
@@ -95,11 +97,14 @@ function StatsEmpty() {
 }
 
 function StatsReady({ data }: { data: Overview }) {
-  // T7.5 lands OverviewCards. T7.6-T7.8 will compose additional
-  // sections below (per-module table, daily chart, weakness widget).
+  // T7.5 OverviewCards · T7.6 PerModuleTable. T7.7-T7.8 add daily
+  // chart + weakness widget below.
   return (
     <div data-testid="stats-ready" className="space-y-10">
       <OverviewCards data={data} />
+      <Section title="By module">
+        <PerModuleTable />
+      </Section>
     </div>
   )
 }
