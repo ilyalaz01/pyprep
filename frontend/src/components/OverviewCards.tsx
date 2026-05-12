@@ -1,7 +1,7 @@
 /**
- * OverviewCards — five-tile summary at the top of /stats.
+ * OverviewCards — four-tile summary at the top of /stats.
  *
- * Layout: responsive grid, 2 → 3 → 5 columns. Hairline border per
+ * Layout: responsive grid, 2 → 4 columns. Hairline border per
  * DESIGN.md (no shadows, no rounded-square chrome). Numbers use
  * `tabular-nums` so adjacent tiles align across the row.
  *
@@ -10,14 +10,22 @@
  *     icon, NO "🔥 N day streak!" copy.
  *   - XP: visible (PRD §3.5 / FR-STATS-4) but the caption is
  *     "Progress" not "Level" / "Rank" / "Score". No level chrome.
- *   - Accuracy: rounded percentage; no "great job!" reinforcement.
  *   - Time: highest meaningful unit (1h 2m vs 3725s). Honest,
  *     wall-clock per ADR-027.
  *   - Reviews: bare count + singular/plural.
+ *
+ * **No Accuracy tile** (P7-fix, stop point #2): per ADR-015 the
+ * server stores rating, not outcome. Cross-session accuracy is
+ * therefore structurally unavailable — computing it from
+ * `rating >= Good` is a lie (the user can rate Good on wrong
+ * answers, ADR-015 explicit intent). Per-session accuracy in
+ * SessionSummary IS honest because the renderer has the answer
+ * data in-memory; only the aggregate /stats tile is dropped.
+ * See NOTES N040 for the post-MVP path to restore.
  */
 import type { Overview } from '../lib/types'
 import {
-  formatAccuracy, formatReviews, formatStreak, formatTime, formatXp,
+  formatReviews, formatStreak, formatTime, formatXp,
 } from '../lib/format-stats'
 
 interface OverviewCardsProps {
@@ -30,10 +38,9 @@ export function OverviewCards({ data }: OverviewCardsProps) {
   return (
     <div
       data-testid="overview-cards"
-      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+      className="grid grid-cols-2 lg:grid-cols-4 gap-3"
     >
       <Tile value={reviews.value} units={reviews.units} label="Reviewed" />
-      <Tile value={formatAccuracy(data.retention)} label="Accuracy" />
       <Tile value={formatTime(data.total_seconds)} label="Time invested" />
       <Tile value={streak.value} units={streak.units} label="Active streak" />
       <Tile value={formatXp(data.xp)} units="XP" label="Progress" />

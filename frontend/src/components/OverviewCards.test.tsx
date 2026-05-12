@@ -28,9 +28,9 @@ function tileBy(label: string): HTMLElement {
 }
 
 describe('OverviewCards — structure', () => {
-  test('renders five tiles', () => {
+  test('renders four tiles (Accuracy dropped per P7-fix / N040)', () => {
     render(<OverviewCards data={sample} />)
-    expect(screen.getByTestId('overview-cards').children).toHaveLength(5)
+    expect(screen.getByTestId('overview-cards').children).toHaveLength(4)
   })
 
   test('Reviewed tile shows count + plural label', () => {
@@ -40,10 +40,13 @@ describe('OverviewCards — structure', () => {
     expect(within(tile).getByText('reviews')).toBeInTheDocument()
   })
 
-  test('Accuracy tile shows rounded percentage, no decimal', () => {
-    render(<OverviewCards data={sample} />)
-    const tile = tileBy('Accuracy')
-    expect(within(tile).getByText('83%')).toBeInTheDocument()
+  // P7-fix regression guard: per ADR-015 + N040, cross-session
+  // accuracy is structurally unavailable; the tile must stay dropped
+  // until backend stores outcome (ADR amendment + schema migration).
+  test('NO Accuracy tile rendered (server has no outcome data)', () => {
+    const { container } = render(<OverviewCards data={sample} />)
+    expect(container.querySelector('[data-tile="Accuracy"]')).toBeNull()
+    expect(container.textContent ?? '').not.toMatch(/accuracy/i)
   })
 
   test('Time invested tile shows wall-clock (ADR-027), highest unit', () => {
@@ -104,6 +107,6 @@ describe('OverviewCards — anti-Duolingo discipline (P7 brief §C)', () => {
   test('numbers use tabular-nums for column alignment', () => {
     const { container } = render(<OverviewCards data={sample} />)
     const numbers = container.querySelectorAll('.tabular-nums')
-    expect(numbers.length).toBe(5)
+    expect(numbers.length).toBe(4)
   })
 })

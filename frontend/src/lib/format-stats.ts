@@ -31,9 +31,11 @@ export function formatStreak(days: number): { value: string; units: string } {
   return { value: String(Math.max(0, Math.floor(days))), units: days === 1 ? 'day' : 'days' }
 }
 
-export function formatAccuracy(retention: number): string {
-  return `${Math.round(Math.max(0, Math.min(1, retention)) * 100)}%`
-}
+// `formatAccuracy(retention: number)` lived here briefly between
+// T7.5 and the P7-fix stop-point-#2 unwind. Removed because the
+// Accuracy tile is dropped from OverviewCards (ADR-015: server has
+// no outcome data — see NOTES N040). SessionSummary has its own
+// `formatAccuracy({ correct, total })` for the per-session display.
 
 export function formatXp(xp: number): string {
   // Integer XP for display — fractional XP from per-difficulty

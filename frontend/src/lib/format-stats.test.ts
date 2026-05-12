@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'vitest'
 
 import {
-  formatAccuracy, formatReviews, formatStreak, formatTime, formatXp,
+  formatReviews, formatStreak, formatTime, formatXp,
 } from './format-stats'
 
 describe('formatTime', () => {
@@ -43,22 +43,10 @@ describe('formatStreak', () => {
   })
 })
 
-describe('formatAccuracy', () => {
-  test.each([
-    [0, '0%'],
-    [0.5, '50%'],
-    [0.83, '83%'],
-    [0.836, '84%'],
-    [1, '100%'],
-  ])('retention=%s → "%s"', (input, expected) => {
-    expect(formatAccuracy(input)).toBe(expected)
-  })
-
-  test('clamps out-of-range retention', () => {
-    expect(formatAccuracy(-0.1)).toBe('0%')
-    expect(formatAccuracy(1.5)).toBe('100%')
-  })
-})
+// formatAccuracy was removed per P7-fix (Accuracy tile dropped from
+// OverviewCards — ADR-015 / N040). SessionSummary has its own
+// per-session accuracy formatter that operates on { correct, total }
+// rather than a retention fraction.
 
 describe('formatXp', () => {
   test('rounds fractional XP to integer', () => {
@@ -84,7 +72,7 @@ describe('anti-Duolingo guards (P7 brief §C)', () => {
   test('no emoji or flame in any formatter output', () => {
     const all = [
       formatTime(3725), formatStreak(3).value, formatStreak(3).units,
-      formatAccuracy(0.83), formatXp(45),
+      formatXp(45),
       formatReviews(12).value, formatReviews(12).units,
     ].join(' ')
     // Banned glyphs: flame, sparkle, party, trophy, medal — common
