@@ -33,6 +33,11 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/.turbo/
+# Playwright local artifacts (traces, screenshots) from cold-start +
+# pyodide-e2e specs. CI uploads via the actions/upload-artifact step;
+# locally these accumulate and shouldn't be tracked.
+frontend/test-results/
+frontend/playwright-report/
 .pnpm-store/
 .npm/
 .yarn/
