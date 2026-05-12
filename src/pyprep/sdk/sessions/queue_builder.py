@@ -26,6 +26,10 @@ def build_queue(
     limit: int,
     daily_new_card_cap: int,
     now: dt.datetime,
+    # P7.T7.9 / ADR-026: "Practice anyway" — when True, _mixed_queue
+    # skips the daily cap. Caller is SessionPage's caught-up empty
+    # state CTA. Reviews persist normally; see ADR-026.
+    override_daily_cap: bool = False,
 ) -> tuple[str, ...]:
     if mode == "learn":
         if sphere_id is None:
@@ -38,7 +42,8 @@ def build_queue(
         if sphere_id is None:
             raise ValueError("mixed mode requires sphere_id")
         return _mixed_queue(
-            cards, reviews, user_id, sphere_id, limit, daily_new_card_cap, now
+            cards, reviews, user_id, sphere_id, limit,
+            daily_new_card_cap, now, override_daily_cap,
         )
     raise ValueError(f"unsupported session mode: {mode}")
 
@@ -61,10 +66,16 @@ def _mixed_queue(
     limit: int,
     daily_new_card_cap: int,
     now: dt.datetime,
+    override_daily_cap: bool = False,
 ) -> tuple[str, ...]:
-    new_today = reviews.new_cards_seen_today_count(user_id, now.date())
-    new_remaining = max(0, daily_new_card_cap - new_today)
     new_pool = _new_in_sphere(cards, reviews, user_id, sphere_id)
+    if override_daily_cap:
+        # ADR-026: bypass the daily cap entirely. Pool of new cards is
+        # bounded by what's left in the sphere, not by today's quota.
+        new_remaining = len(new_pool)
+    else:
+        new_today = reviews.new_cards_seen_today_count(user_id, now.date())
+        new_remaining = max(0, daily_new_card_cap - new_today)
     due_pool = reviews.due_card_ids(user_id, now, sphere_id=sphere_id)
     new_take = min(limit // 2, len(new_pool), new_remaining)
     due_take = min(limit - new_take, len(due_pool))

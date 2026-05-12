@@ -32,6 +32,12 @@ interface LoginSearch {
   from?: string
 }
 
+// P7.T7.9 / ADR-026: ?practice=true on the session route triggers the
+// "Practice anyway" path that bypasses the new-card daily cap.
+interface SessionSearch {
+  practice?: boolean
+}
+
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
 })
@@ -90,6 +96,9 @@ const lessonRoute = createRoute({
 const sessionRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/modules/$moduleId/sphere/$sphereId/session',
+  validateSearch: (raw: Record<string, unknown>): SessionSearch => ({
+    practice: raw.practice === true || raw.practice === 'true',
+  }),
   component: SessionPage,
 })
 

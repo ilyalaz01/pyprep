@@ -54,6 +54,7 @@ class SessionService:
         sphere_id: str | None = None,
         limit: int = 20,
         daily_new_card_cap: int = 15,
+        override_daily_cap: bool = False,  # P7.T7.9 / ADR-026
     ) -> Session:
         queue = build_queue(
             cards=self._cards,
@@ -64,6 +65,7 @@ class SessionService:
             limit=limit,
             daily_new_card_cap=daily_new_card_cap,
             now=self._clock(),
+            override_daily_cap=override_daily_cap,
         )
         session = Session(
             id=self._new_id(),

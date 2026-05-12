@@ -38,6 +38,10 @@ class StartRequest(BaseModel):
     mode: Literal["learn", "review", "mixed"]
     sphere_id: str | None = None
     limit: int = Field(default=20, ge=1, le=100)
+    # P7.T7.9 / ADR-026: "Practice anyway" override. Bypass the daily
+    # new-card cap when building a mixed-mode queue. Only meaningful
+    # for mode='mixed'; ignored for review/learn (no cap applies).
+    override_daily_cap: bool = False
 
     @model_validator(mode="after")
     def _check_sphere_required(self) -> StartRequest:
@@ -127,6 +131,7 @@ def start(
     s = sessions.start(
         user_id=user.id, mode=body.mode, sphere_id=body.sphere_id,
         limit=body.limit, daily_new_card_cap=settings.daily_new_card_cap,
+        override_daily_cap=body.override_daily_cap,
     )
     total = len(cards.by_sphere(body.sphere_id)) if body.sphere_id else None
     return _to_session_response(s, total)

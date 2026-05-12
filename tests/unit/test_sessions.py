@@ -300,6 +300,42 @@ def test_start_mixed_respects_daily_new_card_cap(service, stores) -> None:
     assert set(s.queue) == {"m1-s0-c4", "m1-s0-c5"}
 
 
+def test_start_mixed_override_daily_cap_bypasses_the_cap(service, stores) -> None:
+    """P7.T7.9 / ADR-026 "Practice anyway": with override_daily_cap=True,
+    the queue includes new cards even when new_today is already at the
+    daily cap. Reviews still persist per ADR-026."""
+    _, reviews = stores
+    reviews.new_today = 15  # at cap
+    reviews.due["u1"] = ["m1-s0-c4", "m1-s0-c5"]
+
+    s = service.start(
+        user_id="u1", mode="mixed", sphere_id="m1-s0", limit=10,
+        daily_new_card_cap=15, override_daily_cap=True,
+    )
+
+    # Override fires: new cards from the pool join the queue alongside
+    # due cards, capped only by `limit` and pool size.
+    new_in_queue = [cid for cid in s.queue if cid in {"m1-s0-c1", "m1-s0-c2", "m1-s0-c3"}]
+    assert len(new_in_queue) >= 1
+    assert {"m1-s0-c4", "m1-s0-c5"}.issubset(set(s.queue))
+
+
+def test_start_mixed_override_defaults_off(service, stores) -> None:
+    """Default `override_daily_cap=False` preserves the pre-T7.9 cap
+    behaviour — no caller code that omits the flag changes meaning."""
+    _, reviews = stores
+    reviews.new_today = 15  # at cap
+    reviews.due["u1"] = ["m1-s0-c4"]
+
+    s = service.start(
+        user_id="u1", mode="mixed", sphere_id="m1-s0", limit=10,
+        daily_new_card_cap=15,
+    )
+
+    # Cap applies — no new cards in queue.
+    assert {"m1-s0-c1", "m1-s0-c2"}.isdisjoint(set(s.queue))
+
+
 def test_start_mixed_requires_sphere_id(service) -> None:
     with pytest.raises(ValueError, match="sphere_id"):
         service.start(user_id="u1", mode="mixed", limit=1)

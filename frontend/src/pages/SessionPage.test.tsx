@@ -89,6 +89,10 @@ describe('SessionPage — state machine', () => {
       .toHaveAttribute('href', '/modules/1')
   })
 
+  // P7.T7.9 / ADR-026 "Practice anyway" CTA + ?practice=true flow are
+  // pinned in SessionPage.practice.test.tsx (sibling — keeps this
+  // file under the 150-LOC gate).
+
   test('finished (cardsTotal>0) shows the SessionSummary surface', async () => {
     useSessionMock().mockReturnValue(mockSession({
       status: 'finished', cardsTotal: 5, details: {

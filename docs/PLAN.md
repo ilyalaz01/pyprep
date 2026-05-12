@@ -863,6 +863,42 @@ The hand-rolled implementation lives in one component (`frontend/src/components/
 
 ---
 
+### ADR-026: "Practice anyway" sessions persist FSRS Reviews
+
+**Status:** Accepted (Phase 7, T7.9 — 2026-05-12). Resolves NOTES N031.
+
+**Context:** N031 surfaced the daily-cap caught-up case: when the user has exhausted today's review-due cards and the `daily_new_card_cap` has gated new-card insertion, `SessionPage`'s `EmptySession` shows "You're caught up." with no path forward. Owner wants the option to override the cap and practice anyway — useful for the day-of-interview warm pass + the simple "I want more reps today" case.
+
+**Open question N031 raised:** does "practice anyway" record Reviews against FSRS state? Two viable answers:
+
+1. **Persist Reviews** — same path as a normal session. FSRS receives the rating, updates difficulty + due-date as usual. The session looks identical at the data layer; only the queue-building rule differs (`override_daily_cap=True` skips the cap in `_mixed_queue`).
+2. **Dry-run mode** — a parallel session shape that does NOT write Review rows. FSRS state is preserved across the bonus practice.
+
+**Decision:** Path 1. Practice-anyway sessions persist Reviews exactly like normal sessions. FSRS-side handling of dense revisits is FSRS's job.
+
+**Rationale:**
+- **ADR-015 owns scheduling.** FSRS is the source of truth for "when should this card surface again." A dry-run mode would create a divergence between user behavior and FSRS internal state — the user practiced 8 cards but FSRS thinks they didn't. Downstream effects: retention math is wrong, weakness ranking is wrong, the daily streak counter is wrong (PRD §3.5 / FR-STATS-5 — streak counts days with ≥1 review).
+- **FSRS absorbs dense revisits correctly.** A card rated Easy 3× in 20 minutes generates a longer interval each time — the algorithm is built for this. We don't need a special path.
+- **Single SubmitResult contract.** Both normal and practice-anyway sessions return the same `SubmitResult { next_state }` shape. UI is uniform. Frontend doesn't need to branch on "did the rating count?".
+- **Data-layer simplicity.** No new column, no `is_practice_anyway` flag on `reviews`. The session row carries the queue and the override is implicit in the cards selected; the Review row is unchanged.
+
+**Trade-offs (accepted):**
+- A user who power-practices the same card 5× in one session moves it further into the future faster than FSRS theoretically wants. Acceptable: the FSRS interval growth is already capped by difficulty + stability; a 5× burst doesn't break the schedule. If owner observes "FSRS pushed my cards too far out after a practice-anyway pass," revisit — but the fix is probably an FSRS parameter, not a separate write path.
+- "Practice anyway" sessions count toward the streak, time-invested, XP, and weakness aggregations. **This is intentional.** The user did the work; the stats should show it.
+
+**Implementation contract (pinned at T7.9):**
+- `build_queue` gains `override_daily_cap: bool = False`. In `_mixed_queue`, when True, `new_remaining = len(new_pool)` (skip the cap entirely).
+- `SessionService.start` accepts the param, passes through.
+- `StartRequest` Pydantic model gains `override_daily_cap: bool = False`.
+- Frontend `api.sessions.start({override_daily_cap})` typed.
+- UI: "Practice anyway" CTA on `EmptySession`'s caught-up branch only (NOT on "sphere has no cards yet" — that branch is content-not-authored, not cap-exhausted). Click navigates to the same route + `?practice=true` query param; `SessionPage` reads it and passes `overrideDailyCap` to `useSession`.
+
+**Revisit when:**
+- Owner observes scheduling drift after sustained practice-anyway use. At that point: instrument the FSRS interval growth on dense revisits before changing the write contract.
+- A future feature wants "exam mode" (practice rated-hard cards across modules — N033). N033 is a different scope but might share the override hook; keep the param name generic enough to stay reusable.
+
+---
+
 ### ADR-027: Time-invested aggregation — session wall-clock, not Σ response_ms
 
 **Status:** Accepted (Phase 7, T7.1 — 2026-05-12).

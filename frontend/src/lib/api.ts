@@ -53,8 +53,13 @@ export const api = {
   },
 
   sessions: {
-    start: (body: { mode: SessionMode; sphere_id?: string; limit?: number }) =>
-      call<Session>('/api/sessions', post(body)),
+    // P7.T7.9 / ADR-026: override_daily_cap=true bypasses the new-card
+    // daily cap on mixed mode. Caller is the EmptySession caught-up
+    // CTA on SessionPage.
+    start: (body: {
+      mode: SessionMode; sphere_id?: string; limit?: number;
+      override_daily_cap?: boolean;
+    }) => call<Session>('/api/sessions', post(body)),
     next: (id: string, after?: string) =>
       call<NextCard>(`/api/sessions/${id}/next${qs({ after })}`),
     answer: (

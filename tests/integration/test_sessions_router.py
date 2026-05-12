@@ -88,6 +88,44 @@ async def test_start_mixed_zero_history_yields_new_cards_and_total_count(
 
 
 @pytest.mark.asyncio
+async def test_start_accepts_override_daily_cap_field(
+    client: httpx.AsyncClient,
+) -> None:
+    """P7.T7.9 / ADR-026: StartRequest accepts `override_daily_cap`
+    and POST /api/sessions returns 201 with the request honored.
+    Behavioural verification (queue actually bypasses cap) is in the
+    SDK unit test; this asserts the HTTP boundary."""
+    token = await _register_and_login(client, "practice@example.com")
+    r = await client.post(
+        "/api/sessions",
+        json={
+            "mode": "mixed", "sphere_id": "m1-s0", "limit": 20,
+            "override_daily_cap": True,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["mode"] == "mixed"
+    assert isinstance(body["queue"], list)
+
+
+@pytest.mark.asyncio
+async def test_start_override_daily_cap_defaults_to_false(
+    client: httpx.AsyncClient,
+) -> None:
+    """Default value omitted from request body → field defaults to
+    False — no caller code that doesn't know about override changes."""
+    token = await _register_and_login(client, "nopractice@example.com")
+    r = await client.post(
+        "/api/sessions",
+        json={"mode": "mixed", "sphere_id": "m1-s0", "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+
+
+@pytest.mark.asyncio
 async def test_start_review_without_sphere_omits_total_cards_in_sphere(
     client: httpx.AsyncClient,
 ) -> None:

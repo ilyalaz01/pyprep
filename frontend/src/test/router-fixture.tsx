@@ -24,6 +24,7 @@ import { SessionPage } from '../pages/SessionPage'
 import { StatsPage } from '../pages/StatsPage'
 
 interface LoginSearch { from?: string }
+interface SessionSearch { practice?: boolean }
 
 export function buildRouter(initialUrl: string) {
   const root = createRootRoute({ component: () => <Outlet /> })
@@ -70,6 +71,9 @@ export function buildRouter(initialUrl: string) {
   const session = createRoute({
     getParentRoute: () => authed,
     path: '/modules/$moduleId/sphere/$sphereId/session',
+    validateSearch: (raw: Record<string, unknown>): SessionSearch => ({
+      practice: raw.practice === true || raw.practice === 'true',
+    }),
     component: SessionPage,
   })
   const stats = createRoute({

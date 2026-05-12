@@ -7,7 +7,7 @@
 // in MVP — each navigation issues a fresh POST /api/sessions.
 // T5.12 wires global keymap (Space/1-4/Esc) + cheatsheet footer.
 import { useState } from 'react'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 
 import { Banner } from '../components/Banner'
 import { Button } from '../components/Button'
@@ -23,13 +23,20 @@ export function SessionPage() {
   const { moduleId, sphereId } = useParams({
     from: '/_auth/modules/$moduleId/sphere/$sphereId/session',
   })
+  // P7.T7.9 / ADR-026: ?practice=true is the "Practice anyway" entry —
+  // EmptySession's caught-up CTA navigates here so the new session
+  // bypasses the daily cap.
+  const search = useSearch({
+    from: '/_auth/modules/$moduleId/sphere/$sphereId/session',
+  }) as { practice?: boolean }
   const [retryKey, setRetryKey] = useState(0)
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
       <SessionRunner
-        key={retryKey}
+        key={`${retryKey}-${search.practice ? 'practice' : 'normal'}`}
         moduleId={Number(moduleId)}
         sphereId={sphereId}
+        practice={search.practice === true}
         onRetry={() => setRetryKey((k) => k + 1)}
       />
     </section>
@@ -49,12 +56,16 @@ function KeymapCheatsheet() {
 }
 
 function SessionRunner({
-  moduleId, sphereId, onRetry,
-}: { moduleId: number; sphereId: string; onRetry: () => void }) {
+  moduleId, sphereId, practice, onRetry,
+}: { moduleId: number; sphereId: string; practice: boolean; onRetry: () => void }) {
   // mode='mixed' is the right default for both fresh users (no Reviews
   // → falls back to new cards under daily_new_card_cap) and existing
-  // users (review-due first, top up with new).
-  const session = useSession({ mode: 'mixed', sphereId, moduleId, limit: 20 })
+  // users (review-due first, top up with new). practice=true flips
+  // overrideDailyCap for the "Practice anyway" path (ADR-026).
+  const session = useSession({
+    mode: 'mixed', sphereId, moduleId, limit: 20,
+    overrideDailyCap: practice,
+  })
   const navigate = useNavigate()
   useSessionKeys({
     enabled: session.status !== 'finished' && session.status !== 'error',
@@ -88,7 +99,13 @@ function SessionBody({
     )
   }
   if (session.status === 'finished' && session.cardsTotal === 0) {
-    return <EmptySession moduleId={moduleId} totalCardsInSphere={session.totalCardsInSphere} />
+    return (
+      <EmptySession
+        moduleId={moduleId}
+        sphereId={sphereId}
+        totalCardsInSphere={session.totalCardsInSphere}
+      />
+    )
   }
   if (session.status === 'finished') {
     return <SessionSummary details={session.details} moduleId={moduleId} sphereId={sphereId} />
@@ -116,27 +133,39 @@ function SessionSkeleton() {
 }
 
 function EmptySession({
-  moduleId, totalCardsInSphere,
-}: { moduleId: number; totalCardsInSphere: number | null }) {
-  // Two distinct empty cases — "no cards authored" vs "caught up
-  // for today" — disambiguated by the total_cards_in_sphere field
-  // on the session start response.
-  // TODO(phase-7): add a "Practice anyway" CTA on the caught-up
-  // path that bypasses the daily_new_card_cap. Per ADR-015 spec.
-  const message =
-    totalCardsInSphere === 0
-      ? 'This sphere has no cards yet.'
-      : "You're caught up. Come back tomorrow for new cards."
+  moduleId, sphereId, totalCardsInSphere,
+}: { moduleId: number; sphereId: string; totalCardsInSphere: number | null }) {
+  // Two distinct empty cases:
+  //   - "no cards authored" — content gap, no CTA forward
+  //   - "caught up for today" — daily cap exhausted; P7.T7.9 / ADR-026
+  //     adds a "Practice anyway" CTA that re-enters via ?practice=true
+  //     bypassing the cap. Reviews persist normally.
+  const caughtUp = totalCardsInSphere !== 0
+  const message = caughtUp
+    ? "You're caught up. Come back tomorrow for new cards."
+    : 'This sphere has no cards yet.'
   return (
     <div className="space-y-6">
       <p className="text-sm text-[color:var(--color-fg-muted)]">{message}</p>
-      <LinkButton
-        variant="secondary"
-        to="/modules/$moduleId"
-        params={{ moduleId: String(moduleId) }}
-      >
-        Back to module
-      </LinkButton>
+      <div className="flex flex-wrap gap-3">
+        <LinkButton
+          variant="secondary"
+          to="/modules/$moduleId"
+          params={{ moduleId: String(moduleId) }}
+        >
+          Back to module
+        </LinkButton>
+        {caughtUp ? (
+          <LinkButton
+            variant="primary"
+            to="/modules/$moduleId/sphere/$sphereId/session"
+            params={{ moduleId: String(moduleId), sphereId }}
+            search={{ practice: true }}
+          >
+            Practice anyway
+          </LinkButton>
+        ) : null}
+      </div>
     </div>
   )
 }

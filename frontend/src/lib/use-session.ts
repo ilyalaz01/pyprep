@@ -50,6 +50,10 @@ export interface UseSessionParams {
   // moduleId+sphereId together write last-active on session start.
   moduleId?: number
   limit?: number
+  // P7.T7.9 / ADR-026: "Practice anyway" — bypass the new-card daily
+  // cap. SessionPage flips this when the route arrives with
+  // ?practice=true (caught-up EmptySession CTA).
+  overrideDailyCap?: boolean
 }
 
 export function useSession(params: UseSessionParams): UseSessionResult {
@@ -135,6 +139,7 @@ export function useSession(params: UseSessionParams): UseSessionResult {
       try {
         const s = await api.sessions.start({
           mode: params.mode, sphere_id: params.sphereId, limit: params.limit,
+          override_daily_cap: params.overrideDailyCap,
         })
         sessionIdRef.current = s.id
         queueRef.current = createSessionQueue(s.queue)
