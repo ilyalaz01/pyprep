@@ -1,14 +1,27 @@
 /**
  * Shiki highlighter — single shared instance, lazy-initialized on first
- * use (typically when the user opens a lesson with code blocks). Only
- * Python, JSON, bash, and plain text are bundled — keeps the WASM +
- * grammar payload to ~150 KB rather than the multi-MB default.
+ * use (typically when the user opens a lesson with code blocks).
+ *
+ * Built from `shiki/core` with explicit language/theme/engine imports,
+ * NOT the default `shiki` entry. The default entry pulls every
+ * BundledLanguage as separately-chunked dynamic imports, and Vite's
+ * lazy graph keeps every chunk in dist/ even when only python/json/
+ * bash are reachable from app code — see ADR-022 (T6.11) and
+ * `scripts/check-bundle-size.mjs`. With this core form only the
+ * langs/theme we name below ship.
+ *
+ * Engine: `createJavaScriptRegexEngine`, not Oniguruma. The JS engine
+ * handles the four langs we register (python/json/bash/text), avoids
+ * the 280 KB onig.wasm download on first highlight, and works in
+ * worker + main-thread contexts without WASM-mime-type CDN fiddling.
  *
  * Theme: github-dark-dimmed (restrained, anti-VSCode-dark-plus). If a
  * future polish wants tokens mapped to DESIGN.md instead, swap to a
  * custom Theme JSON here.
  */
-import type { HighlighterCore, BundledLanguage } from 'shiki'
+import type { HighlighterCore } from 'shiki/core'
+import { createHighlighterCore } from 'shiki/core'
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 
 export const SUPPORTED_LANGS = ['python', 'json', 'bash', 'text'] as const
 export type SupportedLang = (typeof SUPPORTED_LANGS)[number]
@@ -17,12 +30,15 @@ let highlighterPromise: Promise<HighlighterCore> | null = null
 
 export async function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
-    highlighterPromise = import('shiki').then((m) =>
-      m.createHighlighter({
-        themes: ['github-dark-dimmed'],
-        langs: SUPPORTED_LANGS as unknown as BundledLanguage[],
-      }),
-    )
+    highlighterPromise = createHighlighterCore({
+      themes: [import('shiki/themes/github-dark-dimmed.mjs')],
+      langs: [
+        import('shiki/langs/python.mjs'),
+        import('shiki/langs/json.mjs'),
+        import('shiki/langs/bash.mjs'),
+      ],
+      engine: createJavaScriptRegexEngine(),
+    })
   }
   return highlighterPromise
 }
