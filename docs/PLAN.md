@@ -717,6 +717,15 @@ Owner's first proposed fix was caller-frame inspection (walk the stack at `__imp
 
 **T6.11 amendment — gate threshold 8 s → 12 s (2026-05-12):** Owner-machine cold-cache measurement at T6.11 entry came in at 9.7 s on a Windows/WSL2 dev box (no throttling, jsdelivr direct hit). The original 8 s ceiling would page on every push from owner's machine, defeating the gate's purpose. New ceiling = owner-measured worst-case 9.7 s + 2.3 s headroom covering both CI-runner variance and protocol-level network throttling. The N036 workaround is implemented as a Playwright `context.route` interceptor that adds an 80 ms hop to every `cdn.jsdelivr.net/**` request (filed in `frontend/test/cold-start.spec.ts`). DevTools throttle was rejected because it doesn't propagate to Web Worker fetch — the exact reason N036 was filed.
 
+**P6.5/P1-3 amendment — realistic workload + NFR-SBX-2 gate added (2026-05-12):**
+The original T6.11 workload was `def add(a, b): return a + b` with a single trivial assertion. Audit P1-3 flagged that as under-measuring the user's first-touch experience: a real code_task pulls `pytest` import overhead, runs 3-4 assertions, walks the JSON adapter — all amortized away by the trivial workload.
+
+Replaced with m1-s1-c12 (Date.from_string) from Module 1: 3 tests, `import pytest`, a `@classmethod` constructor + subclass-instance check. Mirrored verbatim in `frontend/src/cold-start-fixture.ts`; a content change to that card needs a paired fixture update.
+
+Same cold-start ceiling (12 s) — the workload swap adds ~200-400 ms of measured execute time on top of the dominant boot cost, comfortably inside the existing 2.3 s headroom. Re-tuning the ceiling is deliberately deferred to the next owner-machine baseline rather than reactively bumped here.
+
+The fixture now ALSO runs the same workload **twice more** in the warm session and reports per-run timings. The Playwright spec asserts a second budget independently: **NFR-SBX-2 hot-path ≤ 1.5 s per subsequent run** (PRD aspiration is ≤ 1 s; 500 ms headroom for CI variance). A regression that, say, terminates the worker per task instead of reusing it (ADR-018) would trip this gate even if cold-start stays green. CI gate count: 1 → 2 (cold-start spec gates two budgets; pre-push gate count unchanged at 9).
+
 **Trade-offs (accepted explicitly):**
 - CDN outage → code_task cards visibly fail in MVP-1. Acceptable per PRD §8 risk table.
 - jsdelivr could in theory swap the bytes behind a version tag. Vanishingly unlikely for a published Pyodide release; Phase 10 self-host pins the bytes too.
