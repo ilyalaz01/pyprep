@@ -13,6 +13,11 @@ import tailwindcss from '@tailwindcss/vite'
 // dist/cold-start.html; the Playwright spec under `test/` navigates
 // there to measure boot + first runCodeTask end-to-end. CI-only —
 // not linked from the SPA.
+//
+// P6.5/P1-2: `pyodide-e2e.html` is a third build entry for the
+// real-Pyodide e2e Playwright spec — boots the worker once, exposes
+// runCodeTask on window, lets the spec drive the T6.10 + T6.12
+// matrices against the real WASM runtime. Also CI-only.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   worker: { format: 'es' },
@@ -21,6 +26,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         'cold-start': resolve(__dirname, 'cold-start.html'),
+        'pyodide-e2e': resolve(__dirname, 'pyodide-e2e.html'),
       },
     },
   },

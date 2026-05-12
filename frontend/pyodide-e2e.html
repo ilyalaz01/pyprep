@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PyPrep real-Pyodide e2e fixture (CI-only — P6.5/P1-2)</title>
+  </head>
+  <body>
+    <!--
+      Standalone Vite entry built into dist/pyodide-e2e.html. CI-only —
+      `frontend/test/pyodide-e2e.spec.ts` navigates here, awaits the
+      `window.__pyprepE2eReady` boot signal, then drives the T6.10 +
+      T6.12 matrices via `window.__pyprepRunCodeTask`. Not linked from
+      the SPA; safe to ship since it just exercises the same worker
+      the app would.
+    -->
+    <script type="module" src="/src/pyodide-e2e-fixture.ts"></script>
+  </body>
+</html>

@@ -1,7 +1,11 @@
-// Playwright config for T6.11 cold-start gate (CI-only).
+// Playwright config for the two CI-only gates:
+//
+//   1. T6.11 cold-start + P6.5/P1-3 NFR-SBX-2 — `cold-start.spec.ts`
+//   2. P6.5/P1-2 real-Pyodide e2e (T6.10 + T6.12 matrices against the
+//      real WASM runtime) — `pyodide-e2e.spec.ts`
 //
 // Runs against `pnpm preview` which serves `dist/`. The webServer
-// section spins up preview, waits for the port, runs the spec.
+// section spins up preview, waits for the port, runs the specs.
 // reuseExistingServer=true lets local dev avoid double-binding when
 // owner manually runs `pnpm preview` in another shell.
 //
@@ -13,7 +17,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './test',
-  testMatch: /cold-start\.spec\.ts$/,
+  // P6.5/P1-2 — pyodide-e2e.spec.ts joins cold-start.spec.ts in CI.
+  testMatch: /(cold-start|pyodide-e2e)\.spec\.ts$/,
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
