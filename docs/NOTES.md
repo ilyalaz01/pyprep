@@ -797,3 +797,58 @@ on-demand in CI rather than every push.
 Not blocking Phase 6 close — manual stop-#4 covers the gap until
 then.
 
+**Update 2026-05-12 (P6.5/P1-2):** Partially resolved. The Playwright
+spec at `frontend/test/pyodide-e2e.spec.ts` drives the T6.10 + T6.12
+matrices + FR-SBX-6 against real Pyodide in CI. The Pyodide-in-Node
+fallback option above is no longer needed.
+
+---
+
+## N038 — Vite env vars are build-time, not runtime — CI must inject [LESSON]
+
+**Phase:** 6.5 (P6.5/P1-2 CI rollout) · **Date:** 2026-05-12 · **Status:** lesson logged
+
+`VITE_PYODIDE_CDN` and `VITE_PYODIDE_VERSION` (and any future `VITE_*`
+env) are inlined by Vite at **build** time, not read at runtime in the
+browser. Three consequences that bit the P6.5/P1-2 CI rollout:
+
+1. The Playwright job in `.github/workflows/ci.yml` was building
+   without these env vars present, producing a `dist/` whose Pyodide
+   worker correctly fired the T6.0.5 "env not set" error on first
+   `runCodeTask` — clean error, but every spec failed on the same
+   message.
+2. The failure mode was indistinguishable from "preview wedged" at
+   first because `webServer.stdout: 'pipe'` wasn't on, so the worker's
+   diagnostic + error postMessages weren't visible in the job log.
+3. Local works because `frontend/.env.local` ships with the values;
+   CI runners have neither `.env.local` nor inherited env. The gap
+   was invisible until the first push that needed Pyodide in CI.
+
+**Resolution:** Hardcoded values injected at the playwright job's
+build step in ci.yml. CDN URL is non-sensitive; version is pinned
+per ADR-020. Single source of truth = workflow file. Values are
+NOT committed to `.env` or `.env.example` (those stay env-set-by-
+each-developer); committing values to `.env` is the alternative
+path that the project deliberately doesn't take, to keep
+secrets-out-of-source discipline even for non-secret values.
+
+**Lesson + paired-commit rule:** any new `VITE_*` var must land in
+**three** places in the same commit, not two:
+- `frontend/.env.example` (developer-facing template)
+- `frontend/.env.local` (local owner setup; per existing
+  `feedback_env_var_setup_pairing` rule)
+- `.github/workflows/ci.yml` build step `env:` block for any job
+  that needs the var at build time
+
+The Phase 6.5 audit already raised the analogous local-side concern
+(env-var setup pairing) — the CI side is the same shape and just
+got added to the rule.
+
+**Phase 10 gate candidate:** `scripts/check-vite-env-coverage.mjs`
+that greps `VITE_*` references across `frontend/src/**`, compares
+against the union of `.env.example` keys and CI workflow `env:`
+keys, fails on any reference not covered. Same idea as the
+contrast/em-dash/bundle gates: regression detection at push time
+instead of CI-failure time. Filed for Phase 10 polish; not
+blocking Phase 6.5 close.
+

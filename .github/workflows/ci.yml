@@ -124,7 +124,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build (production dist for vite preview)
+        # Vite inlines VITE_* env vars at BUILD time, not runtime.
+        # Without these, the Pyodide worker boots and fires its
+        # "VITE_PYODIDE_CDN not set" error (worker.ts:146) — clean
+        # error, but the SPA can't reach the CDN so every Playwright
+        # spec fails on first runCodeTask. Values hardcoded:
+        # CDN URL is non-sensitive; version pinned per ADR-020.
+        # See NOTES N038 for the lesson + Phase 10 gate candidate.
         run: pnpm build
+        env:
+          VITE_PYODIDE_CDN: https://cdn.jsdelivr.net/pyodide/v0.26.4/full/
+          VITE_PYODIDE_VERSION: 0.26.4
 
       - name: Verify dist/ artifacts before Playwright
         # If `pnpm build` silently produced an empty or wrong-location
