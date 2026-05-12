@@ -177,7 +177,11 @@ frontend/src/pyodide/
 └── types.ts               # TypeScript types
 ```
 
-Each `.ts` file ≤ 150 LOC.
+Each `.ts` file ≤ 150 code-LOC, where code-LOC is the metric enforced by
+`scripts/check_file_size.py` (non-blank, non-comment lines; see the
+script's `count_loc` for the exact rule). Raw `wc -l` may exceed 150 on
+files with substantial header comments + diagnostic emissions; the gate
+is the operative ceiling.
 
 ### 5.3 Timeout
 
@@ -238,5 +242,5 @@ Setup:  PYODIDE_VERSION (semver), PYODIDE_CDN_URL (str), DEFAULT_TIMEOUT_MS (int
 - [ ] Timeout terminates and recovers cleanly.
 - [ ] Per-test results (pass/fail, message, traceback) surface correctly in the UI.
 - [ ] No main-thread freezes during execution (verified by Lighthouse / DevTools).
-- [ ] No file in `frontend/src/pyodide/` exceeds 150 LOC.
+- [ ] No file in `frontend/src/pyodide/` exceeds 150 code-LOC (see §5.2 — `scripts/check_file_size.py` is the canonical counter; raw `wc -l` is not the measurement).
 - [ ] All Module 1 `code_task` cards execute correctly when given the documented `solution_code`.
