@@ -1,0 +1,252 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s2",
+  "cards": [
+    {
+      "id": "m2-s2-c1",
+      "type": "flip",
+      "topic": "splitlines vs split('\\n')",
+      "topic_ru": "splitlines vs split('\\n')",
+      "difficulty": 2,
+      "tags": ["string-methods", "splitlines", "cross-platform"],
+      "question": "Why is `s.splitlines()` preferred over `s.split('\\n')` for parsing text files?",
+      "answer": "`splitlines()` handles every line-ending convention uniformly — `\\n` (Linux/macOS), `\\r\\n` (Windows), and `\\r` (old Mac). `split('\\n')` only handles `\\n` and leaves a stray `\\r` on every line of a Windows-encoded file, breaking downstream `startswith`/`strip` checks. `splitlines()` also doesn't emit a trailing empty string when the input ends with a newline, which `split` does.",
+      "answer_explanation_md": "The trailing-empty-string bug is the one that gets shipped: `'a\\nb\\n'.split('\\n')` is `['a', 'b', '']`, and `for line in lines: process(line)` then calls `process('')` once at the end. `'a\\nb\\n'.splitlines()` is `['a', 'b']`. Use `splitlines()` for files, `split('\\n')` only when you genuinely have a `\\n`-delimited *value* (not a file)."
+    },
+
+    {
+      "id": "m2-s2-c2",
+      "type": "code_task",
+      "topic": "Read a config: skip blanks and comments",
+      "topic_ru": "Чтение конфига: пропуск пустых строк и комментариев",
+      "difficulty": 2,
+      "tags": ["string-methods", "strip", "startswith", "config-parsing"],
+      "prompt_md": "Implement `iter_config_lines(text: str) -> list[str]` that:\n\n- Splits `text` into lines.\n- Strips leading/trailing whitespace from each line.\n- Drops lines that are empty (after stripping).\n- Drops lines that start with `#` (after stripping).\n- Returns the remaining lines, each stripped, in original order.\n\nThis is the read-a-config interview classic.",
+      "starter_code": "def iter_config_lines(text):\n    # your code here\n    pass\n",
+      "solution_code": "def iter_config_lines(text):\n    out = []\n    for line in text.splitlines():\n        line = line.strip()\n        if not line or line.startswith('#'):\n            continue\n        out.append(line)\n    return out\n",
+      "tests": "import pytest\nfrom solution import iter_config_lines\n\ndef test_drops_blank_and_comment_lines():\n    text = '# header comment\\nname = alice\\n\\n  # indented comment\\nport = 8080\\n'\n    assert iter_config_lines(text) == ['name = alice', 'port = 8080']\n\ndef test_strips_whitespace():\n    assert iter_config_lines('   hello   \\n\\tworld\\t') == ['hello', 'world']\n\ndef test_preserves_order():\n    text = 'a\\nb\\nc\\n'\n    assert iter_config_lines(text) == ['a', 'b', 'c']\n\ndef test_empty_input():\n    assert iter_config_lines('') == []\n\ndef test_only_comments_and_blanks():\n    assert iter_config_lines('# a\\n\\n  #b\\n') == []\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s2-c3",
+      "type": "fill_in",
+      "topic": "sep.join: separator is the receiver",
+      "topic_ru": "sep.join: разделитель — это получатель метода",
+      "difficulty": 1,
+      "tags": ["string-methods", "join"],
+      "code_snippet_with_blanks": "parts = ['alice', 'bob', 'carol']\nresult = ___.___(parts)\nassert result == 'alice, bob, carol'",
+      "accepted_answers": [
+        ["\", \"", "', '"],
+        ["join"]
+      ],
+      "explanation_md": "Python's `join` is a method on the separator string, not on the list: `\", \".join(parts)`. This trips up newcomers who expect `parts.join(\", \")` (the JavaScript shape). The reason is that `join` is defined for any iterable that yields strings, but the *separator* is the constant — so it's natural to put it as the method receiver. The pattern: `<separator>.join(<iterable-of-strings>)`."
+    },
+
+    {
+      "id": "m2-s2-c4",
+      "type": "flip",
+      "topic": "re.search vs re.match — anchored vs not",
+      "topic_ru": "re.search vs re.match — с якорем и без",
+      "difficulty": 2,
+      "tags": ["re", "search", "match", "anchoring", "interview-classic"],
+      "question": "What's the difference between `re.search(pat, s)` and `re.match(pat, s)`?",
+      "answer": "`re.match` is anchored at position 0 — the pattern must match starting at the *beginning* of `s`. `re.search` scans the entire string and returns the first match anywhere. Neither requires the whole string to match; use `re.fullmatch` if you need that. Most of the time you want `re.search`, not `re.match` — the name `match` misleads beginners into using it for general searches.",
+      "answer_explanation_md": "Concrete test: `re.match(r\"ERROR\", \"log: ERROR found\")` returns `None`. `re.search(r\"ERROR\", \"log: ERROR found\")` returns a `Match`. The pattern itself is identical; only the entry point differs in anchoring. In code review, `re.match` is a yellow flag — half the time the author meant `re.search` and just didn't know."
+    },
+
+    {
+      "id": "m2-s2-c5",
+      "type": "code_trap",
+      "topic": "re.match returns None when pattern isn't at start",
+      "topic_ru": "re.match возвращает None, если паттерн не в начале",
+      "difficulty": 3,
+      "tags": ["re", "match", "anchoring", "interview-classic"],
+      "code_snippet": "import re\n\nm = re.match(r'\\d+', 'log line: error 500')\nprint(m)",
+      "question": "What does this print?",
+      "options": [
+        "<re.Match object; span=(11, 14), match='500'>",
+        "None",
+        "'500'",
+        "Raises `re.error: no match`"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`re.match` requires the pattern to match starting at position 0. The input begins with `'l'`, not a digit, so no match — `re.match` returns `None` (it does *not* raise). If you wanted the `500`, you needed `re.search(r'\\d+', 'log line: error 500')`, which scans the whole string and returns a Match at span (11, 14). \n\nThis is the single most-asked regex gotcha in junior interviews. Memorize: `match` = anchored, `search` = anywhere."
+    },
+
+    {
+      "id": "m2-s2-c6",
+      "type": "multiple_choice",
+      "topic": "findall vs finditer — when groups matter",
+      "topic_ru": "findall vs finditer — когда нужны группы",
+      "difficulty": 3,
+      "tags": ["re", "findall", "finditer", "groups"],
+      "question": "You want every match of `r\"(?P<level>ERROR|WARN) (?P<msg>.+)\"` in a log, with both groups addressable by name. Which is the best fit?",
+      "options": [
+        "`re.findall(pat, text)` — returns a list of `(level, msg)` tuples; index by position.",
+        "`re.finditer(pat, text)` — yields Match objects; access via `m.group('level')` / `m.group('msg')` or `m.groupdict()`.",
+        "`re.match(pat, text)` and loop manually with `m.end()`.",
+        "`re.search(pat, text)` repeatedly with the leftover slice."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Works mechanically — `findall` with named groups still returns positional tuples — but you lose the names at the call site. Loses the readability benefit named groups exist to provide.",
+        "Correct. `finditer` is the idiomatic choice when you need every match *and* you care about groups by name. The Match objects are full-fidelity — `.groupdict()`, `.start()`, `.end()` all available.",
+        "Awkward and easy to get wrong. The stdlib already has the loop in `finditer`; rewriting it is a smell.",
+        "Same issue — re-implementing what `finditer` already does."
+      ]
+    },
+
+    {
+      "id": "m2-s2-c7",
+      "type": "code_task",
+      "topic": "Mask email addresses in a log line with re.sub",
+      "topic_ru": "Маскировка email-адресов в логе через re.sub",
+      "difficulty": 3,
+      "tags": ["re", "sub", "masking", "security"],
+      "prompt_md": "Implement `mask_emails(text: str) -> str` that replaces every email address in `text` with the string `<email>`.\n\nFor this task, treat an email as `[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}` — the standard 'good enough for logs' shape. Use `re.sub`.\n\nThe interview framing is log hygiene: never let a user's email reach a search index or shared error report.",
+      "starter_code": "import re\n\ndef mask_emails(text):\n    # your code here\n    pass\n",
+      "solution_code": "import re\n\n_EMAIL = re.compile(r'[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}')\n\ndef mask_emails(text):\n    return _EMAIL.sub('<email>', text)\n",
+      "tests": "import pytest\nfrom solution import mask_emails\n\ndef test_masks_a_single_email():\n    assert mask_emails('contact alice@example.com today') == 'contact <email> today'\n\ndef test_masks_multiple_emails():\n    assert mask_emails('alice@a.io, bob+filter@b.co.uk') == '<email>, <email>'\n\ndef test_leaves_non_email_text_alone():\n    assert mask_emails('no addresses here at all') == 'no addresses here at all'\n\ndef test_handles_plus_addressing_and_dots():\n    assert mask_emails('first.last+tag@deep.sub.example.org') == '<email>'\n\ndef test_does_not_match_bare_at_sign():\n    assert mask_emails('see @username on social') == 'see @username on social'\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s2-c8",
+      "type": "fill_in",
+      "topic": "Backreference in re.sub replacement",
+      "topic_ru": "Обратная ссылка в замене re.sub",
+      "difficulty": 3,
+      "tags": ["re", "sub", "backreference", "groups"],
+      "code_snippet_with_blanks": "import re\n\n# Swap the order of 'first last' to 'last, first'\nresult = re.sub(r'(\\w+) (\\w+)', r'___, ___', 'Ada Lovelace')\nassert result == 'Lovelace, Ada'",
+      "accepted_answers": [
+        ["\\\\2"],
+        ["\\\\1"]
+      ],
+      "explanation_md": "In `re.sub`, the replacement string supports backreferences: `\\1` refers to the first capturing group, `\\2` to the second, and so on. Use raw strings (`r'\\2, \\1'`) so the backslashes survive Python's own string escaping. \n\nThe same backreference syntax works inside patterns to require a repeated match — `r'(\\w+) \\1'` matches duplicated words — but that's a separate use; in the *replacement*, `\\1` etc. always means 'substitute the captured text'."
+    },
+
+    {
+      "id": "m2-s2-c9",
+      "type": "code_trap",
+      "topic": "re.sub count parameter — default is replace all",
+      "topic_ru": "Параметр count у re.sub — по умолчанию заменяет все",
+      "difficulty": 2,
+      "tags": ["re", "sub", "count"],
+      "code_snippet": "import re\n\nresult = re.sub(r'cat', 'dog', 'cat cat cat')\nprint(result)",
+      "question": "What does this print?",
+      "options": [
+        "'dog cat cat' (only the first match replaced)",
+        "'dog dog dog'",
+        "'cat cat cat' (re.sub returns the original on no count)",
+        "Raises `TypeError: count is required`"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`re.sub(pattern, repl, string, count=0)` defaults to `count=0`, which the docs document as 'replace all non-overlapping matches'. To replace only the first one, pass `count=1`: `re.sub(r'cat', 'dog', 'cat cat cat', count=1)` returns `'dog cat cat'`. \n\nThis is the opposite of `str.replace`, which also replaces all by default — both are consistent, but the meaning of `count=0` in `re.sub` ('unlimited') is the part that trips people up because zero usually means 'none'."
+    },
+
+    {
+      "id": "m2-s2-c10",
+      "type": "flip",
+      "topic": "Capturing vs non-capturing vs named groups",
+      "topic_ru": "Capturing vs non-capturing vs named группы",
+      "difficulty": 2,
+      "tags": ["re", "groups", "named-groups"],
+      "question": "What's the difference between `(abc)`, `(?:abc)`, and `(?P<name>abc)` in a regex?",
+      "answer": "`(abc)` is a capturing group — it groups for the engine *and* captures the match, addressable as `m.group(1)`. `(?:abc)` is a non-capturing group — it groups for the engine (so you can apply `+`, `?`, alternation) but is invisible to `.group()` numbering. `(?P<name>abc)` is a named capturing group — same as `()` but you can access it via `m.group('name')` or `m.groupdict()['name']`.",
+      "answer_explanation_md": "Use `(?:...)` when you need grouping for the regex structure (`(?:foo|bar)+`) but the matched text isn't interesting to your code — it keeps `m.group(1)` etc. pointing at the groups that actually matter. Use named groups (`(?P<ip>...)`) whenever the captured value is going to be consumed by name; pattern edits that add or remove unnamed groups can silently shift the meaning of `m.group(3)`."
+    },
+
+    {
+      "id": "m2-s2-c11",
+      "type": "multiple_choice",
+      "topic": "Match.groups() vs groupdict()",
+      "topic_ru": "Match.groups() vs groupdict()",
+      "difficulty": 3,
+      "tags": ["re", "groups", "match-object"],
+      "question": "Given `m = re.match(r'(?P<verb>GET|POST) (?P<path>/\\S*) HTTP/(\\d\\.\\d)', 'GET /health HTTP/1.1')`, which row best describes what `m.groups()` and `m.groupdict()` return?",
+      "options": [
+        "`m.groups()` returns `('GET', '/health', '1.1')`; `m.groupdict()` returns `{'verb': 'GET', 'path': '/health'}`.",
+        "`m.groups()` returns only the unnamed groups: `('1.1',)`; `m.groupdict()` returns the named ones.",
+        "`m.groups()` returns `('GET', '/health')`; the third group is hidden because it's unnamed.",
+        "Both return the same dict — `m.groups()` is an alias for `m.groupdict()`."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `m.groups()` is a tuple of every capturing group (named and unnamed), in pattern order. `m.groupdict()` is the dict of *named* groups only. The unnamed `(\\d\\.\\d)` is in `m.groups()` but absent from `m.groupdict()` — by design.",
+        "Wrong — `m.groups()` includes named groups too; it doesn't filter.",
+        "Wrong — unnamed groups are still captured and appear in `m.groups()`.",
+        "Wrong — `m.groups()` returns a *tuple*, `m.groupdict()` a *dict*. Different shapes, different filters."
+      ]
+    },
+
+    {
+      "id": "m2-s2-c12",
+      "type": "code_task",
+      "topic": "Extract IP and timestamp with named groups",
+      "topic_ru": "Извлечение IP и времени через именованные группы",
+      "difficulty": 4,
+      "tags": ["re", "named-groups", "log-parsing", "interview-classic"],
+      "prompt_md": "Implement `parse_log(line: str) -> dict | None` that parses a log line in this exact shape:\n\n```\n10.0.0.1 [2026-05-13T14:30:00Z] GET /health 200\n```\n\nReturn a dict with keys `ip`, `timestamp`, `verb`, `path`, `status` (all strings — don't convert types). Use a single regex with named groups. Return `None` if the line doesn't match the shape.\n\nThe interview framing: every named-group field becomes a column in your downstream parser. Pattern edits that shift positional indices would be a disaster; named groups absorb them.",
+      "starter_code": "import re\n\ndef parse_log(line):\n    # your code here\n    pass\n",
+      "solution_code": "import re\n\n_LINE = re.compile(\n    r'^(?P<ip>\\d{1,3}(?:\\.\\d{1,3}){3}) '\n    r'\\[(?P<timestamp>[^\\]]+)\\] '\n    r'(?P<verb>GET|POST|PUT|DELETE|PATCH) '\n    r'(?P<path>/\\S*) '\n    r'(?P<status>\\d{3})$'\n)\n\ndef parse_log(line):\n    m = _LINE.match(line)\n    return m.groupdict() if m else None\n",
+      "tests": "import pytest\nfrom solution import parse_log\n\ndef test_parses_a_well_formed_line():\n    result = parse_log('10.0.0.1 [2026-05-13T14:30:00Z] GET /health 200')\n    assert result == {\n        'ip': '10.0.0.1',\n        'timestamp': '2026-05-13T14:30:00Z',\n        'verb': 'GET',\n        'path': '/health',\n        'status': '200',\n    }\n\ndef test_returns_none_on_garbage():\n    assert parse_log('not a log line at all') is None\n\ndef test_handles_different_verbs():\n    result = parse_log('192.168.1.1 [2026-01-01T00:00:00Z] POST /api/users 201')\n    assert result['verb'] == 'POST'\n    assert result['status'] == '201'\n\ndef test_status_field_is_string_not_int():\n    result = parse_log('1.2.3.4 [t] GET / 404')\n    assert isinstance(result['status'], str)\n    assert result['status'] == '404'\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s2-c13",
+      "type": "code_trap",
+      "topic": "Compiling regex inside a hot loop",
+      "topic_ru": "Компиляция regex внутри горячего цикла",
+      "difficulty": 3,
+      "tags": ["re", "compile", "performance"],
+      "code_snippet": "import re\n\ndef extract_levels(lines):\n    out = []\n    for line in lines:\n        m = re.compile(r'(ERROR|WARN|INFO)').search(line)\n        if m:\n            out.append(m.group(1))\n    return out",
+      "question": "What's the performance bug?",
+      "options": [
+        "`re.search` is slower than `re.match`; switch to `match`.",
+        "`re.compile` is called inside the loop — the pattern is rebuilt on every line. Move it to module scope (or above the loop) so it compiles once.",
+        "Lists are slow; use a generator.",
+        "There's no bug — `re.compile` is free."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Every iteration calls `re.compile(...)` and then immediately discards the result. The Python `re` module *does* cache module-level calls like `re.search(pattern_str, s)` — but `re.compile(...)` followed by `.search(...)` bypasses that cache and pays the parse-and-build cost on every line. \n\nThe fix: hoist the compile out of the loop.\n\n```python\n_LEVEL = re.compile(r'(ERROR|WARN|INFO)')\n\ndef extract_levels(lines):\n    return [m.group(1) for line in lines if (m := _LEVEL.search(line))]\n```\n\nFor 10,000 lines, the gain is typically 2–4×. This is the canonical 'spot the performance bug in this snippet' interview probe."
+    },
+
+    {
+      "id": "m2-s2-c14",
+      "type": "multiple_choice",
+      "topic": "Combining re flags with |",
+      "topic_ru": "Комбинация флагов re через |",
+      "difficulty": 2,
+      "tags": ["re", "compile", "flags"],
+      "question": "You need a regex that's case-insensitive *and* lets `^` / `$` match per-line. How do you express that?",
+      "options": [
+        "`re.compile(r'pat', re.IGNORECASE, re.MULTILINE)` — pass each flag as a separate argument.",
+        "`re.compile(r'pat', re.IGNORECASE | re.MULTILINE)` — combine flags with bitwise OR.",
+        "`re.compile(r'pat', flags=['IGNORECASE', 'MULTILINE'])` — pass a list of flag names.",
+        "Apply the flags inline only: `re.compile(r'(?i)(?m)pat')`; the `flags=` parameter doesn't accept multiple."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `re.compile` takes only one `flags` argument; passing two extra positional arguments raises `TypeError`.",
+        "Correct. Flags are integer bitmasks; combine with `|`. `re.IGNORECASE | re.MULTILINE` produces the bitmask that enables both.",
+        "Wrong — flag values are integer constants, not strings.",
+        "Inline syntax works (`(?im)`) but is the older / less readable style; the `flags=re.IGNORECASE | re.MULTILINE` form is the standard."
+      ]
+    },
+
+    {
+      "id": "m2-s2-c15",
+      "type": "flip",
+      "topic": "Why re.compile outside the loop",
+      "topic_ru": "Почему re.compile вне цикла",
+      "difficulty": 2,
+      "tags": ["re", "compile", "performance", "patterns"],
+      "question": "When and why should you use `re.compile` instead of calling `re.search` / `re.sub` / `re.findall` directly with a string pattern?",
+      "answer": "Use `re.compile` when the same pattern is applied many times (a loop, a per-request hot path, a long-lived function). Module-level `re.search(pat, s)` caches compiled patterns internally, but the cache is small and shared across the process; an explicit `_PATTERN = re.compile(...)` at module scope is faster, signals intent ('this is a hot path'), and is the natural place to attach flags without repeating them per call.",
+      "answer_explanation_md": "Idiomatic shape: module-level `_NAME = re.compile(r'...', re.FLAG | re.FLAG)`, then `_NAME.search(line)` inside the hot path. The naming convention with a leading underscore signals 'module-private constant', consistent with how engineers tag any precomputed value used by functions in the same module."
+    }
+  ]
+}
