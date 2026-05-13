@@ -1,0 +1,246 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s5",
+  "cards": [
+    {
+      "id": "m4-s5-c1",
+      "type": "flip",
+      "topic": "The three-tree model: working / staging / local (+ remote)",
+      "topic_ru": "Модель трёх деревьев: working / staging / local (+ remote)",
+      "difficulty": 2,
+      "tags": ["git", "three-tree", "workflow", "foundation"],
+      "question": "Name the three local 'trees' Git tracks plus the remote, and the command that moves changes between each pair.",
+      "answer": "**Working directory** → `git add` → **staging area (index)** → `git commit` → **local repository** → `git push` → **remote repository**.\n\n- **Working directory** — the files you edit. `git status` shows them as 'modified'.\n- **Staging area / index** — a snapshot of *what your next commit will contain*. `git add file` moves changes from working → staging.\n- **Local repository** — the committed history on your machine. `git commit -m 'msg'` snapshots the staging area into a permanent commit.\n- **Remote repository** — the shared central copy. `git push` uploads new local commits; `git fetch` downloads new remote commits without merging; `git pull` is fetch + merge.\n\nThe four-stage flow is the foundation that every other Git command operates on. Every operation either moves something between two of these trees, queries the state of one, or moves the branch pointer that defines what 'the local repo' currently looks like.",
+      "answer_explanation_md": "`git status` is the canonical 'show me all three local trees at once' command. Output has three sections that map directly to the three trees:\n\n- **'Changes to be committed'** — staging area (what will go into the next commit).\n- **'Changes not staged for commit'** — working directory (modified files not yet staged).\n- **'Untracked files'** — files in the working directory that Git has never seen.\n\nPlus the comparison to the remote: 'Your branch is ahead of origin/main by 2 commits' (local vs remote). One command, four states, instantly readable once you internalize the model.\n\nThis three-tree model is the foundation that every other card in this sphere builds on: undo commands (`m4-s5-c5`, `m4-s5-c6`) are about moving changes *backward* between trees; branches (`m4-s5-c7`, `m4-s5-c8`) are pointers into the local repo; merge and rebase (`m4-s5-c10`–`m4-s5-c13`) are ways to bring commits from one branch's history into another's."
+    },
+
+    {
+      "id": "m4-s5-c2",
+      "type": "multiple_choice",
+      "topic": "git fetch vs git pull — explicit vs implicit merge",
+      "topic_ru": "git fetch vs git pull — явный vs неявный merge",
+      "difficulty": 3,
+      "tags": ["git", "fetch", "pull", "remote", "interview-classic"],
+      "question": "What's the difference between `git fetch` and `git pull`, and which one does a team-aware engineer typically prefer for daily updates?",
+      "options": [
+        "They're aliases — `pull` is shorthand for `fetch`.",
+        "**`git fetch` ONLY downloads new commits from the remote into the remote-tracking branches (e.g., `origin/main`); it does NOT touch your working directory or current branch.** `git pull` is `git fetch` followed by an automatic `git merge origin/main` (or `git rebase` if configured) into your current branch. **Many engineers prefer `git fetch` + an explicit follow-up** because: (1) the merge step is the one that can produce conflicts or unwanted merge commits — making it explicit gives you a chance to review what's coming first (`git log HEAD..origin/main`); (2) on a branch with local commits, `git pull`'s default merge creates a merge commit that some teams consider noise (vs `git pull --rebase` which produces a linear history but has its own footguns — see `m4-s5-c12`). The interview-relevant point: `git pull` is two operations in one; understanding the seam makes you a better collaborator.",
+        "`git pull` is read-only; `git fetch` modifies your local branches.",
+        "`git fetch` is the modern command; `git pull` is deprecated."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `pull` is fetch + merge, not a shorthand alias. The implicit merge is the entire substantive difference.",
+        "Correct. Memorize: **fetch = download; pull = fetch + merge**. The two-step explicit form is `git fetch && git log HEAD..origin/main && git merge origin/main` (or `git rebase origin/main`). On a clean branch with no local commits, `git pull` is a fast-forward and produces no merge commit; on a branch with local divergence, `git pull` produces a merge commit (or fails with conflicts), and that's the moment you want to have been explicit.",
+        "Wrong — exactly backwards. `git fetch` updates the remote-tracking branches (e.g., `origin/main` pointer moves); `git pull` ALSO modifies your current branch by merging.",
+        "Wrong — both commands are current and standard. `git pull` isn't deprecated; engineers just often prefer the explicit form for daily team work where the merge step deserves attention."
+      ]
+    },
+
+    {
+      "id": "m4-s5-c3",
+      "type": "fill_in",
+      "topic": "git add / commit / push — basic three-tree workflow commands",
+      "topic_ru": "git add / commit / push — базовые команды трёх деревьев",
+      "difficulty": 1,
+      "tags": ["git", "add", "commit", "push", "workflow", "interview-warmup"],
+      "code_snippet_with_blanks": "# You edited two files: src/app.py and src/utils.py. Walk them through the workflow.\n\n# 1. Move both files from working dir to staging area:\n$ git ___ src/app.py src/utils.py\n\n# 2. Snapshot the staging area into a commit on the local repo:\n$ git ___ -m \"Fix off-by-one in app, refactor utils\"\n\n# 3. Upload the new commit to the remote:\n$ git ___ origin feat-fixup",
+      "accepted_answers": [
+        ["add"],
+        ["commit"],
+        ["push"]
+      ],
+      "explanation_md": "Three commands, three transitions in the three-tree model:\n\n- **`git add` files** — working dir → staging. Adds the current contents of the named files to the staging area. Re-running after further edits stages the newer contents (staging is a snapshot, not a reference). `git add -A` stages everything; `git add -p` walks you through changes interactively (hunk by hunk).\n- **`git commit -m \"...\"`** — staging → local repo. Creates a permanent commit object from the current staging snapshot. The commit message describes intent for future readers (and your future self running `git log`).\n- **`git push origin branch`** — local repo → remote. Uploads commits that exist locally but not on the remote. `git push -u origin branch` (the `-u` for upstream) also sets the tracking relationship so future `git push` and `git pull` work without arguments.\n\nThe fourth tree (the remote) is what `git fetch` and `git pull` read from. See `m4-s5-c1` for the full picture and `m4-s5-c2` for the fetch vs pull distinction."
+    },
+
+    {
+      "id": "m4-s5-c4",
+      "type": "flip",
+      "topic": "git diff variants: unstaged / staged / commit-relative",
+      "topic_ru": "Варианты git diff: unstaged / staged / относительно коммита",
+      "difficulty": 2,
+      "tags": ["git", "diff", "status", "interview-warmup"],
+      "question": "Three diff commands show three different deltas. What does each compare?\n\n```bash\ngit diff\ngit diff --staged\ngit diff HEAD~1\n```",
+      "answer": "- **`git diff`** — working directory vs staging area. Shows changes you've edited but NOT yet staged. If you've staged a file's changes, `git diff` won't show them anymore (the working dir and staging now match for that file).\n- **`git diff --staged`** (also `--cached`) — staging area vs last commit. Shows what your *next commit* will contain. Run this before `git commit` as the final sanity check.\n- **`git diff HEAD~1`** — working directory vs the commit before HEAD. Shows everything that changed since two commits ago (uncommitted + committed). `git diff HEAD~3` for three commits ago; `git diff main..feat` for branch-to-branch comparison.\n\n**Mental model:** every `git diff` is 'tree A vs tree B' where you pick which two of {working dir, staging, some commit} to compare. Default (no args) is working vs staging.",
+      "answer_explanation_md": "The two diffs you'll use 90% of the time:\n\n```bash\ngit diff                  # what have I changed but not staged?\ngit diff --staged         # what will the next commit contain?\n```\n\nA typical workflow: edit → `git diff` (review changes) → `git add` → `git diff --staged` (confirm what's queued) → `git commit`. The two diffs catch different mistakes — `git diff` catches 'oh, I forgot to stage that fix'; `git diff --staged` catches 'oh, I accidentally staged a debugging print statement'.\n\n`git diff --stat` gives a high-level summary (filenames + line counts) instead of full diff hunks; useful for getting a sense of scope before reading details. `git diff --name-only` lists just the file paths — useful for piping into other commands."
+    },
+
+    {
+      "id": "m4-s5-c5",
+      "type": "multiple_choice",
+      "topic": "git restore vs git checkout -- vs git reset — modern undo mechanics",
+      "topic_ru": "git restore vs git checkout -- vs git reset — современные механики отмены",
+      "difficulty": 3,
+      "tags": ["git", "restore", "checkout", "reset", "undo", "interview-classic"],
+      "question": "Two operations: (a) discard uncommitted edits to a file; (b) unstage a file that you `git add`-ed but no longer want to include in the next commit. Which modern commands handle each?",
+      "options": [
+        "Both operations use `git reset --hard`.",
+        "**(a) `git restore file`** — discards working-directory changes by overwriting the file with its staged version (or HEAD if not staged). Replaces the legacy `git checkout -- file`. **(b) `git restore --staged file`** — un-stages the file: moves changes from staging back to working dir (the file is no longer queued for the next commit, but your edits are preserved in the working dir). Replaces the legacy `git reset HEAD file`. **The split:** modern Git (2.23+) introduced `git restore` and `git switch` to separate two responsibilities that the legacy `git checkout` overloaded into one command: restoring files and switching branches. `git restore` only handles files; `git switch` (see `m4-s5-c7`) only handles branches. **Footgun:** `git restore file` is DESTRUCTIVE for uncommitted work — there is no Git-managed undo. If you might want the changes back, `git stash` first.",
+        "(a) `git restore --staged file`; (b) `git restore file` — they swap roles.",
+        "(a) `git revert file`; (b) `git unstage file`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong, and dangerous. `git reset --hard` resets the *entire* working directory and staging area to a commit — useful for 'discard everything', but a sledgehammer for the single-file cases above.",
+        "Correct. The full modern mapping (with legacy equivalents):\n\n| Intent | Modern command | Legacy equivalent |\n| --- | --- | --- |\n| Discard working-dir changes | `git restore file` | `git checkout -- file` |\n| Unstage a file | `git restore --staged file` | `git reset HEAD file` |\n| Restore file from older commit | `git restore --source=HEAD~2 file` | `git checkout HEAD~2 -- file` |\n| Switch to existing branch | `git switch branch` | `git checkout branch` |\n| Create + switch | `git switch -c branch` | `git checkout -b branch` |\n\nLearn the modern forms first; recognize the legacy forms in old tutorials and Stack Overflow answers. The split makes intent unambiguous: `restore` operates on files; `switch` operates on branches. Cross-link to `m4-s5-c6` for the destructiveness footgun and `m4-s5-c1` for the three-tree-model framing that explains why 'unstage' is 'move backward from staging to working dir'.",
+        "Wrong — the (a)/(b) flags are inverted. `git restore file` is for working-dir; `git restore --staged file` is for unstaging.",
+        "Wrong on both. `git revert` creates a NEW commit that undoes a *past* commit (used for shared history); it's not a file-level operation. There's no `git unstage` command — it's `git restore --staged file`."
+      ]
+    },
+
+    {
+      "id": "m4-s5-c6",
+      "type": "code_trap",
+      "topic": "git restore destroys uncommitted work with no undo — use git stash first",
+      "topic_ru": "git restore уничтожает несохранённые правки без undo — сначала git stash",
+      "difficulty": 4,
+      "tags": ["git", "restore", "stash", "destructive", "incident", "interview-classic"],
+      "code_snippet": "# You spent two hours editing src/app.py — refactoring, fixing bugs, adding tests.\n# Nothing committed yet, nothing staged. You decide you want to look at how main\n# has the file currently:\n\n$ git restore src/app.py\n\n# Two hours of work, gone. No prompt, no warning.",
+      "question": "What state is `src/app.py` in now, and what's the discipline that prevents this disaster?",
+      "options": [
+        "`src/app.py` is unchanged — `git restore` only works on staged files.",
+        "**`src/app.py` is now identical to its staged version (or HEAD if not staged) — your two hours of edits are gone, with no Git-managed undo.** `git restore` is destructive on the working directory: it overwrites your current file contents with the older version. There is no trash, no `git restore --undo`, no reflog entry (the reflog tracks commits and branch movements, not working-directory state). **The discipline: `git stash` before any destructive operation.** `git stash` packages your working-dir + staging changes into a stash object that lives in the local repo. After `git stash`, your working dir matches HEAD (clean), but `git stash pop` (or `git stash apply`) brings the changes back exactly as they were. Three habits worth internalizing: (1) before any `git restore`, `git checkout`, `git reset --hard` on uncommitted work, run `git stash` first. (2) Commit early and often — even WIP commits with `git commit -m 'WIP'` give you a recovery point (and can be squashed later with interactive rebase — see `m4-s5-c13`). (3) Some IDEs (VS Code, JetBrains) keep their own local history independent of Git; check your editor's 'Local History' as a last-resort recovery channel.",
+        "`src/app.py` is gone but recoverable from `git reflog`.",
+        "Modern Git prompts before destructive restore — the command above would have asked for confirmation."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The exact reason there's no recovery: the reflog (`git reflog`) tracks **commit history movements** — when HEAD moves between commits, when branches are created/deleted/reset. It does NOT track working-directory edits. Your two hours of work never lived in Git's object store; the moment `git restore` overwrites the file, it's a normal filesystem-level overwrite with no Git audit trail.\n\nThe stash workflow that prevents this:\n\n```bash\n$ git stash                         # save working-dir + staging changes\nSaved working directory and index state WIP on feat: a1b2c3d Last commit\n\n$ git restore src/app.py            # now safe — file changes are in the stash\n$ # ... look at the older version, do whatever you needed to do ...\n\n$ git stash pop                     # restore the saved changes\nOn branch feat\nChanges not staged for commit:\n  modified:   src/app.py             # back exactly as they were\n```\n\n`git stash` can save multiple stashes (`git stash list` shows them); `git stash pop` removes the most recent stash after applying it; `git stash apply` applies without removing (useful if you want to apply the same stash to multiple branches).\n\n**Cross-link to `m4-s5-c5`:** the destructive footgun in this card is the consequence of `git restore`'s mechanism described there. Same command, same mechanism — this card names the *risk*, c5 names the *operation*."
+    },
+
+    {
+      "id": "m4-s5-c7",
+      "type": "flip",
+      "topic": "Branches: create, switch, modern git switch -c",
+      "topic_ru": "Ветки: создание, переключение, современный git switch -c",
+      "difficulty": 2,
+      "tags": ["git", "branch", "switch", "checkout"],
+      "question": "What do `git branch`, `git branch feat`, `git switch feat`, `git switch -c feat`, and `git checkout -b feat` each do? Which are modern and which are legacy?",
+      "answer": "- `git branch` — **list** local branches; the current branch is marked with `*`. `git branch -a` includes remote-tracking branches.\n- `git branch feat` — **create** a branch called `feat` at the current HEAD. Does NOT switch to it; you're still on whatever branch you were on.\n- `git switch feat` — **switch to** an existing branch. Modern (Git 2.23+).\n- `git switch -c feat` — **create AND switch** in one step. Modern.\n- `git checkout -b feat` — legacy form of `git switch -c feat`; same effect.\n\n**Modern vs legacy:** `git switch` was introduced to split `git checkout`'s overloaded responsibilities (it used to handle both branch-switching and file-restoring). The modern form is unambiguous: `git switch` for branches, `git restore` for files. The legacy `git checkout` still works and is what older tutorials show.",
+      "answer_explanation_md": "A branch in Git is just a **movable pointer to a commit**. Creating a branch is cheap — it's a single new ref pointing at the current HEAD; nothing is copied or duplicated. Switching to a branch moves HEAD to point at that branch, and Git updates the working directory + staging area to match the branch's commit.\n\nThis cheapness is why feature-branch workflows work: branching has nearly zero cost (one line in `.git/refs/heads/`), so create a branch per feature, throw it away when done, no penalty. Compare to older VCS systems where branching was expensive — many teams branched once per release and never per feature.\n\n**The push-the-first-time pattern:**\n\n```bash\ngit switch -c feat-new-thing       # branch off main\n# ... edit, add, commit ...\ngit push -u origin feat-new-thing  # `-u` sets upstream tracking\n# After this, `git push` and `git pull` work with no args.\n```\n\nThe `-u` (upstream) flag is the one to remember on the first push of a new branch. Without it, future `git push` from this branch errors with 'no upstream configured'."
+    },
+
+    {
+      "id": "m4-s5-c8",
+      "type": "multiple_choice",
+      "topic": "Detached HEAD — what it is, when it happens, how to recover",
+      "topic_ru": "Detached HEAD — что это, когда возникает, как восстановить",
+      "difficulty": 4,
+      "tags": ["git", "detached-head", "branches", "recovery", "interview-classic"],
+      "question": "You ran `git checkout a1b2c3d` to look at an old commit's state. Git prints:\n\n```\nNote: switching to 'a1b2c3d'.\nYou are in 'detached HEAD' state. You can look around, make experimental\nchanges and commit them, and you can discard any commits you make in this\nstate without impacting any branches by switching back to a branch.\n```\n\nYou edit a file and `git commit -m \"fix\"`. What state is your fix in, and how do you recover it before switching back to `main`?",
+      "options": [
+        "The fix is automatically saved to a `temp` branch — `git switch main` is safe.",
+        "**Your commit exists in Git's object store but is not reachable from any branch.** In detached HEAD, `HEAD` points at a commit directly, not at a branch ref; when you commit, the new commit's parent is `a1b2c3d`, but no branch is updated to point at the new commit. If you `git switch main` now, HEAD moves to `main` and the new commit becomes unreachable — Git's garbage collector will eventually delete it (typically after 30 days unless referenced elsewhere). **Recover BEFORE switching away: `git switch -c rescue`** — this creates a new branch named `rescue` at the current HEAD, capturing the commit you just made. Now the commit is reachable; you can merge `rescue` into `main` or push it as a feature branch. **Alternatively, if you've already switched away and lost it:** `git reflog` shows HEAD's recent movements, including the commit hash — `git switch -c rescue <hash>` recovers it as long as garbage collection hasn't run.",
+        "The fix is on a hidden branch called `(no branch)` and is committed permanently.",
+        "Git refuses to commit in detached HEAD; the error tells you to create a branch first."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — Git does NOT auto-create a branch. The commit is genuinely orphaned until you create a branch pointing at it.",
+        "Correct. Detached HEAD is the most common 'junior engineer confused' state in Git. The mental model: a branch is a label that follows your commits forward; in detached HEAD, there's no label to follow, so new commits exist but are 'unlabelled'. Switching away leaves them unreachable. **Two safe shapes:** (1) intentionally — `git checkout <hash>` to inspect old code, look around, then `git switch main` (no commits made in between; nothing to lose). (2) accidentally enter detached HEAD, realize you've committed, then `git switch -c rescue` BEFORE switching to a branch. The reflog is the safety net even after switching away. Cross-link to `m4-s5-c1`'s three-tree model: detached HEAD is the state where the *local repo* contains commits, but no branch ref points at them; once you create a branch with `git switch -c`, the local repo's tree gains a new pointer and the commits become reachable.",
+        "Wrong — `(no branch)` is the literal output of `git branch` while in detached HEAD, but there's no actual branch ref by that name. New commits aren't 'committed permanently' because nothing references them after you switch away.",
+        "Wrong — Git allows commits in detached HEAD (the wording 'make experimental changes and commit them' is right there in the warning). The risk is loss after switching away, not the inability to commit."
+      ]
+    },
+
+    {
+      "id": "m4-s5-c9",
+      "type": "multiple_choice",
+      "topic": "git branch -d vs -D — safe delete vs force delete",
+      "topic_ru": "git branch -d vs -D — безопасное удаление vs принудительное",
+      "difficulty": 3,
+      "tags": ["git", "branch", "delete", "force"],
+      "question": "What's the difference between `git branch -d feat` and `git branch -D feat`?",
+      "options": [
+        "They're the same; case is irrelevant.",
+        "**`-d` (lowercase) is safe: it REFUSES to delete `feat` if `feat` has commits that haven't been merged into the current branch (or its upstream).** Git prints `error: the branch 'feat' is not fully merged` — this guards against losing work by deleting an in-progress feature branch. **`-D` (uppercase) is force-delete: it ignores the unmerged check and deletes anyway.** Use `-D` only when you genuinely want to throw away the branch's commits (an abandoned experiment, work superseded by a different approach). **Recovery:** even after `git branch -D`, the commits live in Git's object store for ~30 days; `git reflog` shows recent branch deletions and you can `git switch -c recovered <hash>` to bring them back. But: don't rely on this — `-d` is the everyday form; `-D` is the deliberate 'I know what I'm doing' form.",
+        "`-d` deletes the branch locally; `-D` also deletes it from the remote.",
+        "`-d` archives the branch (recoverable forever); `-D` permanently destroys it."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — Git command flags are case-sensitive; `-d` and `-D` have meaningfully different behavior.",
+        "Correct. The safety dimension is 'have these commits been integrated somewhere reachable?'. The recovery dimension is 'how long do orphaned commits survive Git's garbage collection?' (typically 30 days via reflog). Combined: `-d` is the everyday safe form (won't delete unmerged work); `-D` is the I-mean-it force form (used for abandoned branches); the reflog is the last-resort recovery for either, with a finite window.",
+        "Wrong on remote behavior. Neither `-d` nor `-D` affects the remote. To delete a remote branch: `git push origin --delete feat` (or the older `git push origin :feat`).",
+        "Wrong on permanence. `-D` doesn't 'permanently destroy' — the commits remain in the object store for the reflog window before garbage collection. Both deletions are equally permanent regarding the *branch name*; the difference is the unmerged-check guard."
+      ]
+    },
+
+    {
+      "id": "m4-s5-c10",
+      "type": "flip",
+      "topic": "merge vs rebase — mechanism and resulting history shape",
+      "topic_ru": "merge vs rebase — механизм и форма истории",
+      "difficulty": 4,
+      "tags": ["git", "merge", "rebase", "history", "interview-classic"],
+      "question": "Mechanically, what does `git merge feat` (on main) do versus `git rebase main` (on feat)? Describe the resulting history shape for each.",
+      "answer": "**`git merge feat`** (run on `main`): combines `feat`'s commits into `main`. If the branches diverged (both have new commits since they split), Git creates a **merge commit** with *two parents* — one parent on each side of the divergence. History remains a tree:\n\n```\nmain: A───B───C─────────M\n                  ╲    ╱\nfeat:              D───E\n```\n\nNo commit hashes change; both branches' original commits are preserved.\n\n**`git rebase main`** (run on `feat`): replays `feat`'s commits one by one on top of `main`'s tip. Each replay creates a NEW commit with the same diff but a different parent (and therefore different hash):\n\n```\nmain: A───B───C\nfeat:           D'──E'   (D' and E' are new commits, D and E are no longer reachable from feat)\n```\n\nHistory becomes **linear** — `feat` looks as if its commits were made on top of `main` directly. The old `D` and `E` still exist in the reflog briefly, but they're no longer reachable from `feat`.\n\n**Summary:** merge preserves *what actually happened* (tree-shaped, with merge commits); rebase rewrites history to look *as if* feat was always linear on top of main.",
+      "answer_explanation_md": "Two consequences of the mechanism worth knowing:\n\n- **Conflict resolution timing.** Merge conflicts are resolved once, at the merge commit. Rebase conflicts can recur per commit — if `feat` has five commits and each touches the same line that `main` also changed, you may resolve the same conflict up to five times (one per replayed commit). This is why some teams discourage rebasing large branches.\n- **Force-push consequence.** After rebasing a branch you've already pushed, the local `feat` has different commit hashes than the remote `feat`. Pushing requires `git push --force-with-lease` (a safer version of `--force` that refuses if someone else pushed in the meantime). This is the operational shape that motivates the golden rule (see `m4-s5-c12`).\n\nWhich one to use is the marquee interview question — see `m4-s5-c13` for the decision framework."
+    },
+
+    {
+      "id": "m4-s5-c11",
+      "type": "multiple_choice",
+      "topic": "Predicting merge vs rebase result given a diverged history",
+      "topic_ru": "Предсказание результата merge vs rebase для разошедшейся истории",
+      "difficulty": 3,
+      "tags": ["git", "merge", "rebase", "history", "discrimination"],
+      "question": "Starting state: `main` has commits A→B→C; `feat` branched off at B and has commits B→D→E. After integrating `feat` into `main`, how many TOTAL commits exist on `main`'s history (counting from origin), and what's the shape?\n\n```\n(scenario M)  Run on main:  git merge feat\n(scenario R)  Run on feat:  git rebase main,  then on main:  git merge feat\n```",
+      "options": [
+        "Both scenarios produce 5 commits and identical history.",
+        "**Scenario M (merge) produces 6 commits: A → B → C → M (merge commit) with M's two parents being C and E. Counting commits reachable from main's tip: A, B, C, D, E, M = 6.** Scenario R (rebase + fast-forward merge) produces 5 commits in a linear shape: A → B → C → D' → E' (where D' and E' are rebased copies of D and E with new hashes). **The shape difference is the entire point of merge vs rebase:** merge preserves the divergence as visible tree structure (the merge commit M has two parents, signaling 'these two lines of work came together here'); rebase erases the divergence so the history looks as if D' and E' were always made directly on top of C. **Fast-forward note:** in scenario R, the final `git merge feat` on main is a 'fast-forward' merge — `main` just moves its pointer from C to E' because there's no divergence anymore. No merge commit is created; `git log` looks linear.",
+        "Scenario M produces 5 commits; scenario R produces 6.",
+        "Both scenarios produce 6 commits but different commit hashes."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on both count and shape. The merge scenario adds a merge commit M (6 total); the rebase scenario produces 5 linear commits.",
+        "Correct. The mental model worth carrying: **merge ADDS a commit (the merge commit M) and preserves the original commits; rebase REPLACES commits (D, E become D', E') and leaves the history linear.** Cross-link to `m4-s5-c10` for the mechanism and `m4-s5-c13` for the decision framework. **`git log --graph --oneline`** is the command that makes the shape difference visible — try it after each scenario to see the tree vs linear pictures.",
+        "Wrong, inverted. Merge produces MORE commits (because of the merge commit); rebase produces FEWER (because it just replays and the final merge is a fast-forward).",
+        "Wrong on count. Merge = 6; rebase + ff-merge = 5. Both produce different hashes for the rebased commits, but the counts differ too."
+      ]
+    },
+
+    {
+      "id": "m4-s5-c12",
+      "type": "code_trap",
+      "topic": "Never rebase shared history — the golden rule",
+      "topic_ru": "Никогда не rebase общую историю — золотое правило",
+      "difficulty": 4,
+      "tags": ["git", "rebase", "force-push", "shared-history", "incident", "interview-classic"],
+      "code_snippet": "# You're on feat-new-thing. You've pushed it. A colleague has based their\n# work on commits D and E from your branch. You decide to \"clean up history\"\n# before merging:\n\n$ git rebase main         # rewrites D, E into D', E' (new commit hashes)\n$ git push --force        # overwrites the remote feat-new-thing\n\n# What just happened to your colleague's clone?",
+      "question": "Why is this the canonical Git disaster, and what's the rule that prevents it?",
+      "options": [
+        "Nothing bad — Git auto-merges your colleague's clone on their next `git pull`.",
+        "**Your colleague's clone still references the OLD commits D and E as the basis for their work. Your force-push replaced D and E on the remote with D' and E' (different hashes — same content, different commit objects).** On their next `git pull`, Git sees: remote has D', E' on `feat-new-thing`; their local branch has work based on D, E (and possibly their own commits on top). The pull tries to reconcile divergent histories, producing either: (a) an unexpected merge commit pulling BOTH histories together (D, E AND D', E' both appearing in their local log — confusing, duplicated work), (b) a conflict explosion if they have local commits, (c) silent loss of their commits if they `git pull` with rebase configured and resolve conflicts wrong. **The golden rule:** **never rebase commits that have been pushed to a branch others might be using.** Rebase your own LOCAL commits before the first push; merge for integrating after sharing. **If you absolutely must rebase shared history** (rare — usually because secrets leaked into a commit), coordinate with the team: everyone stops work, force-push happens, everyone runs `git reset --hard origin/branch` to align with the rewritten history.",
+        "Force-push is illegal on GitHub by default; the second command would have errored out.",
+        "Your colleague's clone is fine — Git stores commits by content, not by hash."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The exact mechanics of the failure:\n\n1. Original remote `feat-new-thing` points at commit `E` (with parent `D`, parent `B` for D).\n2. You rebase: locally, `feat-new-thing` now points at `E'` (parent `D'`, parent `C` for D'). Commits `D` and `E` still exist in your local object store but are no longer reachable from `feat-new-thing`.\n3. You force-push: remote `feat-new-thing` now points at `E'`. Commits `D` and `E` still exist on the remote's object store (briefly, until garbage-collected) but no branch references them.\n4. Your colleague's local clone still has `feat-new-thing` pointing at `E` (the OLD commit). They've based their work `F` on top of `E`.\n5. Your colleague runs `git pull`. Git fetches `E'` from origin. The local `feat-new-thing` (`E` → `F`) and `origin/feat-new-thing` (`E'`) have diverged in unexpected ways — there's no common ancestor between F and E' that wasn't ALSO the ancestor of E. Git produces an awkward merge or, if rebase-on-pull is configured, can mis-apply F to a different base.\n\n**Mitigation when it does happen:**\n\n```bash\n# On your colleague's machine, after they've discovered the rewrite:\ngit fetch origin\ngit log --oneline origin/feat-new-thing   # see the new linear history\ngit log --oneline feat-new-thing          # see their local history with F on old base\n\n# Option 1: rebase their work on top of the new remote:\ngit rebase --onto origin/feat-new-thing E  # rewrite F to be based on E' instead of E\n\n# Option 2: cherry-pick:\ngit reset --hard origin/feat-new-thing\ngit cherry-pick F                          # apply F on top of the rewritten history\n```\n\nBoth require knowing exactly which commits are 'theirs' vs 'yours', and the team coordination overhead is the cost the golden rule exists to avoid. **`git push --force-with-lease`** is a safer version of `--force`: it refuses the push if the remote has moved since you last fetched, which catches some race conditions where a colleague pushed in the meantime. Prefer `--force-with-lease` over `--force` even when force-pushing is intentional. Cross-link to `m4-s5-c10` for the rebase mechanism and `m4-s5-c13` for the decision framework."
+    },
+
+    {
+      "id": "m4-s5-c13",
+      "type": "multiple_choice",
+      "topic": "When to use merge vs rebase — the decision framework",
+      "topic_ru": "Когда использовать merge vs rebase — фреймворк решения",
+      "difficulty": 4,
+      "tags": ["git", "merge", "rebase", "workflow", "interactive-rebase", "interview-classic"],
+      "question": "You have four common scenarios. Pick the right tool for each:\n\n```\n(1) Squash 5 \"WIP\" commits on your local branch into one clean commit before the first push.\n(2) Integrate a completed feature branch into main after code review.\n(3) Bring your local feature branch up to date with main's latest commits so the eventual merge is fast-forward.\n(4) Combine your feature branch with main when main has commits you don't have yet, AND your branch is already pushed and reviewed.\n```",
+      "options": [
+        "All four use merge — rebase is dangerous and should be avoided.",
+        "**(1) Interactive rebase** (`git rebase -i HEAD~5`) — local cleanup, no one else has the commits, squash WIPs into one. **(2) Merge** (`git merge feat` on main) — integrating shared history; the merge commit signals 'this is where the feature joined'. **(3) Rebase** (`git rebase main` on feat) — updates your local branch on top of latest main; only safe if `feat` hasn't been pushed yet OR you're prepared to `--force-with-lease` and your team is OK with that. **(4) Merge** (`git merge main` on feat, or PR-style merge) — your branch is shared, rebase is dangerous per the golden rule (see `m4-s5-c12`); merge preserves history safely. **Decision framework:** ask 'have these commits been pushed to a branch others might be using?'. NO → rebase is fine (clean linear history). YES → merge (preserves shared history safely). The golden rule and the decision framework are the same observation: rebase is for LOCAL cleanup; merge is for SHARED integration.",
+        "All four use rebase — merge commits are noise and should be avoided.",
+        "The answer depends on team preference, not on what the operation actually does."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — rebase is safe and idiomatic for local cleanup (scenario 1, 3). Avoiding it entirely misses one of Git's most useful tools.",
+        "Correct. The interview-relevant framing: **'Have these commits been shared?' is the deciding question.** Senior engineers can pick the right tool reflexively because they've internalized this single criterion. The team-convention layer matters too (some teams enforce rebase-only for clean history; some enforce merge-only for audit clarity), but understanding *why* each tool fits each scenario is the underlying competence the interview probes. Cross-link to `m4-s5-c10` (mechanism), `m4-s5-c11` (history shape), `m4-s5-c12` (shared-history golden rule).",
+        "Wrong — rebasing shared history is the canonical Git disaster (see `m4-s5-c12`). Merge is the right tool for shared integration; rebase is the right tool for local cleanup.",
+        "Wrong on framing. Team preference layers on top of the technical decision, but the technical question 'have these commits been shared?' has a right answer independent of convention. A team that enforces 'rebase only' still does so in a context where rebase happens before sharing; the convention doesn't override the golden rule."
+      ]
+    }
+  ]
+}
