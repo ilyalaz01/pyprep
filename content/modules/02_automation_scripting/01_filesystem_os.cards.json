@@ -1,0 +1,267 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s1",
+  "cards": [
+    {
+      "id": "m2-s1-c1",
+      "type": "flip",
+      "topic": "Why pathlib over os.path.join",
+      "topic_ru": "Почему pathlib, а не os.path.join",
+      "difficulty": 2,
+      "tags": ["pathlib", "interview-warmup"],
+      "question": "Why is `Path('a') / 'b'` preferred over `os.path.join('a', 'b')` in modern Python?",
+      "answer": "`Path('a') / 'b'` returns a typed `Path` object (not a `str`), composes naturally with the `/` operator, exposes `.exists()` / `.is_file()` / `.is_dir()` / `.parent` / `.suffix` as methods on the same object, and is cross-platform without manual separator handling. `os.path.join` returns a string, forcing you to re-parse it the moment you want to check existence or extract a component.",
+      "answer_explanation_md": "The pragmatic test: anything that does `os.path.join(...)` and then `os.path.exists(joined)` is one round trip more code than `Path(...).exists()`. In a 200-line script, that compounds. `pathlib` has been the stdlib-blessed default since Python 3.6; `os.path` is fine but it dates the code."
+    },
+
+    {
+      "id": "m2-s1-c2",
+      "type": "code_trap",
+      "topic": "Path division operator returns a Path",
+      "topic_ru": "Оператор / у Path возвращает Path",
+      "difficulty": 2,
+      "tags": ["pathlib", "operator"],
+      "code_snippet": "from pathlib import Path\n\nroot = Path('/var/log')\nfile = root / 'app' / 'today.log'\n\nprint(type(file).__name__, file.suffix, file.stem)",
+      "question": "What does this print on a POSIX system?",
+      "options": [
+        "str .log today.log",
+        "PosixPath .log today",
+        "WindowsPath .log today",
+        "TypeError — `/` is not defined on Path"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`Path.__truediv__` is overloaded to compose paths. On Linux/macOS the concrete subclass is `PosixPath`, on Windows it's `WindowsPath`. `file.suffix` is the final extension including the dot (`.log`); `file.stem` is the name without the suffix (`today`). \n\nThis is the entire reason `pathlib` reads better than `os.path.join`: the chain stays inside one typed object, every method you'd want is on it, and the printed `repr` tells you which platform you're on."
+    },
+
+    {
+      "id": "m2-s1-c3",
+      "type": "multiple_choice",
+      "topic": "Path component access (parent / name / stem / suffix / parts)",
+      "topic_ru": "Доступ к компонентам Path (parent / name / stem / suffix / parts)",
+      "difficulty": 3,
+      "tags": ["pathlib", "components"],
+      "question": "For `p = Path('/var/log/app/today.log')`, which row matches every attribute correctly?",
+      "options": [
+        "parent=Path('/var/log/app'); name='today.log'; stem='today'; suffix='.log'; parts=('/', 'var', 'log', 'app', 'today.log')",
+        "parent=Path('/var/log'); name='today'; stem='today.log'; suffix='log'; parts=('var', 'log', 'app', 'today.log')",
+        "parent=Path('/var/log/app'); name='today'; stem='today.log'; suffix='log'; parts=('var', 'log', 'app', 'today')",
+        "parent=Path('/'); name='today.log'; stem='today'; suffix='.log'; parts=('/var/log/app/today.log',)"
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `parent` strips the final segment, `name` is the final segment, `stem` is `name` without the final suffix, `suffix` includes the leading dot, and `parts` splits at every separator (with `/` as the first element on POSIX absolute paths).",
+        "Wrong on multiple counts: `name` keeps the extension, `suffix` includes the dot, and `parts` includes the root.",
+        "Wrong — `name` keeps the extension; `stem` strips it; `suffix` has the dot.",
+        "Wrong — `parent` removes only one segment, not all of them, and `parts` splits on separators."
+      ]
+    },
+
+    {
+      "id": "m2-s1-c4",
+      "type": "flip",
+      "topic": "iterdir vs glob vs rglob",
+      "topic_ru": "iterdir vs glob vs rglob",
+      "difficulty": 2,
+      "tags": ["pathlib", "glob", "iterdir"],
+      "question": "What's the difference between `path.iterdir()`, `path.glob(...)`, and `path.rglob(...)`?",
+      "answer": "`iterdir()` yields every direct child (files and directories) with no filtering. `glob(pattern)` yields direct children that match the pattern. `rglob(pattern)` is recursive — it walks the entire subtree and yields every matching descendant at any depth. All three return generators of `Path` objects, not strings.",
+      "answer_explanation_md": "Mental model: `iterdir` is `ls`, `glob` is `ls *.log`, `rglob` is `find . -name '*.log'`. `rglob('*.py')` is the one-liner for 'all Python files in this project'; `Path('.').rglob('*')` is 'every file and folder under here'."
+    },
+
+    {
+      "id": "m2-s1-c5",
+      "type": "code_trap",
+      "topic": "glob is non-recursive; rglob is recursive",
+      "topic_ru": "glob нерекурсивный, rglob — рекурсивный",
+      "difficulty": 3,
+      "tags": ["pathlib", "glob", "rglob"],
+      "code_snippet": "# Tree:\n#   root/\n#     a.log\n#     sub/\n#       b.log\n#       deeper/\n#         c.log\n\nfrom pathlib import Path\nprint(sorted(p.name for p in Path('root').glob('*.log')))\nprint(sorted(p.name for p in Path('root').rglob('*.log')))",
+      "question": "What does each line print?",
+      "options": [
+        "['a.log', 'b.log', 'c.log'] then ['a.log', 'b.log', 'c.log']",
+        "['a.log'] then ['a.log', 'b.log', 'c.log']",
+        "['a.log'] then ['b.log', 'c.log']",
+        "['a.log', 'b.log', 'c.log'] then ['a.log']"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`glob('*.log')` looks only at direct children of `root/`, so it sees `a.log` only. `rglob('*.log')` walks the whole subtree and finds all three. \n\nIf you want `glob` to recurse, the pattern is `**/*.log` (the `**` means 'any depth') — `path.glob('**/*.log')` is equivalent to `path.rglob('*.log')`. The `rglob` form is just the shorter spelling."
+    },
+
+    {
+      "id": "m2-s1-c6",
+      "type": "multiple_choice",
+      "topic": "Glob pattern syntax: * vs ** vs ?",
+      "topic_ru": "Синтаксис glob: * vs ** vs ?",
+      "difficulty": 3,
+      "tags": ["pathlib", "glob", "pattern-syntax"],
+      "question": "In `pathlib` glob patterns, what's the difference between `*`, `**`, and `?`?",
+      "options": [
+        "`*` matches any single character; `**` matches any string; `?` matches a directory boundary.",
+        "`*` matches any characters except `/` (so one path segment); `**` matches across any number of directory levels; `?` matches exactly one character.",
+        "All three are equivalent — they're just stylistic aliases.",
+        "`*` matches one character; `**` matches one segment; `?` matches optional segments."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Backward on `*` and `**`; `?` is one char, not a directory boundary.",
+        "Correct. `*` is intra-segment any-chars (doesn't cross `/`); `**` is the recursive wildcard that matches zero or more path segments; `?` is exactly one character. `[abc]` matches one character in the set.",
+        "Wrong — they're distinct.",
+        "Backward — `*` is one segment, not one char; `**` is many segments; `?` is one char, not 'optional segment'."
+      ]
+    },
+
+    {
+      "id": "m2-s1-c7",
+      "type": "flip",
+      "topic": "Why os.makedirs(exist_ok=True) instead of pre-check",
+      "topic_ru": "Почему os.makedirs(exist_ok=True), а не проверка заранее",
+      "difficulty": 2,
+      "tags": ["os", "makedirs", "toctou", "race-condition"],
+      "question": "Why do `os.makedirs(path, exist_ok=True)` instead of `if not os.path.exists(path): os.makedirs(path)`?",
+      "answer": "The `if-not-exists-then-create` pattern has a TOCTOU (time-of-check / time-of-use) race condition: another process can create the directory between the check and the call, and the second branch then raises `FileExistsError`. `exist_ok=True` is handled atomically inside the syscall — the directory either exists at function return or the call raises a real error, with no race window.",
+      "answer_explanation_md": "TOCTOU bugs are a textbook interview probe because they look fine in code review but only fail under concurrency. The fix is to do the operation directly and let the OS report the outcome — `exist_ok=True` here, `open(..., 'x')` for exclusive create, `os.replace(...)` for atomic rename. 'Check-then-act' on shared filesystem state is the anti-pattern."
+    },
+
+    {
+      "id": "m2-s1-c8",
+      "type": "multiple_choice",
+      "topic": "shutil.copy vs copy2 vs move",
+      "topic_ru": "shutil.copy vs copy2 vs move",
+      "difficulty": 3,
+      "tags": ["shutil", "copy", "move"],
+      "question": "Which row most accurately distinguishes `shutil.copy`, `shutil.copy2`, and `shutil.move`?",
+      "options": [
+        "`copy` copies content only; `copy2` copies content + permissions + timestamps; `move` renames/moves the file (atomic on same filesystem, copy+delete across filesystems).",
+        "`copy` and `copy2` are aliases; `move` deletes the source after copying.",
+        "`copy` copies metadata too; `copy2` is the same but for directories; `move` only works on the same filesystem.",
+        "`copy` is for files; `copy2` is for directories; `move` is for both."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `copy` also copies permissions but not timestamps/extended attrs; `copy2` preserves as much metadata as the platform supports; `move` is rename when possible and copy+delete otherwise — the cross-filesystem case is the one that's not atomic.",
+        "Wrong — `copy` and `copy2` differ in how much metadata they preserve.",
+        "Wrong on directories — both `copy` and `copy2` are for files; `shutil.copytree` is for directories.",
+        "Wrong on the directory split — neither `copy` nor `copy2` is for directories; that's `copytree`."
+      ]
+    },
+
+    {
+      "id": "m2-s1-c9",
+      "type": "code_trap",
+      "topic": "shutil.rmtree is rm -rf with no confirmation",
+      "topic_ru": "shutil.rmtree — это rm -rf без подтверждения",
+      "difficulty": 3,
+      "tags": ["shutil", "rmtree", "danger", "interview-classic"],
+      "code_snippet": "import shutil\n\ndef clean_build(target):\n    shutil.rmtree(target)\n\nclean_build('build/')\n# What happens if 'target' is ever ''  or '/'?",
+      "question": "What's the most important failure mode of this function, as written?",
+      "options": [
+        "`rmtree` raises if the path doesn't exist, so it's safe.",
+        "If `target` is `''`, Python rejects it as falsy. If `target` is `/`, the OS refuses.",
+        "If `target` is reached from untrusted input (CLI arg, config, env var), `shutil.rmtree('/')` or `shutil.rmtree(os.path.expanduser('~'))` would recursively delete the system or the user's home — no confirmation, no undo. Always validate the target before calling.",
+        "It leaks file handles."
+      ],
+      "correct_index": 2,
+      "explanation_md": "`shutil.rmtree` is the Python equivalent of `rm -rf` — there is no prompt, no safety check, no `--preserve-root` flag. On a typical Linux machine, `shutil.rmtree('/')` running as root will go quite far before something stops it. \n\nThe defensive patterns: validate `target` against an expected prefix (`target.resolve().is_relative_to(allowed_root)`), reject empty / absolute / home-relative paths, or use `Path` operations whose blast radius you can audit. **`rmtree` should never receive a path that came directly from untrusted input.**"
+    },
+
+    {
+      "id": "m2-s1-c10",
+      "type": "flip",
+      "topic": "os.environ.get vs os.environ[] vs os.getenv",
+      "topic_ru": "os.environ.get vs os.environ[] vs os.getenv",
+      "difficulty": 2,
+      "tags": ["os.environ", "secrets", "env-vars"],
+      "question": "What's the difference between `os.environ.get('K')`, `os.environ['K']`, and `os.getenv('K', default)`?",
+      "answer": "`os.environ.get('K')` returns the value or `None` if missing — safe, silent. `os.environ['K']` raises `KeyError` if missing — use when the secret is mandatory and missing-at-startup should crash the script. `os.getenv('K', default)` returns `default` (which itself defaults to `None`) if missing — same shape as `.get` with a more familiar name.",
+      "answer_explanation_md": "Pick based on what 'missing' means for the call site: optional config → `.get` or `getenv` with a default; mandatory secret → `[]` so the script dies loudly at boot rather than passing `None` into your auth code. `getenv` and `environ.get` are interchangeable; consistency within a codebase matters more than the choice between them."
+    },
+
+    {
+      "id": "m2-s1-c11",
+      "type": "code_trap",
+      "topic": "os.environ['K'] raises KeyError when missing",
+      "topic_ru": "os.environ['K'] бросает KeyError, если переменной нет",
+      "difficulty": 2,
+      "tags": ["os.environ", "env-vars", "keyerror"],
+      "code_snippet": "import os\n\nos.environ.pop('API_KEY', None)   # ensure it's not set\n\nkey = os.environ['API_KEY']\nprint(key)",
+      "question": "What does this code do?",
+      "options": [
+        "Prints an empty string.",
+        "Prints `None`.",
+        "Raises `KeyError: 'API_KEY'`.",
+        "Prints `'API_KEY'`."
+      ],
+      "correct_index": 2,
+      "explanation_md": "`os.environ` is a dict-like mapping; subscript access raises `KeyError` for missing keys, exactly like a regular dict. \n\nThis is the intended behaviour for mandatory secrets: the script should crash at boot with a loud `KeyError: 'API_KEY'` rather than wander on with `None` and produce a confusing 401 from an HTTP call ten lines later. When missing is acceptable, switch to `os.environ.get('API_KEY')`, which returns `None` instead of raising."
+    },
+
+    {
+      "id": "m2-s1-c12",
+      "type": "multiple_choice",
+      "topic": "Why hardcoded secrets in source are dangerous",
+      "topic_ru": "Почему хардкод секретов в исходниках опасен",
+      "difficulty": 1,
+      "tags": ["secrets", "security", "env-vars", "interview-warmup"],
+      "question": "Why is it dangerous to hardcode an API key as a string literal in source code, even on a private repository?",
+      "options": [
+        "It's not dangerous on a private repo — the source is gated by GitHub access controls.",
+        "Secrets in source leak through git history (forever, even if the line is later deleted), through error tracebacks and logs that may quote source, through screenshots in support tickets, and through any future open-sourcing or contractor handoff. Env vars and secret managers are the standard mitigation.",
+        "It only matters if the key is for a paid service.",
+        "Hardcoded strings are slow at runtime because Python re-parses them."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — private-now does not mean private-forever. A repo open-sourced later, a contractor with read access, a leaked archive, or any future audit all read history.",
+        "Correct. The threat model isn't 'someone with current repo access reads it' — it's all the surfaces that capture source over time, none of which a delete-the-line commit removes. Env vars plus a secret manager (Vault, Kubernetes secrets, GitHub Actions secrets) is the table-stakes answer.",
+        "Wrong — the threat applies to any credential, including unmonetized ones (rate limits, scraping, downstream user impersonation).",
+        "Wrong — runtime cost is a non-issue. The issue is exfiltration through artifacts that capture source."
+      ]
+    },
+
+    {
+      "id": "m2-s1-c13",
+      "type": "flip",
+      "topic": "sys.exit(0) vs sys.exit(1) — CI semantics",
+      "topic_ru": "sys.exit(0) vs sys.exit(1) — семантика CI",
+      "difficulty": 1,
+      "tags": ["sys.exit", "exit-code", "ci-cd"],
+      "question": "What do `sys.exit(0)` and `sys.exit(1)` signal to a CI/CD runner like Jenkins or GitHub Actions?",
+      "answer": "`sys.exit(0)` signals success — the runner marks the step green and moves on. `sys.exit(1)` (or any non-zero code) signals failure — the runner marks the step red and typically halts the pipeline. The CI/CD system reads the *exit code* of the process, not your log lines: a script that prints 'ERROR: failed' and then exits 0 will be reported as a passing build.",
+      "answer_explanation_md": "By convention, 0 = success and non-zero = failure; the specific non-zero code can carry meaning (`2` for misuse, `127` for command-not-found in shells, etc.) but for most automation `1` is the catch-all. The contract is OS-level: `int main()` in C, `sys.exit(n)` in Python, `exit n` in Bash all end up in the same `WEXITSTATUS` byte that the CI runner reads."
+    },
+
+    {
+      "id": "m2-s1-c14",
+      "type": "code_trap",
+      "topic": "Bare except swallows SystemExit",
+      "topic_ru": "Голый except проглатывает SystemExit",
+      "difficulty": 4,
+      "tags": ["sys.exit", "exception-handling", "system-exit", "tricky"],
+      "code_snippet": "import sys\n\ndef main():\n    try:\n        sys.exit(1)\n    except:                    # bare except\n        print('caught it')\n    print('still running')\n\nmain()",
+      "question": "What does this print?",
+      "options": [
+        "Nothing — `sys.exit(1)` terminates the process immediately.",
+        "Just `caught it`, then exits with code 1.",
+        "`caught it` then `still running`, then exits 0.",
+        "Raises `SystemExit` uncaught, exit code 1."
+      ],
+      "correct_index": 2,
+      "explanation_md": "`sys.exit(n)` doesn't kill the process directly — it raises `SystemExit`, which propagates up the call stack and is caught by the interpreter's top-level handler, which then exits with code `n`. \n\nA bare `except:` (or `except BaseException:`) catches `SystemExit` too, because `SystemExit` inherits from `BaseException`, not `Exception`. This silently neutralises the exit, the script continues, and the final exit code is 0 — exactly the failure mode where 'my CI says green but the script clearly errored'. \n\n**Rule:** never use bare `except:`. Catch specific exceptions (or at most `Exception`, which excludes `SystemExit` and `KeyboardInterrupt` by design)."
+    },
+
+    {
+      "id": "m2-s1-c15",
+      "type": "code_task",
+      "topic": "Compute the CI exit code from a result summary",
+      "topic_ru": "Вычислить exit code для CI из сводки результатов",
+      "difficulty": 3,
+      "tags": ["sys.exit", "exit-code", "ci-cd"],
+      "prompt_md": "Implement `exit_code_for(summary)` where:\n\n- `summary` is a `dict` with integer keys `'passed'`, `'failed'`, `'errors'` (all `>= 0`).\n- Return `0` if and only if `failed == 0 AND errors == 0`. Otherwise return `1`.\n- If any of the three keys is missing, treat it as `0`.\n\nThis is the same shape that a test runner uses to decide whether to exit green or red for its CI host.",
+      "starter_code": "def exit_code_for(summary):\n    # your code here\n    pass\n",
+      "solution_code": "def exit_code_for(summary):\n    failed = summary.get('failed', 0)\n    errors = summary.get('errors', 0)\n    return 0 if failed == 0 and errors == 0 else 1\n",
+      "tests": "import pytest\nfrom solution import exit_code_for\n\ndef test_all_passing_returns_zero():\n    assert exit_code_for({'passed': 10, 'failed': 0, 'errors': 0}) == 0\n\ndef test_any_failure_returns_one():\n    assert exit_code_for({'passed': 9, 'failed': 1, 'errors': 0}) == 1\n\ndef test_any_error_returns_one():\n    assert exit_code_for({'passed': 9, 'failed': 0, 'errors': 1}) == 1\n\ndef test_failures_and_errors_returns_one():\n    assert exit_code_for({'passed': 0, 'failed': 3, 'errors': 2}) == 1\n\ndef test_missing_keys_treated_as_zero():\n    assert exit_code_for({'passed': 5}) == 0\n\ndef test_empty_summary_returns_zero():\n    assert exit_code_for({}) == 0\n",
+      "allowlist": ["pytest"]
+    }
+  ]
+}
