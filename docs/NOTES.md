@@ -1258,3 +1258,125 @@ string as a fenced block. Don't leave `code_snippet` as an extra
 key on a multiple_choice card; the schema allows unknown keys but
 the renderer may double-show.
 
+---
+
+## N046 — Cross-card reinforcement pattern [AUTHORING]
+
+**Phase:** 9 (m4-s2 + m4-s3 + m4-s4) · **Date:** 2026-05-13 · **Status:** active
+
+Authoring pattern that emerged across three consecutive Module 4
+spheres (Linux Ops, Docker, SQL) on distinct subject matter, with
+the same shape each time. Stable enough to codify.
+
+**Shape:** within a sphere — or across closely related spheres —
+multiple cards layer different facets of one underlying principle.
+Each card stands alone (pedagogical isolation preserved, since
+the scheduler may resurface them weeks apart in unrelated review
+sessions). The reinforcement is delivered through
+**explicit cross-references in `explanation_md` /
+`answer_explanation_md` / `option_explanations`**, citing related
+card IDs and naming the shared principle. When a learner happens
+to encounter the thread sequentially, the explanations stitch a
+multi-card mental model; when they encounter them in isolation,
+each card is still self-contained.
+
+**Why it works:** complex principles (signal handling, NULL
+semantics, idempotency, atomic-rename safety, layer caching) have
+multiple natural manifestations across the curriculum. A single
+card cannot do justice to a principle that recurs across five
+operationally distinct contexts; spreading the load across cards
+in different sub-tasks matches how the principle actually appears
+in production work. The cross-references give learners the
+"oh, that's the same thing" moment without forcing them to
+encounter the cards in any particular order.
+
+**Landed threads:**
+
+- **m4-s2 signal handling** (within-sphere, three cards across
+  t5+t6): c14 SIGTERM/SIGKILL escalation → c15 SIGHUP/SIGINT
+  vocabulary → c18 SIGHUP for fd-release prevention (cross-
+  references c14 and c15 explicitly in its explanation).
+- **m4-s3 → m4-s2 cross-sphere signal continuation:** m4-s3-c8
+  (CMD shell-form makes `sh` PID 1, which doesn't forward SIGTERM)
+  cites m4-s2-c14 and m4-s2-c15 as the vocabulary it builds on.
+  The Docker PID-1 context is the *application* of the signal
+  vocabulary built in m4-s2.
+- **m4-s3 incident-and-prevention pair** (within-sphere, two cards
+  across t1+t5): c3 (`docker rm` deletes the writable layer, data
+  is gone) names the incident; c14 (named volumes survive `docker
+  rm`) names the prevention. c14's explanation explicitly links
+  back to c3 by ID.
+- **m4-s4 NULL semantics** (within-sphere, four cards across
+  t1+t3+t5): c2 establishes three-valued logic (WHERE = NULL fails);
+  c8 applies it to COUNT (NULLs excluded except in COUNT(*)); c9
+  applies it to AVG (denominator is non-NULL count); c15 applies
+  it to NOT IN (single NULL poisons the entire IN-list comparison).
+  c15's explanation_md names c2 as foundation and lists all four
+  cards as a deliberate thread.
+- **m4-s4 aggregation-timing** (within-sphere, three cards across
+  t1+t3+t4): c1 WHERE row-level filter → c10 GROUP BY collapse →
+  c11 WHERE-vs-HAVING evaluation order. c11 explicitly cites c1,
+  c2, c10 in its option explanations.
+
+**When to apply:**
+
+- Concept has multiple natural manifestations across distinct
+  operational contexts.
+- Cards within different sub-tasks naturally touch the same
+  principle (don't manufacture this — observe it).
+- Reinforcement happens through explanation cross-references, NOT
+  by repeating card content.
+- The thread spans at least three cards (two-card pairs are
+  better handled by [[N041]] footgun-pair pattern instead).
+
+**When NOT to apply:**
+
+- Forcing threads where the natural connection doesn't exist —
+  cards should stand independently first; threading is additive,
+  not load-bearing.
+- Cross-references that duplicate card content rather than
+  connecting distinct facets. If c8 and c15 both teach "NULL is
+  unknown", one of them is redundant. Each card should teach a
+  *distinct* manifestation; the cross-reference names the shared
+  principle without re-teaching it.
+- Cards within a single sub-task — those naturally share context
+  through the lesson text; cross-card threading shines when the
+  cards live in different sub-tasks or different spheres.
+
+**Authoring discipline:**
+
+- Cross-references go in `explanation_md` (code_trap),
+  `option_explanations` (multiple_choice), or
+  `answer_explanation_md` (flip). Never in the question or option
+  text itself — the citation is a "for further study" hint, not
+  part of the answer the learner is expected to recall.
+- Cite by ID (e.g., `m4-s2-c14`), not by topic — IDs are stable;
+  topics may be rephrased in future polish.
+- Name the shared principle once, typically in the *last* card of
+  the thread. The card that closes the thread is the natural place
+  to step back and say "this is the same principle in three
+  contexts".
+
+**Discovery:** observed first in m4-s2 (signal-handling triple),
+strengthened in m4-s3 (cross-sphere signal continuation +
+incident-prevention pair), confirmed in m4-s4 (NULL thread
+spanning four cards across three sub-tasks). Three consecutive
+spheres on operationally distinct subject matter (Linux ops,
+Docker, relational SQL) showing the same shape; codifying.
+
+**Related patterns:**
+
+- [[N041]] footgun-pair: two cards as a unit (recognize-the-bug +
+  pick-the-fix). N046 is the multi-card generalization for
+  principles too big for one pair.
+- Composite-distractor (within MC cards): one option contains the
+  trap, three others test discrimination. N046 is the
+  *cross-card* extension of the same idea — one card per facet,
+  rather than four options per facet.
+
+Future sphere authors: observe whether the thread emerges
+organically before authoring it deliberately — manufactured
+threads fail the "stands alone" test and produce cards whose
+cross-references load-bear what should be the card's own
+pedagogy.
+
