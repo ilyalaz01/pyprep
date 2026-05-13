@@ -950,6 +950,81 @@ Module 3 is the testing track: philosophy first, then `pytest` mechanics, then f
 
 ## Module 4 — Linux, Docker, SQL, Git, Tooling & Operations
 
+Module 4 is the operational-engineer track: the terminal, container runtime, SQL queries, version control, Python tooling, and the three extension spheres added in `78278a5` (web security, CI/CD, bash scripting). Sphere index in bullet form below; per-sphere knowledge points and interview angles follow as `### Sphere` sections.
+
+- `m4-s0` — Networking Fundamentals
+  - `m4-s0-t1` — IP, ports, localhost; common ports
+  - `m4-s0-t2` — TCP vs UDP; HTTP-over-TCP
+  - `m4-s0-t3` — DNS resolution; HTTP request/response anatomy
+  - `m4-s0-t4` — Status codes: 200, 400, 401, 403, 404, 500
+
+- `m4-s1` — Linux CLI Basics
+  - `m4-s1-t1` — `pwd`, `cd`, `ls -la`
+  - `m4-s1-t2` — `touch`, `mkdir`, `rm -rf` (and dangers)
+  - `m4-s1-t3` — `cp`, `mv`
+  - `m4-s1-t4` — Permissions: `r/w/x`; `chmod` numeric and `+x`; `chown`; `sudo`
+
+- `m4-s2` — Linux Operations
+  - `m4-s2-t1` — `cat`, `less`, `tail -f`, `tail -n`
+  - `m4-s2-t2` — `find` for files by age/name
+  - `m4-s2-t3` — `>`, `>>`, pipe `|`
+  - `m4-s2-t4` — `grep` (basic, `-i`, `-v`); `awk` for column extraction
+  - `m4-s2-t5` — `top`/`htop`, `ps aux | grep`, `kill` / `kill -9`
+  - `m4-s2-t6` — `df -h`, `free -m`
+
+- `m4-s3` — Docker
+  - `m4-s3-t1` — Image vs container
+  - `m4-s3-t2` — `Dockerfile`: `FROM`, `WORKDIR`, `COPY`, `RUN`
+  - `m4-s3-t3` — `CMD` vs `ENTRYPOINT`
+  - `m4-s3-t4` — `build`, `run -d`, `ps`, `logs`, `exec -it bash`
+  - `m4-s3-t5` — Port mapping `-p`; volumes `-v` for persistence
+
+- `m4-s4` — SQL
+  - `m4-s4-t1` — `SELECT`, `WHERE` (`AND`, `OR`, `IN`, `LIKE`)
+  - `m4-s4-t2` — `INSERT`, `UPDATE`, `DELETE`
+  - `m4-s4-t3` — `COUNT`, `SUM`, `AVG`, `MAX`, `MIN`
+  - `m4-s4-t4` — `GROUP BY` and `HAVING` vs `WHERE`
+  - `m4-s4-t5` — `INNER JOIN` vs `LEFT JOIN`
+
+- `m4-s5` — Git
+  - `m4-s5-t1` — Working dir → staging → local → remote workflow
+  - `m4-s5-t2` — `git diff`, `git status`, `git restore`
+  - `m4-s5-t3` — Branches: `branch`, `checkout -b`
+  - `m4-s5-t4` — `merge` vs `rebase` (and history shape)
+
+- `m4-s6` — Python Tooling
+  - `m4-s6-t1` — Virtual environments: `venv`, `uv venv`
+  - `m4-s6-t2` — `pip` vs `uv` vs `poetry`; `pyproject.toml` and lockfiles
+  - `m4-s6-t3` — `ruff`, `black`, `mypy` — what each does
+  - `m4-s6-t4` — Big-O thinking lite: time vs space; common collection complexities
+
+- `m4-s7` — Web Security Basics
+  - `m4-s7-t1` — SQL injection prevention (parametrized queries)
+  - `m4-s7-t2` — Password hashing (bcrypt/argon2 — never plaintext, never MD5)
+  - `m4-s7-t3` — JWT vs sessions vs cookies
+  - `m4-s7-t4` — OAuth 2.0 basics (authorization flow)
+  - `m4-s7-t5` — CORS (Cross-Origin Resource Sharing)
+  - `m4-s7-t6` — HTTPS / TLS basics
+
+- `m4-s8` — CI/CD Pipelines
+  - `m4-s8-t1` — Pipeline-as-code structure (jobs, steps, triggers)
+  - `m4-s8-t2` — GitHub Actions workflow syntax
+  - `m4-s8-t3` — Caching dependencies
+  - `m4-s8-t4` — Secrets management
+  - `m4-s8-t5` — Matrix builds (multi-version testing)
+  - `m4-s8-t6` — Common patterns (PR triggers, branch protection, status checks)
+
+- `m4-s9` — Bash Scripting Basics
+  - `m4-s9-t1` — Variables and quoting (single vs double quotes, $VAR vs "$VAR")
+  - `m4-s9-t2` — Conditionals (if/then/else, `[[ ]]`, test command)
+  - `m4-s9-t3` — Loops (for, while)
+  - `m4-s9-t4` — Exit codes (`$?`, `set -e` for fail-fast)
+  - `m4-s9-t5` — Reading input (`read`, pipes, redirection)
+  - `m4-s9-t6` — Functions and arguments
+
+---
+
+
 Module 4 spans the most diverse skillset in the curriculum — networking, OS, containers, databases, version control, modern Python tooling, web security, CI/CD pipelines, and basic bash scripting. Its 10 spheres reflect that every "any-role Python engineer" position assumes baseline literacy across all these domains.
 
 ### Sphere `m4-s0` — Networking Fundamentals

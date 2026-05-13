@@ -391,6 +391,16 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | Report saved | ⬜ |
 | T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |
+| T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | ⬜ (see candidate list below) |
+
+**T10.8 retroactive N041 fix-MC pair candidates (surfaced during module-sweep audits):**
+
+- `m3-s2-c4` (`match=` is regex, not substring) — paired fix-MC compares `re.escape()` vs raw-string-with-manual-escapes vs anchored regex `^...$` vs unrelated solution. Currently single d4 code_trap; pairing adds explicit-prescription card.
+- `m3-s4-c5` (`assert_called_with` checks LAST call only) — paired fix-MC compares `assert_called_once_with` (right for "called exactly once") vs `assert_any_call` (order-agnostic) vs `assert_has_calls` with `mock.call` (explicit sequence) vs manual `call_args_list` iteration.
+- `m3-s3-c10` (session-scope mutable contamination) — paired fix-MC compares `scope='function'` (default, safe) vs `scope='session'` + immutable wrapper vs factory-fixture-returning-fresh vs deep-copy-per-test.
+- (Future-add) any further d4 traps surfaced during Module 4 sweeps. Update this list as Module 4 closes.
+
+**T10.8 constraint-catalog promotion:** N039 (Pyodide-vs-CPython divergences), N043 (single-file harness — `solution.py` + `test_solution.py` only), N044 (verify pyproject.toml deps before importing non-stdlib) are all code_task authoring constraints that future authors need before writing their first card. Currently scattered as numbered NOTES entries. Promote to a dedicated appendix in `docs/PRD_code_sandbox.md` (section §10 or similar) titled "Code_task authoring constraints" so the rules are co-located with the sandbox PRD they govern.
 
 **Phase 10 exit gate:** Segal §16 final-submission checklist 100% green.
 

@@ -1,0 +1,252 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s0",
+  "cards": [
+    {
+      "id": "m4-s0-c1",
+      "type": "flip",
+      "topic": "Common ports (SSH/HTTP/HTTPS/DB/Redis/dev)",
+      "topic_ru": "Общеизвестные порты (SSH/HTTP/HTTPS/БД/Redis/dev)",
+      "difficulty": 1,
+      "tags": ["networking", "ports", "vocabulary", "interview-warmup"],
+      "question": "From memory, what services run on these default ports: 22, 80, 443, 3306, 5432, 6379, 27017, 8000?",
+      "answer": "**22** SSH; **80** HTTP; **443** HTTPS (HTTP + TLS); **3306** MySQL; **5432** PostgreSQL; **6379** Redis; **27017** MongoDB; **8000** / 8080 / 3000 dev / local-server convention (no protocol mandate; just where dev frameworks default).",
+      "answer_explanation_md": "Burn these in. An interviewer asking 'what port does PostgreSQL run on?' is calibrating whether you've ever actually connected to one — anyone who has knows 5432 reflexively. Bonus reflexes: SMTP 25 (legacy) / 587 (modern), DNS 53, FTP 21 (deprecated for real use). Ports under 1024 are 'well-known' and on Linux require root or `CAP_NET_BIND_SERVICE` to bind."
+    },
+
+    {
+      "id": "m4-s0-c2",
+      "type": "multiple_choice",
+      "topic": "0.0.0.0 vs 127.0.0.1 binding semantics",
+      "topic_ru": "Биндинг 0.0.0.0 vs 127.0.0.1",
+      "difficulty": 3,
+      "tags": ["networking", "localhost", "binding", "interview-classic"],
+      "question": "Your dev server logs `Listening on 127.0.0.1:8000`. A teammate on the same office network tries `curl http://<your-laptop-ip>:8000/health` and gets `Connection refused`. Why, and what binding would make it reachable?",
+      "options": [
+        "Firewall is blocking it; open port 8000 in the OS firewall.",
+        "`127.0.0.1` is the loopback interface — only processes on the *same machine* can reach it. The teammate's request hits your laptop's external IP, which the server isn't listening on. Switch the bind to `0.0.0.0:8000` (listen on every interface) to make the service reachable from the network. (Frameworks default to `127.0.0.1` in dev for safety; production services bind to `0.0.0.0`.)",
+        "The server is up but the port is busy; restart and try again.",
+        "`127.0.0.1` and `localhost` are different IPs; use `localhost:8000` instead."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Possible cause in some setups but not the typical one. With a `127.0.0.1` bind, the firewall isn't even reached — the kernel rejects the connection because nothing is listening on the relevant interface.",
+        "Correct. `127.0.0.1` is the loopback address — packets to it never leave the host. Binding `0.0.0.0` tells the kernel 'accept on every interface' (loopback, ethernet, wifi, anything else). The dev-default is deliberate: services on `127.0.0.1` can't be reached from the network, which is the safe default while you're developing.",
+        "Wrong — `Connection refused` is the symptom of *no listener on that interface*, not a busy port (which would yield 'Address already in use' at server start, not at client connect).",
+        "Wrong — `127.0.0.1` and `localhost` are equivalent on every standard system; `localhost` resolves to `127.0.0.1`."
+      ]
+    },
+
+    {
+      "id": "m4-s0-c3",
+      "type": "code_trap",
+      "topic": "Ports < 1024 require elevated privilege",
+      "topic_ru": "Порты < 1024 требуют повышенных прав",
+      "difficulty": 4,
+      "tags": ["networking", "ports", "linux", "privileges", "subtle"],
+      "code_snippet": "# Running as a non-root user on Linux:\n$ python -m http.server 80\nTraceback (most recent call last):\n  ...\nPermissionError: [Errno 13] Permission denied",
+      "question": "Why does this fail, and what are the standard fixes?",
+      "options": [
+        "Port 80 is unused on your machine but Python forbids privileged ports for security.",
+        "The user account lacks read permission on the directory being served.",
+        "Ports below 1024 are 'well-known' ports; on Linux, binding to them requires `root` or the `CAP_NET_BIND_SERVICE` capability. As a non-root user, the kernel rejects the `bind(80)` syscall with EACCES (errno 13). Standard fixes: (a) run on a high port (`8000`, `8080`) and put nginx / Caddy / Cloud LB in front to map `:80` → `:8000`; (b) `sudo setcap 'cap_net_bind_service=+ep' /path/to/python` (gives just the binding capability without full root); (c) systemd socket activation; (d) run as root (production: don't).",
+        "Python lacks low-level network bindings without C extensions installed."
+      ],
+      "correct_index": 2,
+      "explanation_md": "Historical reason: ports < 1024 were designated 'privileged' to ensure only the system administrator could run standard services (SSH, HTTP, SMTP) on them. The kernel enforces it with a check in the `bind()` syscall — non-root + port < 1024 = `EACCES`.\n\nIn 2026 production, the conventional pattern is **not** to bind your app to 80 / 443 directly. Instead:\n\n- App listens on `:8000` as a non-root user.\n- nginx / Caddy / a cloud load balancer terminates TLS on `:443` and proxies to `:8000`.\n- The OS-level privileged-port constraint never enters the picture for the Python app itself.\n\nIf you genuinely need direct binding (single-container deployments, embedded systems), `setcap 'cap_net_bind_service=+ep'` on the interpreter is the granular fix. Running production code as root is a last-resort smell — every container runtime and orchestrator has a non-root alternative."
+    },
+
+    {
+      "id": "m4-s0-c4",
+      "type": "flip",
+      "topic": "Private IP ranges (RFC 1918)",
+      "topic_ru": "Приватные IP-диапазоны (RFC 1918)",
+      "difficulty": 2,
+      "tags": ["networking", "ip", "rfc1918", "private-range"],
+      "question": "Name the three private IPv4 ranges reserved by RFC 1918, and why they matter.",
+      "answer": "**`10.0.0.0/8`** (10.x.x.x — 16M addresses, biggest), **`172.16.0.0/12`** (172.16.x.x – 172.31.x.x — 1M addresses), **`192.168.0.0/16`** (192.168.x.x — 65K addresses, the home-router default). Anything else is routable on the public internet.\n\nWhy they matter: traffic to these ranges is NOT routed by ISP / backbone routers. Home networks, office LANs, Kubernetes pod networks, Docker bridge networks, AWS VPCs all live in private ranges and rely on NAT (Network Address Translation) at the gateway to reach the public internet.",
+      "answer_explanation_md": "If you see `10.42.1.7` in a log line, you know it's an internal address — same datacenter, same VPC, same office. If you see `8.8.8.8`, you know it's public (Google's DNS). The distinction matters for security audits, log triage, and firewall rules. Bonus: `127.0.0.0/8` (loopback), `169.254.0.0/16` (link-local — DHCP-failed devices use it), and `224.0.0.0/4` (multicast) are also non-public but for different reasons."
+    },
+
+    {
+      "id": "m4-s0-c5",
+      "type": "flip",
+      "topic": "TCP vs UDP — basic distinctions",
+      "topic_ru": "TCP vs UDP — базовые отличия",
+      "difficulty": 2,
+      "tags": ["networking", "tcp", "udp", "interview-classic"],
+      "question": "What are the four binding differences between TCP and UDP?",
+      "answer": "(1) **Connection**: TCP is connection-oriented (three-way handshake: SYN, SYN-ACK, ACK); UDP is connectionless (just send the datagram). (2) **Ordering**: TCP guarantees ordered delivery; UDP doesn't — packets can arrive out of order or be duplicated. (3) **Reliability**: TCP retransmits lost packets and enforces flow control; UDP fire-and-forget. (4) **Overhead**: TCP carries handshake state, sequence numbers, ack tracking; UDP is a thin wrapper over IP.\n\nMental model: TCP is a phone call (negotiate, ordered conversation, hang up); UDP is a postcard (write it, drop it in the box, no guarantee of arrival or order).",
+      "answer_explanation_md": "The trade-off both protocols make explicit: TCP is reliable but adds latency (handshake + retransmits + ack); UDP is fast but lossy. Neither is 'better' — they're tools for different jobs. The next card covers when to pick UDP specifically."
+    },
+
+    {
+      "id": "m4-s0-c6",
+      "type": "multiple_choice",
+      "topic": "When to use UDP",
+      "topic_ru": "Когда использовать UDP",
+      "difficulty": 3,
+      "tags": ["networking", "udp", "use-cases"],
+      "question": "Which set of use cases makes the most sense for UDP rather than TCP?",
+      "options": [
+        "File transfer, banking API, version control sync — anything where data correctness matters.",
+        "DNS lookups, real-time video / VoIP, online multiplayer games, NTP time sync — anything where (a) the message is small and self-contained AND (b) losing or delaying a packet is better than waiting for retransmission. The application accepts loss in exchange for low latency.",
+        "All cases — UDP is strictly faster than TCP.",
+        "Email (SMTP), web browsing (HTTP), SSH — anything that runs over IP."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — those are exactly the cases that need TCP. Banking and file transfer are non-negotiable on correctness; UDP would corrupt or drop bytes.",
+        "Correct. UDP wins when (a) latency matters more than reliability, and (b) the application can recover from loss on its own (skip a video frame; resend a DNS query; let a game session 'predict' missed packets). The list — DNS, VoIP, games, NTP — are canonical UDP workloads. Note: HTTP/3 (QUIC) is built on UDP because the application reimplements reliability with better latency than TCP.",
+        "Wrong — UDP is *lower-overhead*, not strictly faster. A TCP connection that's already established and warm is competitive on throughput. UDP wins on setup time and on workloads tolerant to loss.",
+        "Wrong — SMTP, HTTP/1, HTTP/2, and SSH all run over TCP. They need ordered, reliable delivery."
+      ]
+    },
+
+    {
+      "id": "m4-s0-c7",
+      "type": "code_trap",
+      "topic": "TCP three-way handshake + ordering vs UDP loss",
+      "topic_ru": "TCP three-way handshake + ordering vs UDP loss",
+      "difficulty": 4,
+      "tags": ["networking", "tcp", "udp", "handshake", "subtle", "interview-classic"],
+      "code_snippet": "# Two clients send three messages each to a server.\n# Network drops 10% of packets randomly. Network reorders some packets.\n\nclient_A: TCP connection — sends ['hello', 'middle', 'goodbye']\nclient_B: UDP datagrams  — sends ['hello', 'middle', 'goodbye']",
+      "question": "What does the server see for each client, given the lossy + reordering network?",
+      "options": [
+        "Both clients: the server receives the three messages in order with no loss — TCP and UDP both retransmit.",
+        "TCP (A): the server receives all three messages in order — TCP retransmits any lost packets and reassembles them into the correct sequence using the SYN-ACK sequence numbers. UDP (B): the server may receive only some of the messages, in any order; the three messages might arrive as `['hello', 'goodbye']` or `['middle', 'hello']` or any subset. The application must handle reordering and loss itself.",
+        "TCP (A): three messages, possibly reordered. UDP (B): all three messages in order — UDP guarantees ordering, just not delivery.",
+        "Neither protocol survives 10% loss; both fail with `ConnectionError`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "TCP's three-way handshake (SYN → SYN-ACK → ACK) establishes the sequence-number baseline; every byte sent carries a sequence number; the receiver acks the highest contiguous sequence number received; the sender retransmits anything not acked within a timeout. The net effect: the application sees an ordered, lossless stream, with latency cost from retransmits.\n\nUDP has no sequence numbers, no acks, no retransmits. Each datagram is independent. Three sends produces three independent datagrams; the network may deliver 0–3 of them in any order. The application that uses UDP either accepts loss (video frames, game positions) or implements its own reliability layer on top (QUIC / HTTP/3 / custom protocols).\n\nThe interview question: 'tell me what TCP gives you that UDP doesn't.' Three things: ordering, reliability (via retransmit), flow control. None of these are free — they cost handshake latency and per-packet overhead."
+    },
+
+    {
+      "id": "m4-s0-c8",
+      "type": "flip",
+      "topic": "DNS resolution chain",
+      "topic_ru": "Цепочка DNS-резолюции",
+      "difficulty": 1,
+      "tags": ["networking", "dns", "resolution-chain", "interview-warmup"],
+      "question": "Walk through the layers a DNS lookup of `google.com` passes through, from the browser's perspective, in order.",
+      "answer": "1. **Browser cache** — recent lookups are kept; if `google.com` is here, the lookup ends immediately. 2. **OS resolver cache** (`/etc/hosts` first, then the system-wide resolver cache). 3. **Configured DNS server** — typically the ISP's recursive resolver, or a public one like `8.8.8.8` (Google) / `1.1.1.1` (Cloudflare). 4. **Root nameservers** — direct the resolver to TLD servers. 5. **TLD nameservers** for `.com` — direct to authoritative servers. 6. **Authoritative nameservers** for `google.com` — return the actual IP record (`A` for IPv4, `AAAA` for IPv6).\n\nEach layer caches with a TTL; most real lookups never reach the authoritative server.",
+      "answer_explanation_md": "The 'walk me through what happens when you type google.com' question expects you to start here. The DNS chain is layer one; layers two through five (TCP connect → TLS handshake → HTTP request → response → render) are the natural follow-up. Senior interviewers will probe one layer's specifics — e.g., 'what's a CNAME?' (alias record), 'what's TTL?' (cache lifetime, in seconds)."
+    },
+
+    {
+      "id": "m4-s0-c9",
+      "type": "multiple_choice",
+      "topic": "Walk a DNS lookup of google.com",
+      "topic_ru": "Прогон DNS-резолюции google.com",
+      "difficulty": 3,
+      "tags": ["networking", "dns", "interview-classic"],
+      "question": "Which sequence most accurately describes a fresh (uncached) DNS resolution of `www.google.com`?",
+      "options": [
+        "Browser → ISP DNS → Google directly — the resolver knows google.com because it's popular.",
+        "Browser → OS hosts file → done; everything famous is in `/etc/hosts`.",
+        "Browser cache → OS resolver cache → configured DNS resolver (e.g., ISP or `8.8.8.8`) → root nameservers (which say 'ask the `.com` TLD') → `.com` TLD nameservers (which say 'ask google.com's authoritative servers') → authoritative nameservers for `google.com` (which return the `A` record IP). Each layer caches with a TTL.",
+        "Browser → router → modem → IP delivered as ARP broadcast."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — recursive resolvers don't have hardcoded mappings for popular names. They walk the hierarchy like every other lookup, just with cached intermediate answers most of the time.",
+        "Wrong — `/etc/hosts` contains a handful of system-defined mappings (`localhost`, sometimes the machine's own hostname). Public names aren't there.",
+        "Correct. The cache-resolver-root-TLD-authoritative chain is the canonical walkthrough. Notice the 'fresh' qualifier — caching at any layer short-circuits the rest; in practice the resolver chain almost never reaches the root for popular names.",
+        "Wrong — DNS lookups are application-level; ARP is link-layer (resolving MAC addresses, not DNS names). The four layers don't map onto each other."
+      ]
+    },
+
+    {
+      "id": "m4-s0-c10",
+      "type": "fill_in",
+      "topic": "HTTP methods + idempotency",
+      "topic_ru": "HTTP-методы + идемпотентность",
+      "difficulty": 2,
+      "tags": ["networking", "http", "methods", "idempotency"],
+      "code_snippet_with_blanks": "# Fill in 'idempotent' or 'not idempotent' for each method.\n\nGET     -> ___\nPOST    -> ___\nPUT     -> ___\nPATCH   -> ___\nDELETE  -> ___",
+      "accepted_answers": [
+        ["idempotent"],
+        ["not idempotent"],
+        ["idempotent"],
+        ["not idempotent"],
+        ["idempotent"]
+      ],
+      "explanation_md": "Idempotent means: making the same request N times has the same effect as making it once. Critical for retry logic — an idempotent operation is safe to retry after a network timeout; a non-idempotent one might do the work twice.\n\n- **GET** is idempotent (read; no state change).\n- **POST** is *not* idempotent (creates a new resource each time — two POSTs make two users).\n- **PUT** is idempotent (replaces the resource at a fixed URL — two PUTs of the same body leave the same state).\n- **PATCH** is *not* idempotent in general (e.g., `{\"x\": x + 1}` would increment twice). Specific PATCHes can be idempotent by design (setting absolute fields), but the spec doesn't promise it.\n- **DELETE** is idempotent (resource gone after the first call; subsequent calls return 404 or 204 — same end state).\n\nThe interview probe: 'is PATCH idempotent?' — Answer: 'depends on the patch; the spec says no in general'. Getting it right shows you understand the *semantic* property, not just the verb name."
+    },
+
+    {
+      "id": "m4-s0-c11",
+      "type": "code_trap",
+      "topic": "POST retry-after-timeout — non-idempotency hazard",
+      "topic_ru": "Повтор POST после таймаута — опасность не-идемпотентности",
+      "difficulty": 4,
+      "tags": ["networking", "http", "post", "idempotency", "retry", "interview-classic"],
+      "code_snippet": "def create_user(name):\n    try:\n        resp = requests.post('/api/users', json={'name': name}, timeout=5)\n        return resp.json()\n    except Timeout:\n        return create_user(name)   # retry on timeout\n\ncreate_user('alice')",
+      "question": "The first call times out because the server is slow. The retry succeeds. What's the danger, and what's the standard mitigation?",
+      "options": [
+        "No danger — the timeout means the request never reached the server.",
+        "**Two users named 'alice' may now exist in the database.** A timeout on POST is *ambiguous*: the server may have received and processed the request (created the user) but the response didn't arrive in time, OR the request never reached the server. Retrying without knowing which case it was *creates a duplicate* in the first case. Standard mitigation: **idempotency keys** — the client generates a unique key per logical operation (`Idempotency-Key: <uuid>`); the server stores it; if a duplicate request arrives with the same key, return the cached response instead of creating a second user. Used by Stripe, AWS, every payment API.",
+        "Python's `requests` library auto-deduplicates retries.",
+        "The retry will fail with `ConnectionError` because the original socket is still open."
+      ],
+      "correct_index": 1,
+      "explanation_md": "POST is non-idempotent by design (creates a resource each time). A naive retry doubles the side effect when the original request actually succeeded but the response was lost.\n\nThe idempotency-key pattern is the standard fix:\n\n```python\nimport uuid\nimport requests\n\ndef create_user(name):\n    idempotency_key = str(uuid.uuid4())\n    for attempt in range(3):\n        try:\n            return requests.post(\n                '/api/users',\n                json={'name': name},\n                headers={'Idempotency-Key': idempotency_key},\n                timeout=5,\n            ).json()\n        except Timeout:\n            continue\n    raise\n```\n\nThe key stays *the same* across retries (uuid generated once per logical operation). The server, on receiving the same key twice, returns the cached response instead of doing the work again. Same-shape API across payment processors (Stripe), cloud providers (AWS), and most modern backends.\n\nThe interview test: 'how do you safely retry a POST after a timeout?' — Answer: 'idempotency key.' Without that answer you're admitting you'd double-charge a customer."
+    },
+
+    {
+      "id": "m4-s0-c12",
+      "type": "flip",
+      "topic": "HTTP status code families (2xx / 3xx / 4xx / 5xx)",
+      "topic_ru": "Семейства HTTP-статусов (2xx / 3xx / 4xx / 5xx)",
+      "difficulty": 1,
+      "tags": ["networking", "http", "status-codes", "interview-warmup"],
+      "question": "Name the four HTTP status code families and what each one means at a glance.",
+      "answer": "**2xx Success** — the request worked. Common: 200 OK, 201 Created, 204 No Content. **3xx Redirect** — fetch a different URL. Common: 301 Moved Permanently, 302 Found (temporary), 304 Not Modified (cache hit, body not sent). **4xx Client error** — the request is wrong. Common: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 422 Unprocessable Entity, 429 Too Many Requests. **5xx Server error** — the server failed to process a valid request. Common: 500 Internal Server Error, 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout.",
+      "answer_explanation_md": "Reading a status code, you can tell *who* to blame: 4xx is your client's fault, 5xx is the server's, 3xx asks you to look elsewhere, 2xx is success. A code like 418 (I'm a teapot — the joke status) is technically valid 4xx; in real systems the active codes are the ones above, plus a handful of vendor-specific ones (Cloudflare 520-525 for upstream-origin issues)."
+    },
+
+    {
+      "id": "m4-s0-c13",
+      "type": "multiple_choice",
+      "topic": "401 vs 403 — the canonical interview distinction",
+      "topic_ru": "401 vs 403 — каноническое различие",
+      "difficulty": 4,
+      "tags": ["networking", "http", "auth", "401", "403", "interview-classic"],
+      "question": "A user logs in successfully. They then GET `/admin/users` and get a 403. What does that say about their auth state, and what would a 401 mean instead?",
+      "options": [
+        "Both 401 and 403 mean the user isn't logged in.",
+        "**403 Forbidden** = 'we know who you are; you don't have permission for this resource.' Auth succeeded (the server knows the user), but the user's identity / role / permissions don't grant access to `/admin/users`. **401 Unauthorized** = 'we don't know who you are; auth missing, malformed, or invalid.' If the user were logged out (no session cookie, no Bearer token, or an expired one), the server would respond 401 to force a re-auth — not 403. The shorthand: 401 'who are you?' / 403 'I know you, you can't do this.'",
+        "401 = client bug; 403 = server bug.",
+        "403 means the server is overloaded; 401 means the user is throttled."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — they have distinct semantics. Treating them as equivalent is the marker that catches juniors fastest.",
+        "Correct. The split is *identity established vs not*. 401: server has no valid credentials, the client should authenticate. 403: server has credentials, but the credentials' identity isn't authorized for this resource. Practical consequence: a 401 typically triggers a login-redirect or refresh-token flow; a 403 surfaces as 'access denied' UI without trying to re-auth. Some backends (e.g., legacy or hand-rolled) misreturn 401 when they mean 403, which causes infinite refresh loops in client code.",
+        "Wrong — both are 4xx (client-error family); neither is a server bug. 5xx is the server-bug family.",
+        "Wrong — server overload is 503 Service Unavailable; rate limiting is 429 Too Many Requests. Neither maps to 401 or 403."
+      ]
+    },
+
+    {
+      "id": "m4-s0-c14",
+      "type": "code_trap",
+      "topic": "Common status codes in real scenarios",
+      "topic_ru": "Часто встречающиеся статусы в реальных сценариях",
+      "difficulty": 3,
+      "tags": ["networking", "http", "status-codes", "scenarios"],
+      "code_snippet": "Six scenarios, six expected status codes:\n\n1. A client POSTs valid JSON to /api/users; user is created.\n2. A client PUTs an update; the resource is updated, no body returned.\n3. A client requests /api/users/9999 (no such user).\n4. A client POSTs malformed JSON.\n5. A client POSTs valid JSON but a required field is missing (passes JSON parse, fails schema validation).\n6. The database is down; the request can't be served.",
+      "question": "Which row maps each scenario to its conventional HTTP status code?",
+      "options": [
+        "1=200, 2=200, 3=200 with empty body, 4=200, 5=200, 6=200",
+        "1=201 Created, 2=204 No Content, 3=404 Not Found, 4=400 Bad Request, 5=422 Unprocessable Entity, 6=503 Service Unavailable (or 500 Internal Server Error if the framework doesn't differentiate).",
+        "1=200, 2=201, 3=403, 4=500, 5=400, 6=400",
+        "1=200, 2=201, 3=204, 4=401, 5=403, 6=500 for all server-side failures"
+      ],
+      "correct_index": 1,
+      "explanation_md": "The pairings:\n\n1. **POST creates → 201 Created** (with a `Location` header pointing at the new resource).\n2. **PUT replaces with no body → 204 No Content** (success, no payload).\n3. **No such resource → 404 Not Found.**\n4. **Body fails JSON parse → 400 Bad Request** (syntactically wrong).\n5. **Body parses but fails schema → 422 Unprocessable Entity** (syntactically right, semantically wrong — this is what FastAPI / Pydantic returns from `ValidationError`). 400 is also acceptable in non-Pydantic ecosystems; the distinction is finer-grained but real.\n6. **Database down → 503 Service Unavailable** if the framework can detect the dependency failure; 500 Internal Server Error if it just sees an unhandled exception. Both are 5xx (server's fault).\n\nThe nuance worth knowing: **400 vs 422**. 400 is 'I can't parse this'; 422 is 'I parsed it, it's invalid per the schema'. APIs that use this distinction (FastAPI, modern REST frameworks) give clients more debuggable errors; APIs that collapse everything into 400 force clients to read the error body to understand the failure mode."
+    }
+  ]
+}
