@@ -1,0 +1,269 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 3,
+  "sphere_id": "m3-s4",
+  "cards": [
+    {
+      "id": "m3-s4-c1",
+      "type": "flip",
+      "topic": "Mock vs MagicMock + return_value",
+      "topic_ru": "Mock vs MagicMock + return_value",
+      "difficulty": 1,
+      "tags": ["mock", "magicmock", "return-value", "interview-warmup"],
+      "question": "What's the difference between `Mock` and `MagicMock`, and how do you configure what a mocked method returns?",
+      "answer": "`Mock` is the base mock — auto-creates attributes and methods on access; calling any method returns another Mock. `MagicMock` is `Mock` *plus* pre-configured magic methods (`__len__`, `__iter__`, `__enter__`/`__exit__`, `__getitem__`, etc.) so the mock can stand in for objects used as containers, iterables, or context managers. Use `MagicMock` whenever the code under test does `len(x)`, `for item in x`, `with x:`, or `x[key]` on the mocked object; `Mock` for plain function-like dependencies.\n\nConfigure the return: `m.fetch.return_value = {'id': 42}`. Then `m.fetch()` returns the configured dict, regardless of arguments passed.",
+      "answer_explanation_md": "`Mock()` is fine for most function-shaped dependencies (`m.send()`, `m.query()`). Reach for `MagicMock` the moment the mocked object needs to support a dunder method. Calling magic methods on a plain `Mock` raises `TypeError`: `len(Mock())` fails because `Mock.__len__` isn't configured. `MagicMock()` handles all the standard dunders out of the box."
+    },
+
+    {
+      "id": "m3-s4-c2",
+      "type": "code_trap",
+      "topic": "Typo on mock attribute silently succeeds",
+      "topic_ru": "Опечатка в атрибуте mock проходит молча",
+      "difficulty": 3,
+      "tags": ["mock", "spec", "autospec", "typo", "interview-classic"],
+      "code_snippet": "from unittest.mock import Mock\n\nm = Mock()\nm.fetech.return_value = {'id': 42}    # typo: 'fetech' instead of 'fetch'\n\n# Production calls m.fetch(), expecting the configured dict:\nresult = m.fetch()\nprint(result, type(result).__name__)",
+      "question": "What does the print show, and what's the defense against this class of bug?",
+      "options": [
+        "Prints `{'id': 42} dict` — Mock auto-corrects similar attribute names.",
+        "Raises `AttributeError: Mock object has no attribute 'fetch'` — Mock enforces declared attrs.",
+        "Prints something like `<Mock id='...'> Mock`. `m.fetch` auto-creates a *new* Mock attribute on access (Mock's signature behavior); the `fetech` typo went into a different attribute entirely. The test runs against an unconfigured mock and probably passes for the wrong reason. **Defense:** `Mock(spec=RealClass)` or `create_autospec(RealClass)` — typos raise `AttributeError` at construction or first-access time.",
+        "Prints `None None` — unconfigured attributes return None."
+      ],
+      "correct_index": 2,
+      "explanation_md": "Bare `Mock()` is the most permissive object in Python: every attribute access returns a fresh Mock, every call returns a Mock, comparisons against arbitrary objects work. The typo creates `m.fetech` (a new Mock) and the configured-but-unused return value sits dormant; `m.fetch` is a *different* Mock auto-created at access time.\n\nThe defense:\n\n```python\nfrom unittest.mock import create_autospec\n\nclass UserService:\n    def fetch(self, user_id): ...\n\nm = create_autospec(UserService)\nm.fetech.return_value = {'id': 42}\n# AttributeError: Mock object has no attribute 'fetech'\n```\n\n`create_autospec(RealClass)` introspects the real class and rejects access to attributes that don't exist on it. `Mock(spec=RealClass)` is a lighter version that does the same at attribute-access time. **Treat bare `Mock()` as a smell in production test suites; prefer `autospec` or `spec` for anything mocking a real interface.**"
+    },
+
+    {
+      "id": "m3-s4-c3",
+      "type": "code_task",
+      "topic": "Production function uses a dependency mocked via Mock + return_value",
+      "topic_ru": "Производственная функция использует зависимость, замокированную через Mock + return_value",
+      "difficulty": 4,
+      "tags": ["mock", "return-value", "boundary", "patterns"],
+      "prompt_md": "Implement `greet_user(user_service, user_id) -> str`:\n\n- Calls `user_service.fetch(user_id)`, expecting a dict like `{'name': 'alice'}`.\n- Returns the string `f\"Hello, {name}!\"` where `name` comes from the dict's `'name'` field.\n- If the dict has no `'name'` key, return `\"Hello, stranger!\"`.\n\nThe hidden tests inject a `Mock()` as the `user_service` parameter and configure `mock.fetch.return_value` per test. Your function shouldn't know it's being mocked — the dependency-at-boundary shape is what makes mocking clean.",
+      "starter_code": "def greet_user(user_service, user_id):\n    # your code here\n    pass\n",
+      "solution_code": "def greet_user(user_service, user_id):\n    data = user_service.fetch(user_id)\n    name = data.get('name', 'stranger')\n    if not name:\n        name = 'stranger'\n    return f'Hello, {name}!'\n",
+      "tests": "from unittest.mock import Mock\nimport pytest\nfrom solution import greet_user\n\ndef test_uses_name_from_service():\n    svc = Mock()\n    svc.fetch.return_value = {'name': 'alice'}\n    assert greet_user(svc, 42) == 'Hello, alice!'\n\ndef test_calls_service_with_right_id():\n    svc = Mock()\n    svc.fetch.return_value = {'name': 'bob'}\n    greet_user(svc, 7)\n    svc.fetch.assert_called_once_with(7)\n\ndef test_falls_back_when_name_missing():\n    svc = Mock()\n    svc.fetch.return_value = {'id': 42}     # no 'name'\n    assert greet_user(svc, 42) == 'Hello, stranger!'\n\ndef test_falls_back_when_name_empty():\n    svc = Mock()\n    svc.fetch.return_value = {'name': ''}\n    assert greet_user(svc, 42) == 'Hello, stranger!'\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s4-c4",
+      "type": "flip",
+      "topic": "assert_called* family — four flavors",
+      "topic_ru": "Семейство assert_called* — четыре варианта",
+      "difficulty": 2,
+      "tags": ["mock", "assert-called", "patterns"],
+      "question": "Name four `assert_called*` methods on a Mock and what each one checks.",
+      "answer": "`m.assert_called()` — fails if the mock was never called (called >= 1 time). `m.assert_called_once()` — fails unless called exactly once. `m.assert_called_with(*args, **kw)` — checks the **most recent** call matched these args. `m.assert_called_once_with(*args, **kw)` — combines `assert_called_once` + arg check (called exactly once, with these args).\n\nThere's also `m.assert_any_call(*args, **kw)` (was called with these args at some point) and `m.call_args_list` (a list of every call) for multi-call assertions.",
+      "answer_explanation_md": "Reflex rule: when the test really means 'called exactly once', use `assert_called_once_with`. It's strictly more informative than `assert_called_with` because it also catches accidental double-invocations. Use `assert_any_call` when the order of multiple calls doesn't matter and you just need 'one of them looked like X'. Iterate `m.call_args_list` when the test asserts a *sequence* of calls."
+    },
+
+    {
+      "id": "m3-s4-c5",
+      "type": "code_trap",
+      "topic": "assert_called_with checks only the LAST call",
+      "topic_ru": "assert_called_with проверяет только ПОСЛЕДНИЙ вызов",
+      "difficulty": 4,
+      "tags": ["mock", "assert-called-with", "last-call", "subtle", "interview-classic"],
+      "code_snippet": "from unittest.mock import Mock\n\ndef test_emits_event_for_each_action():\n    emitter = Mock()\n    do_signup(emitter, user='alice')\n    # do_signup internally calls emitter.emit('user.created', 'alice')\n    # and then emitter.emit('audit.write', 'signup')\n\n    emitter.emit.assert_called_with('user.created', 'alice')",
+      "question": "Does this assertion pass, and what does that tell us about `assert_called_with`?",
+      "options": [
+        "Passes — `assert_called_with` checks that the call appeared at some point during the test.",
+        "Fails. `assert_called_with` checks only the **most recent** call. `do_signup` made TWO calls; the last one was `('audit.write', 'signup')`. The assertion compares the test's expected `('user.created', 'alice')` against `('audit.write', 'signup')`, which doesn't match, and pytest reports the mismatch. The fix depends on intent: `assert_any_call('user.created', 'alice')` (was called with these at some point), or iterate `emitter.emit.call_args_list` to verify both calls in order.",
+        "Passes — Mock automatically dedupes calls and remembers each one.",
+        "Raises `AttributeError` because emitter is mocked, not real."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Common bug shape: the test asserts an early call's args, but the production code makes additional calls after the one the test cares about. `assert_called_with` silently checks the last call only and reports a confusing mismatch.\n\nTwo robust patterns:\n\n```python\n# Pattern A: order-agnostic, 'was this call made at some point?'\nemitter.emit.assert_any_call('user.created', 'alice')\n\n# Pattern B: assert full sequence of calls\nfrom unittest.mock import call\nemitter.emit.assert_has_calls([\n    call('user.created', 'alice'),\n    call('audit.write', 'signup'),\n], any_order=False)\n```\n\nThe `mock.call` helper builds the canonical call-args representation; `assert_has_calls(list, any_order=False)` checks the sequence in order. **Rule:** `assert_called_with` is correct only when you're certain the mock is called exactly once *or* you specifically care about the last call. Otherwise reach for `assert_called_once_with`, `assert_any_call`, or `assert_has_calls`."
+    },
+
+    {
+      "id": "m3-s4-c6",
+      "type": "code_task",
+      "topic": "Verify mock call shape via assert_called_once_with",
+      "topic_ru": "Проверить шейп вызова mock через assert_called_once_with",
+      "difficulty": 3,
+      "tags": ["mock", "assert-called-once-with", "patterns"],
+      "prompt_md": "Implement `notify(transport, recipient: str, level: str = 'info') -> None`:\n\n- Validates `level` is one of `'debug'`, `'info'`, `'warning'`, `'error'`. Raises `ValueError` with message `'invalid level'` otherwise.\n- Calls `transport.send(recipient=recipient, level=level)` exactly once.\n- Returns `None`.\n\nThe hidden tests inject a `Mock()` transport and verify the call shape via `assert_called_once_with` (so spurious extra calls or wrong kwargs fail the test).",
+      "starter_code": "def notify(transport, recipient, level='info'):\n    # your code here\n    pass\n",
+      "solution_code": "_VALID_LEVELS = {'debug', 'info', 'warning', 'error'}\n\ndef notify(transport, recipient, level='info'):\n    if level not in _VALID_LEVELS:\n        raise ValueError('invalid level')\n    transport.send(recipient=recipient, level=level)\n",
+      "tests": "from unittest.mock import Mock\nimport pytest\nfrom solution import notify\n\ndef test_calls_transport_with_kwargs():\n    transport = Mock()\n    notify(transport, recipient='alice@x.io', level='warning')\n    transport.send.assert_called_once_with(recipient='alice@x.io', level='warning')\n\ndef test_default_level_is_info():\n    transport = Mock()\n    notify(transport, recipient='bob@y.io')\n    transport.send.assert_called_once_with(recipient='bob@y.io', level='info')\n\ndef test_invalid_level_raises_and_does_not_call_transport():\n    transport = Mock()\n    with pytest.raises(ValueError, match='invalid level'):\n        notify(transport, recipient='c@z.io', level='SHOUT')\n    transport.send.assert_not_called()\n\ndef test_calls_transport_exactly_once_per_invocation():\n    transport = Mock()\n    notify(transport, recipient='a@x.io')\n    assert transport.send.call_count == 1\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s4-c7",
+      "type": "code_trap",
+      "topic": "Patching where defined instead of where used — mock not effective",
+      "topic_ru": "Патчинг там, где определено, а не там, где используется — mock не работает",
+      "difficulty": 4,
+      "tags": ["mock", "patch", "where-used", "golden-rule", "interview-classic", "footgun-pair"],
+      "code_snippet": "# src/myapp/users.py\nimport requests\n\ndef fetch_user(user_id):\n    return requests.get(f'https://api/users/{user_id}').json()\n\n# tests/test_users.py\nfrom unittest.mock import patch\nfrom myapp.users import fetch_user\n\n@patch('requests.get')                     # WRONG TARGET\ndef test_fetch_user(mock_get):\n    mock_get.return_value.json.return_value = {'id': 42}\n    result = fetch_user(42)\n    assert result == {'id': 42}",
+      "question": "Does the test pass, and what's happening with the mock?",
+      "options": [
+        "Passes — `@patch('requests.get')` patches the global `requests.get` and the function uses it.",
+        "Fails or behaves unpredictably. `@patch('requests.get')` patches the `get` attribute on the **`requests` module object**, but `myapp.users` already executed `import requests` at module load and has its own reference. When `fetch_user` calls `requests.get(...)`, it resolves the name *in `myapp.users`'s namespace*, which still points at the original `requests.get`. The mock isn't seen; the test either tries a real network call (no network → fail) or somehow passes for the wrong reason. Correct target: `@patch('myapp.users.requests.get')` — the path *where the name is used*, not where it's defined.",
+        "Raises `ImportError` because pytest can't find `requests`.",
+        "Passes — pytest's patcher walks all modules to find imports."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**The Golden Rule of patching: patch where the name is *used*, not where it's *defined*.** When `myapp/users.py` does `import requests`, Python creates a new name `requests` in `myapp.users`'s namespace pointing at the requests module object. From then on, `myapp.users.requests.get` and the global `requests.get` are *two different references to the same function*. Patching one doesn't affect the other.\n\nFixes for the example, in order of preference:\n\n```python\n@patch('myapp.users.requests.get')          # canonical — patch where used\ndef test_fetch_user(mock_get):\n    ...\n\n# If the function is imported by name: from requests import get\n# then the local reference IS 'myapp.users.get', and you patch that:\n@patch('myapp.users.get')\ndef test_fetch_user(mock_get):\n    ...\n```\n\nThis is THE most-asked mocking question in junior interviews. The phrasing is sometimes 'why doesn't my patch work?' or 'where do you patch a function?' Getting the answer wrong (or hand-waving) signals 'I've used `@patch` but never debugged a non-working one'. See the paired fix MC (next card) for the canonical answer."
+    },
+
+    {
+      "id": "m3-s4-c8",
+      "type": "multiple_choice",
+      "topic": "Fix MC for the patch-target trap (footgun pair with c7)",
+      "topic_ru": "Fix MC для патч-таргет ловушки (footgun-пара с c7)",
+      "difficulty": 3,
+      "tags": ["mock", "patch", "where-used", "footgun-pair"],
+      "question": "Given `src/myapp/users.py` does `import requests` and uses `requests.get(...)`, which `@patch` target makes the mock take effect in a test of `myapp.users.fetch_user`?",
+      "options": [
+        "`@patch('requests.get')` — patch at the source of truth (the requests module).",
+        "`@patch('myapp.users.requests.get')` — patch the reference *as seen from `myapp.users`*. This is the canonical 'patch where used' form: the target string is `<module-under-test>.<the-imported-name-chain>`. When `fetch_user` looks up `requests.get`, Python resolves it through `myapp.users`'s namespace, hits the patched version, and the mock takes effect.",
+        "`@patch('requests')` — patch the whole module.",
+        "`@patch('myapp.requests.get')` or any path that omits the actual module the call lives in."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — patches the requests module's `get` attribute, but `myapp.users` has its own reference to the function that was bound at `import` time. The local reference still points at the original.",
+        "Correct. The patch target is the path Python uses to resolve the name *inside the module under test*. Since `myapp.users` did `import requests`, the name `requests.get` resolves through `myapp.users.requests.get`. Patching that path replaces the reference for the duration of the test.",
+        "Wrong — replaces the whole `requests` symbol, but again only on the global, not on `myapp.users`'s local reference.",
+        "Wrong — `myapp.requests.get` doesn't exist as a real path (no `requests` attribute on `myapp` package unless something explicitly created it). Patching invalid paths raises AttributeError at decoration time."
+      ]
+    },
+
+    {
+      "id": "m3-s4-c9",
+      "type": "code_task",
+      "topic": "Production code uses urllib.request; test patches where used",
+      "topic_ru": "Прод-код использует urllib.request; тест патчит там, где используется",
+      "difficulty": 3,
+      "tags": ["mock", "patch", "where-used", "patterns"],
+      "prompt_md": "Implement `fetch_status(url: str) -> int` in `solution.py` that:\n\n- Imports `urllib.request` at the top of the module.\n- Calls `urllib.request.urlopen(url, timeout=5)`.\n- Returns the response's `.status` attribute as an integer.\n\nThe hidden tests patch `solution.urllib.request.urlopen` (the where-used path, since `solution.py` imported `urllib.request`) and configure the mock's `.return_value.status`. If you wrote the import correctly, the test's patch takes effect.\n\n(Same lesson as patching `requests.get`; we use stdlib here so the test harness doesn't need a third-party dependency.)",
+      "starter_code": "import urllib.request\n\ndef fetch_status(url):\n    # your code here\n    pass\n",
+      "solution_code": "import urllib.request\n\ndef fetch_status(url):\n    response = urllib.request.urlopen(url, timeout=5)\n    return response.status\n",
+      "tests": "from unittest.mock import patch, Mock\nimport pytest\nfrom solution import fetch_status\n\n@patch('solution.urllib.request.urlopen')\ndef test_returns_status_code(mock_open):\n    mock_open.return_value = Mock(status=200)\n    assert fetch_status('https://api/health') == 200\n\n@patch('solution.urllib.request.urlopen')\ndef test_passes_url_through(mock_open):\n    mock_open.return_value = Mock(status=200)\n    fetch_status('https://api/widgets/42')\n    args, kwargs = mock_open.call_args\n    assert args == ('https://api/widgets/42',) or kwargs.get('url') == 'https://api/widgets/42'\n\n@patch('solution.urllib.request.urlopen')\ndef test_passes_timeout_keyword(mock_open):\n    mock_open.return_value = Mock(status=200)\n    fetch_status('https://api/health')\n    _, kwargs = mock_open.call_args\n    assert kwargs.get('timeout') == 5\n\n@patch('solution.urllib.request.urlopen')\ndef test_returns_5xx_status_unchanged(mock_open):\n    mock_open.return_value = Mock(status=503)\n    assert fetch_status('https://api/down') == 503\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s4-c10",
+      "type": "flip",
+      "topic": "Chained @patch decorators evaluate bottom-up",
+      "topic_ru": "Связанные @patch-декораторы вычисляются снизу вверх",
+      "difficulty": 3,
+      "tags": ["mock", "patch", "decorators", "order", "interview-classic"],
+      "question": "When you stack multiple `@patch` decorators on a test function, in what order do the corresponding mock arguments appear in the function signature?",
+      "answer": "**Bottom-up.** Decorator stacking in Python wraps innermost-first, so the *closest* decorator to the function is applied first and its mock is passed as the *first* argument. Example:\n\n```python\n@patch('mod.foo')        # outermost — mock_foo is LAST\n@patch('mod.bar')        # inner — mock_bar is SECOND\n@patch('mod.baz')        # closest — mock_baz is FIRST\ndef test_it(mock_baz, mock_bar, mock_foo):\n    ...\n```\n\nRead from bottom to top, args go left to right.",
+      "answer_explanation_md": "This is the subtle gotcha every junior hits the first time they stack `@patch`. Mentally substitute the args wrong, the test passes anyway because both mocks behave permissively, and the assertions fire on the wrong mock object. The fix is to read carefully or use the context-manager form (`with patch(...) as mock_foo: with patch(...) as mock_bar:`), which avoids the ordering confusion entirely by binding names locally."
+    },
+
+    {
+      "id": "m3-s4-c11",
+      "type": "flip",
+      "topic": "with patch() context manager basics",
+      "topic_ru": "Базовый context manager with patch()",
+      "difficulty": 1,
+      "tags": ["mock", "patch", "context-manager", "interview-warmup"],
+      "question": "Sketch the `with patch(...)` form for mocking a function only within a specific block of a test.",
+      "answer": "```python\nfrom unittest.mock import patch\n\ndef test_one_specific_path():\n    setup_unmocked_state()\n\n    with patch('myapp.users.requests.get') as mock_get:\n        mock_get.return_value.json.return_value = {'id': 42}\n        result = fetch_user(42)\n\n    assert result == {'id': 42}      # mock no longer in effect here\n```\nThe `with patch(target) as mock_obj:` block installs the patch on `__enter__` and removes it on `__exit__`. Outside the block, the original `target` is restored. The bound name (`mock_obj`) is the mock you configure and assert against.",
+      "answer_explanation_md": "Use the context-manager form when only part of a test should run against the mock. The decorator form applies for the entire function; the context manager applies only inside `with`. Both forms accept the same target string and produce the same mock object — the only difference is lifetime."
+    },
+
+    {
+      "id": "m3-s4-c12",
+      "type": "multiple_choice",
+      "topic": "Context manager vs decorator — when to reach for each",
+      "topic_ru": "Context manager vs decorator — когда какой",
+      "difficulty": 3,
+      "tags": ["mock", "patch", "context-manager", "decorator"],
+      "question": "Both `@patch('mod.f')` (decorator) and `with patch('mod.f'):` (context manager) work. When should you reach for each?",
+      "options": [
+        "Always the decorator — it's the canonical form; the context manager is legacy.",
+        "Always the context manager — it's more explicit about lifetime.",
+        "Decorator when the patch applies for the entire test function (the common case). Context manager when (a) only part of the test should run against the mock, (b) you need to patch *conditionally* mid-test (different mocks per branch), or (c) you're patching inside a non-test helper / fixture / loop where decorators are awkward. Pytest fixtures with `yield` often use the context-manager form internally.",
+        "They're identical aliases; either is fine."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — the context manager isn't legacy; it's the right tool for narrower scope.",
+        "Wrong — for whole-function patches, the decorator is cleaner (the patch target lives near the test name; the mock object is a named parameter).",
+        "Correct. The decorator wins on readability for whole-function patches. The context manager wins for narrower scope, conditional patches, dynamic targets, and uses outside a test function. Default to decorator; reach for context manager when you have a reason.",
+        "Wrong — they're functionally equivalent but stylistically differ. The decorator is shorter for the common case; the context manager is more flexible."
+      ]
+    },
+
+    {
+      "id": "m3-s4-c13",
+      "type": "code_trap",
+      "topic": "patch() not entered — mock is not active",
+      "topic_ru": "patch() без with — mock неактивен",
+      "difficulty": 4,
+      "tags": ["mock", "patch", "context-manager", "subtle"],
+      "code_snippet": "from unittest.mock import patch\n\ndef test_fetch_with_mock():\n    p = patch('myapp.users.requests.get')\n    p.return_value.json.return_value = {'id': 42}\n\n    result = fetch_user(42)\n    assert result == {'id': 42}",
+      "question": "What's wrong with this test?",
+      "options": [
+        "Nothing — `patch()` activates immediately when called.",
+        "`p = patch(...)` returns a patcher *object* without entering its context. The patch isn't applied; `requests.get` still points at the real function. The next line `p.return_value.json.return_value = ...` configures attributes on the **patcher object itself** (not on a mock), which is meaningless. `fetch_user(42)` calls real `requests.get` (network call or failure depending on environment). The fix is to enter the patch: either `with patch(...) as mock_get:` or `mock_get = p.start(); ...; p.stop()` explicitly.",
+        "Raises `RuntimeError: patch not entered`.",
+        "The test passes because pytest auto-enters all patchers."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`patch('target')` returns a `_patch` object — a context manager descriptor. It doesn't *do* anything until you either enter its `with` block or call `.start()` explicitly. The two correct forms:\n\n```python\n# Form A: with statement (preferred)\ndef test_fetch_with_mock():\n    with patch('myapp.users.requests.get') as mock_get:\n        mock_get.return_value.json.return_value = {'id': 42}\n        result = fetch_user(42)\n        assert result == {'id': 42}\n\n# Form B: start/stop pair (use with addCleanup in unittest, or pytest fixture)\ndef test_fetch_with_mock():\n    p = patch('myapp.users.requests.get')\n    mock_get = p.start()\n    try:\n        mock_get.return_value.json.return_value = {'id': 42}\n        result = fetch_user(42)\n    finally:\n        p.stop()\n    assert result == {'id': 42}\n```\n\nForm A is the default; Form B is for situations where the lifetime crosses a `with`-block boundary (e.g., setup/teardown in a fixture). The bug in the question is the omitted `with` (or `start()`); the patcher object is built and immediately discarded."
+    },
+
+    {
+      "id": "m3-s4-c14",
+      "type": "fill_in",
+      "topic": "side_effect for sequence simulation",
+      "topic_ru": "side_effect для симуляции последовательности",
+      "difficulty": 2,
+      "tags": ["mock", "side-effect", "sequence", "patterns"],
+      "code_snippet_with_blanks": "from unittest.mock import Mock\nfrom requests.exceptions import Timeout\n\n# Simulate 'two timeouts, then a successful response':\nmock_get = Mock()\nmock_get.___ = [Timeout(), Timeout(), Mock(status_code=200)]\n\nmock_get()    # raises Timeout (first item)\nmock_get()    # raises Timeout (second item)\nmock_get()    # returns the third item (Mock with status_code=200)",
+      "accepted_answers": [
+        ["side_effect"]
+      ],
+      "explanation_md": "`side_effect = [<items>]` makes the mock return (or raise) the items in order on successive calls. Items that are `Exception` instances or classes are *raised*; everything else is *returned*. After the list is exhausted, the next call raises `StopIteration`.\n\nThe pattern is the canonical way to simulate retry-then-succeed flows: the production code under test calls the dependency, gets a timeout, retries, gets another timeout, retries, gets a real response, and proceeds. The test verifies the retry logic was exercised (e.g., `mock_get.call_count == 3`) and the final result was used. Without `side_effect`, you'd need a stateful counter in a custom callable — `side_effect` is the same shape, stdlib-blessed."
+    },
+
+    {
+      "id": "m3-s4-c15",
+      "type": "multiple_choice",
+      "topic": "side_effect as exception vs sequence vs callable",
+      "topic_ru": "side_effect как exception vs sequence vs callable",
+      "difficulty": 3,
+      "tags": ["mock", "side-effect", "exceptions"],
+      "question": "Which row correctly describes what each `side_effect` assignment does?",
+      "options": [
+        "`side_effect=ValueError`: returns `ValueError` (the class). `side_effect=[1, 2]`: returns the list `[1, 2]` on every call. `side_effect=lambda x: x`: replaces the mock's spec with the function.",
+        "`side_effect=ValueError`: raises `ValueError()` on every call (an exception class is called and raised). `side_effect=ValueError('oops')`: raises that specific instance every call. `side_effect=[1, 2, 3]`: returns 1, then 2, then 3, then raises `StopIteration`. `side_effect=lambda *a, **kw: ...`: calls the lambda with the mock's args and uses the lambda's return value as the call's return.",
+        "`side_effect` always raises whatever is assigned to it.",
+        "`side_effect` and `return_value` are aliases."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on all three: an exception class is called/raised, not returned; a list is iterated, not returned whole; a lambda is called, not used as spec.",
+        "Correct. `side_effect` supports three distinct shapes by inspecting what you assign: callable → call it; iterable → yield successive values (raising any that are exceptions); exception class or instance → raise it. The dispatch is by *type* of the assigned value at call time, not at assignment time.",
+        "Wrong — only exception classes/instances are raised; everything else returns or runs.",
+        "Wrong — `side_effect` overrides `return_value`. When both are set, `side_effect` wins."
+      ]
+    },
+
+    {
+      "id": "m3-s4-c16",
+      "type": "code_task",
+      "topic": "Retry function tested via side_effect sequence",
+      "topic_ru": "Функция повтора тестируется через последовательность side_effect",
+      "difficulty": 4,
+      "tags": ["mock", "side-effect", "retry", "sequence", "patterns"],
+      "prompt_md": "Implement `retry_fetch(fetcher, url: str, max_attempts: int = 3) -> object`:\n\n- Calls `fetcher(url)`.\n- If it raises a `TimeoutError`, retry up to `max_attempts` total attempts (so up to `max_attempts - 1` retries after the first).\n- If a non-TimeoutError exception is raised, do NOT retry; propagate it.\n- If `max_attempts` is exhausted with all TimeoutErrors, re-raise the LAST TimeoutError.\n- On success (no exception), return the fetcher's return value.\n\nThe hidden tests use `side_effect=[...]` to simulate timeout-then-timeout-then-success, all-timeouts, and immediate-success scenarios.",
+      "starter_code": "def retry_fetch(fetcher, url, max_attempts=3):\n    # your code here\n    pass\n",
+      "solution_code": "def retry_fetch(fetcher, url, max_attempts=3):\n    last_error = None\n    for _ in range(max_attempts):\n        try:\n            return fetcher(url)\n        except TimeoutError as e:\n            last_error = e\n            continue\n    raise last_error\n",
+      "tests": "from unittest.mock import Mock\nimport pytest\nfrom solution import retry_fetch\n\nclass FakeResponse:\n    def __init__(self, status):\n        self.status = status\n\ndef test_succeeds_on_first_attempt():\n    fetcher = Mock(return_value=FakeResponse(200))\n    result = retry_fetch(fetcher, 'https://x')\n    assert result.status == 200\n    assert fetcher.call_count == 1\n\ndef test_retries_then_succeeds():\n    fetcher = Mock(side_effect=[TimeoutError('t1'), TimeoutError('t2'), FakeResponse(200)])\n    result = retry_fetch(fetcher, 'https://x', max_attempts=3)\n    assert result.status == 200\n    assert fetcher.call_count == 3\n\ndef test_all_attempts_timeout_raises_last():\n    fetcher = Mock(side_effect=[TimeoutError('t1'), TimeoutError('t2'), TimeoutError('t3-last')])\n    with pytest.raises(TimeoutError, match='t3-last'):\n        retry_fetch(fetcher, 'https://x', max_attempts=3)\n    assert fetcher.call_count == 3\n\ndef test_non_timeout_exception_does_not_retry():\n    fetcher = Mock(side_effect=ValueError('bad url'))\n    with pytest.raises(ValueError, match='bad url'):\n        retry_fetch(fetcher, 'https://x', max_attempts=3)\n    assert fetcher.call_count == 1\n\ndef test_max_attempts_one_means_no_retries():\n    fetcher = Mock(side_effect=[TimeoutError('only')])\n    with pytest.raises(TimeoutError, match='only'):\n        retry_fetch(fetcher, 'https://x', max_attempts=1)\n    assert fetcher.call_count == 1\n",
+      "allowlist": ["pytest"]
+    }
+  ]
+}

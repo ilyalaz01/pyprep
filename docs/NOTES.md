@@ -1089,3 +1089,52 @@ chrome); N029 / validator's `_check_no_emoji` is the *enforcement*.
 Inline status markers fall under the enforcement even when the
 authoring intent is operational rather than decorative.
 
+---
+
+## N043 — code_task harness writes only solution.py + test_solution.py [AUTHORING]
+
+**Phase:** 9 (m3-s3) · **Date:** 2026-05-13 · **Status:** active
+
+Both the host validator (`scripts/validate_content.py` → `_run_code_task`)
+and the Pyodide browser harness (`frontend/src/pyodide/pytest_harness.py`)
+expose **only two files** to pytest at code_task execution time:
+
+- `/<tempdir>/solution.py` — written from `card["solution_code"]`.
+- `/<tempdir>/test_solution.py` — written from `card["tests"]`.
+
+There is **no mechanism to write a third file**, including:
+
+- `conftest.py` — pytest's auto-discovery file for cross-file fixtures
+- `pytest.ini` / `pyproject.toml` — pytest configuration
+- Helper modules — supporting utilities the solution would import
+- `__init__.py` — package-marker files
+- Data files (CSV, JSON, YAML) — fixtures loaded from disk
+
+**Authoring implication:** any pedagogical concept that *requires* a
+separate file (conftest.py, multi-module imports, package layout) must
+be taught via `code_trap` / `multiple_choice` / `flip` / `fill_in`. A
+`code_task` that depends on a separate file will fail at validation
+time.
+
+**Workarounds inside a code_task:**
+
+- **Fixtures**: define `@pytest.fixture` inline in `test_solution.py`.
+  Pytest discovers fixtures in the same file just as it discovers them
+  in `conftest.py`. Cross-file sharing is the conftest.py feature; for
+  a single-file test it's not needed.
+- **Helper code**: inline into the solution or test file. Don't try to
+  `from helper import ...` from a third file.
+- **Test data**: embed as Python literals (dicts, lists, multi-line
+  strings) in the test file. Don't load from `tests/data/*.json`.
+- **Package layout demos**: skip code_task; teach via code_trap that
+  shows the layout diagram in the snippet field.
+
+**Discovered:** m3-s3 (Fixtures) authoring, verified by reading
+`_run_code_task` in `src/pyprep/tools/validate_content.py`. The
+constraint was inferred but not codified before m3-s3.
+
+**Related:** the harness reuses `subprocess.run([sys.executable, "-m",
+"pytest", "-q", str(td_path)])` with a 30s timeout. Tests have full
+access to stdlib + any package listed in the card's `allowlist`.
+Limited only by what fits in two files.
+
