@@ -993,3 +993,55 @@ sitting with before committing.
   number the user sees during the loop. Aggregate accuracy is the
   cross-session signal that needs the backend work.
 
+---
+
+## N041 — Footgun-pair card pattern for security/correctness anchors [AUTHORING]
+
+**Phase:** 8 (m2-s5, m2-s6) · **Date:** 2026-05-13 · **Status:** active
+
+Authoring pattern that emerged across `m2-s5` and `m2-s6` and is
+worth replicating in remaining sphere-level security/correctness
+anchors:
+
+**Shape:** for each sphere's marquee gotcha, ship *two* cards as a
+pedagogical unit:
+
+1. A `code_trap` at difficulty 3–4 showing the vulnerable / wrong
+   pattern with a concrete failure mode (rm -rf via shell injection,
+   silent traceback loss from `logger.error(str(e))`). Options name
+   the actual mechanism, not just "this is bad".
+2. A `multiple_choice` at difficulty 2–3 right after, comparing the
+   fix candidates: structural fix (canonical), alternative-but-OK,
+   incomplete defense, plain wrong. The MC forces the learner to pick
+   between *good* and *good-but-second-best*, not between right and
+   nonsense.
+
+**Why it works:** the trap card builds recognition ("I've seen this
+bug shape before"); the MC card builds prescription ("I know the
+canonical fix and why the alternatives are second-best"). Recognition
+without prescription is the failure mode where junior engineers spot
+the smell but propose a less-good fix in code review.
+
+**Landed pairs:**
+- `m2-s5-c2` + `m2-s5-c3` — shell injection trap + arg-list-vs-shlex
+  -quote fix MC.
+- `m2-s6-c2` + (planned) — argparse `type=bool` is broken. m2-s6 c2
+  was a single card; the pattern wasn't yet codified. Acceptable;
+  the gotcha is shallow enough that one card carries it.
+- `m2-s6-c6` (single card at diff 4 carrying `logger.error(str(e))`)
+  — see future-author note below.
+
+**Future-replicate explicitly:**
+- `m4-s7` SQL injection — vulnerable parameterization vs prepared-
+  statement / ORM fix.
+- `m4-s9` Bash `set -euo pipefail` — script-without-it trap vs
+  what each flag protects against.
+- Any future sphere with a marquee security or correctness gotcha
+  where "recognize" and "fix" are usefully separable skills.
+
+**Quality bar:** the MC's four options should follow the "two of four
+plausibly wrong-for-an-interesting-reason" rule from `PRD_content_authoring.md`
+section 6. Don't pad with "all of the above" or "none of these";
+every option should be a real candidate a junior might genuinely
+write.
+

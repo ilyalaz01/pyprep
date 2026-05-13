@@ -1,0 +1,227 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s7",
+  "cards": [
+    {
+      "id": "m2-s7-c1",
+      "type": "flip",
+      "topic": "FastAPI route, path param, query param",
+      "topic_ru": "FastAPI маршрут, path-параметр, query-параметр",
+      "difficulty": 2,
+      "tags": ["fastapi", "routing", "interview-warmup"],
+      "question": "Sketch a FastAPI GET route that takes a path parameter `item_id: int` and an optional query parameter `q: str | None`.",
+      "answer": "```python\nfrom fastapi import FastAPI\napp = FastAPI()\n\n@app.get('/items/{item_id}')\ndef read_item(item_id: int, q: str | None = None):\n    return {'id': item_id, 'q': q}\n```\nThe `{item_id}` in the path matches the function argument by name; the type hint drives validation and coercion. `q` isn't in the path, so FastAPI treats it as a query parameter (`?q=hello`).",
+      "answer_explanation_md": "Two rules cover almost all of FastAPI routing: function arguments mentioned in the path are path parameters; everything else is a query parameter unless it's a Pydantic BaseModel (then it's the request body). Type hints are the entire validation system — `item_id: int` makes `/items/abc` return 422; `q: str | None = None` makes `q` optional."
+    },
+
+    {
+      "id": "m2-s7-c2",
+      "type": "code_trap",
+      "topic": "Path param type hint drives coercion; bad input returns 422",
+      "topic_ru": "Тип path-параметра приводит значения и даёт 422 при ошибке",
+      "difficulty": 3,
+      "tags": ["fastapi", "path-param", "validation", "http-422"],
+      "code_snippet": "@app.get('/items/{item_id}')\ndef read_item(item_id: int):\n    return {'id': item_id, 'doubled': item_id * 2}\n\n# Client requests:  GET /items/abc",
+      "question": "What does FastAPI return for `GET /items/abc`?",
+      "options": [
+        "200 with `{'id': 'abc', 'doubled': 'abcabc'}` — strings multiply.",
+        "500 Internal Server Error — `int * int` failed.",
+        "422 Unprocessable Entity with a structured JSON body explaining that `item_id` should be a valid integer; the handler never runs.",
+        "404 Not Found — the path doesn't match the integer pattern."
+      ],
+      "correct_index": 2,
+      "explanation_md": "FastAPI uses the parameter type hint to parse incoming path / query values *before* calling the handler. `item_id: int` means the framework tries to coerce `'abc'` to `int`, fails, and returns 422 with a body like:\n\n```json\n{\"detail\": [{\"type\": \"int_parsing\", \"loc\": [\"path\", \"item_id\"], \"msg\": \"Input should be a valid integer, ...\", \"input\": \"abc\"}]}\n```\n\nThe handler `read_item` is never entered. You write no validation code — the type hint is the contract. 422 is the standard FastAPI shape for 'request shape correct but a field failed validation'; 400 is generic and FastAPI rarely emits it."
+    },
+
+    {
+      "id": "m2-s7-c3",
+      "type": "multiple_choice",
+      "topic": "Path param vs query param vs request body — how FastAPI decides",
+      "topic_ru": "Path vs query vs body — как FastAPI выбирает",
+      "difficulty": 2,
+      "tags": ["fastapi", "routing", "parameters"],
+      "question": "Given `@app.post('/items/{item_id}')` and `def create(item_id: int, q: str | None = None, item: ItemModel):`, which parameter becomes what?",
+      "options": [
+        "All three become query parameters; the body is implicit.",
+        "All three become path parameters because they're typed.",
+        "`item_id` is a path param (mentioned in the URL), `q` is a query param (not in path, not a BaseModel), `item` is the request body (it's a Pydantic BaseModel).",
+        "`item_id` and `item` are body fields; `q` is a query param."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — path templating and BaseModel parameters both override the query-param default.",
+        "Wrong — path parameters are determined by appearance in the URL template, not by type.",
+        "Correct. FastAPI's rules in order: (1) parameter name in `{}` in the path → path param; (2) parameter is a Pydantic BaseModel → request body; (3) anything else → query param. The three rules cover the common cases without ambiguity.",
+        "Wrong — `item_id` is in the URL template, so it's a path param, not a body field."
+      ]
+    },
+
+    {
+      "id": "m2-s7-c4",
+      "type": "fill_in",
+      "topic": "Typed path parameter syntax",
+      "topic_ru": "Синтаксис типизированного path-параметра",
+      "difficulty": 1,
+      "tags": ["fastapi", "path-param", "patterns"],
+      "code_snippet_with_blanks": "from fastapi import FastAPI\napp = FastAPI()\n\n@app.get('/users/{user_id}')\ndef read_user(user_id: ___):\n    return {'id': user_id}",
+      "accepted_answers": [
+        ["int"]
+      ],
+      "explanation_md": "`user_id: int` is the one-token contract: FastAPI parses the URL segment as `int`, returns 422 on `/users/abc`, generates `/docs` with the right schema, and IDE autocomplete works on `user_id`. The same shape works for `str`, `float`, `UUID`, and any Pydantic-supported type. If you wanted a string ID, the answer would be `str`."
+    },
+
+    {
+      "id": "m2-s7-c5",
+      "type": "flip",
+      "topic": "Pydantic BaseModel as request body",
+      "topic_ru": "Pydantic BaseModel как тело запроса",
+      "difficulty": 2,
+      "tags": ["fastapi", "pydantic", "request-body"],
+      "question": "How do you tell FastAPI 'parse the request body as JSON, validate against this shape, give me a typed object'?",
+      "answer": "Declare a `pydantic.BaseModel` subclass with the expected fields and type-hint a function parameter as that model: `def create_item(item: ItemIn):`. FastAPI sees a non-path, non-primitive parameter typed as a BaseModel and treats it as the request body — parses JSON, runs Pydantic validation, raises ValidationError on mismatch (auto-converted to 422), and passes the typed instance to the handler.",
+      "answer_explanation_md": "You write no `request.body()` call, no `json.loads`, no `if 'name' not in payload: return 400`. The type hint *is* the contract. The same model can power `response_model=` on the endpoint decorator, which validates outgoing data the same way. Schema-driven request handling is the entire reason FastAPI exists; not using BaseModel for body parsing is a 'why are you here' code-review smell."
+    },
+
+    {
+      "id": "m2-s7-c6",
+      "type": "code_trap",
+      "topic": "Pydantic default ignores extra fields; ConfigDict(extra='forbid') rejects them",
+      "topic_ru": "Pydantic по умолчанию игнорирует лишние поля; extra='forbid' их отвергает",
+      "difficulty": 3,
+      "tags": ["pydantic", "extra-fields", "config", "subtle"],
+      "code_snippet": "from pydantic import BaseModel\n\nclass User(BaseModel):\n    name: str\n    email: str\n\nu = User.model_validate({\n    'name': 'alice', 'email': 'a@x.io',\n    'is_admin': True,   # extra field, not declared on User\n})\nprint(hasattr(u, 'is_admin'))",
+      "question": "What does this print, and what changes if `User` declares `model_config = ConfigDict(extra='forbid')`?",
+      "options": [
+        "Prints `True` — pydantic accepts and attaches extra fields by default.",
+        "Prints `False`. Pydantic's default is `extra='ignore'`: extra fields parse without error but are silently dropped. With `model_config = ConfigDict(extra='forbid')` the same input raises `ValidationError` listing `is_admin` as a forbidden extra field.",
+        "Raises `ValidationError` regardless of config — extra fields are always forbidden.",
+        "Prints `True` and adds `is_admin` to `User.__annotations__` at runtime."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Pydantic v2 default is `extra='ignore'`: incoming data with extra fields validates fine; the extras are dropped and not accessible on the resulting instance. This is the right default for *response* validation (third-party APIs grow new fields and you don't want to break on them) but the *wrong* default for trusted input where you want to catch typos and stale clients.\n\nThe fix per-model:\n\n```python\nfrom pydantic import BaseModel, ConfigDict\n\nclass User(BaseModel):\n    model_config = ConfigDict(extra='forbid')\n    name: str\n    email: str\n```\n\nNow `is_admin` raises `ValidationError`. Use `extra='forbid'` for request bodies you control end-to-end; use the default `ignore` for upstream response shapes you can't lock down."
+    },
+
+    {
+      "id": "m2-s7-c7",
+      "type": "code_task",
+      "topic": "Pydantic model with validation rules; model_validate round-trip",
+      "topic_ru": "Pydantic-модель с валидацией; round-trip model_validate",
+      "difficulty": 3,
+      "tags": ["pydantic", "model-validate", "field", "patterns"],
+      "prompt_md": "Implement a `pydantic.BaseModel` subclass `Item` with three fields:\n\n- `name: str` — non-empty (use `Field(min_length=1)`).\n- `price: float` — must be `> 0` (`Field(gt=0)`).\n- `tags: list[str]` — default to empty list.\n\nAlso implement `parse_item(payload: dict) -> Item` that returns `Item.model_validate(payload)`, letting any `ValidationError` propagate.\n\nDon't catch the validation error in `parse_item` — the test asserts on it.",
+      "starter_code": "from pydantic import BaseModel, Field\n\nclass Item(BaseModel):\n    # your fields here\n    pass\n\ndef parse_item(payload):\n    # your code here\n    pass\n",
+      "solution_code": "from pydantic import BaseModel, Field, ValidationError\n\nclass Item(BaseModel):\n    name: str = Field(min_length=1)\n    price: float = Field(gt=0)\n    tags: list[str] = []\n\ndef parse_item(payload):\n    return Item.model_validate(payload)\n",
+      "tests": "import pytest\nfrom pydantic import ValidationError\nfrom solution import Item, parse_item\n\ndef test_round_trip_valid_payload():\n    item = parse_item({'name': 'apple', 'price': 1.5, 'tags': ['fruit']})\n    assert item.name == 'apple'\n    assert item.price == 1.5\n    assert item.tags == ['fruit']\n\ndef test_tags_default_to_empty_list():\n    item = parse_item({'name': 'apple', 'price': 1.5})\n    assert item.tags == []\n\ndef test_empty_name_raises():\n    with pytest.raises(ValidationError):\n        parse_item({'name': '', 'price': 1.5})\n\ndef test_zero_price_raises():\n    with pytest.raises(ValidationError):\n        parse_item({'name': 'apple', 'price': 0})\n\ndef test_negative_price_raises():\n    with pytest.raises(ValidationError):\n        parse_item({'name': 'apple', 'price': -1})\n\ndef test_missing_required_field_raises():\n    with pytest.raises(ValidationError):\n        parse_item({'name': 'apple'})\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s7-c8",
+      "type": "flip",
+      "topic": "Depends basics — what it injects and when",
+      "topic_ru": "Depends — что инжектит и когда",
+      "difficulty": 2,
+      "tags": ["fastapi", "depends", "dependency-injection"],
+      "question": "What does `Depends(some_func)` do in a FastAPI endpoint signature, and when does `some_func` get called?",
+      "answer": "`Depends(some_func)` tells FastAPI to call `some_func` at request time (synchronously or async, whichever it's declared as) and pass the result as the corresponding argument. `some_func` can take its own parameters typed as path/query/body/dependencies, which FastAPI resolves recursively. The dependency runs *per request*, before the handler body; the result is cached for the duration of that request, so the same `Depends(get_db)` referenced from two endpoints (or from the handler and a sub-dependency) returns the same value within one request.",
+      "answer_explanation_md": "Dependencies are how FastAPI handles cross-cutting concerns: DB sessions, current-user authentication, settings/config, feature flags. The common shape is a `def get_thing(...): return ...` returning a value, or a `def get_thing(...): try: yield X; finally: cleanup()` generator for setup/teardown. The DI graph is resolved fresh each request; there's no global state."
+    },
+
+    {
+      "id": "m2-s7-c9",
+      "type": "multiple_choice",
+      "topic": "Depends with yield — DB session cleanup pattern",
+      "topic_ru": "Depends с yield — паттерн закрытия DB-сессии",
+      "difficulty": 3,
+      "tags": ["fastapi", "depends", "yield", "db-session", "interview-classic"],
+      "question": "Which pattern is the canonical way to inject a DB session into endpoints with guaranteed cleanup on both success and failure?",
+      "options": [
+        "Global `db = connect()` at module top; reference directly in handlers.",
+        "`def get_db(): return connect()` and `db = Depends(get_db)` — FastAPI closes it automatically.",
+        "Generator dependency: `def get_db(): db = connect(); try: yield db; finally: db.close()`. The `yield` form lets FastAPI run the `finally` block after the handler returns, guaranteeing cleanup even on exceptions.",
+        "Subclass `BaseModel` with a `__del__` that closes the connection."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — a global connection has no per-request lifecycle and breaks under any concurrency.",
+        "Wrong — FastAPI doesn't magically know to close a returned value. Without `yield` + `finally`, the connection leaks.",
+        "Correct. The `yield` form gives you setup-before / cleanup-after semantics. FastAPI runs the body up to `yield`, hands the yielded value to the handler, then re-enters the generator (running the `finally`) when the handler returns or raises. Same shape as a context manager, but plugged into the DI graph.",
+        "Wrong — `__del__` runs at garbage-collection time, not request-end time. Race conditions and resource leaks guaranteed."
+      ]
+    },
+
+    {
+      "id": "m2-s7-c10",
+      "type": "code_trap",
+      "topic": "Depends caching: same dependency in one request runs once",
+      "topic_ru": "Кэширование Depends: одна и та же зависимость в одном запросе вызывается один раз",
+      "difficulty": 4,
+      "tags": ["fastapi", "depends", "caching", "subtle"],
+      "code_snippet": "calls = []\n\ndef expensive():\n    calls.append(1)\n    return 'token'\n\ndef inner(token: str = Depends(expensive)):\n    return token\n\n@app.get('/x')\ndef endpoint(\n    a: str = Depends(expensive),\n    b: str = Depends(expensive),\n    c: str = Depends(inner),\n):\n    return {'count': len(calls)}",
+      "question": "On a single request to `GET /x`, how many times is `expensive()` actually called?",
+      "options": [
+        "3 — once per `Depends(expensive)` reference.",
+        "4 — three direct refs plus one through `inner`.",
+        "1. FastAPI caches dependency results within a single request by default (`use_cache=True`). All three references — direct and via `inner` — share the same call. The cache key is the dependency callable itself.",
+        "0 — the dependency only runs if you call `await` on it."
+      ],
+      "correct_index": 2,
+      "explanation_md": "Default behavior: `Depends(fn)` resolves once per request, regardless of how many times `fn` is referenced (directly or as a sub-dependency). Subsequent references in the same request return the cached value. This is what makes `Depends(get_db)` safe to pin in five sub-dependencies: you get *one* DB session per request, not five.\n\nTo opt out — re-run the dependency every time it's referenced — pass `use_cache=False`:\n\n```python\nDepends(expensive, use_cache=False)\n```\n\nNeeded only when the dependency has side effects you want repeated (rare). The interview question is the *default* behavior; getting it wrong signals 'I've used Depends but never thought about its lifecycle'."
+    },
+
+    {
+      "id": "m2-s7-c11",
+      "type": "flip",
+      "topic": "async def vs def in FastAPI — when to use which",
+      "topic_ru": "async def vs def в FastAPI — когда какой",
+      "difficulty": 3,
+      "tags": ["fastapi", "async", "event-loop", "interview-classic"],
+      "question": "When should a FastAPI endpoint be `async def` vs plain `def`?",
+      "answer": "`async def` when the body uses `await` (async DB driver, `httpx.AsyncClient`, `asyncio.sleep`, anything awaitable). Plain `def` when the body does sync work — FastAPI runs sync handlers in a thread pool, so they don't block the event loop. The wrong combination is `async def` plus *sync blocking I/O* (`time.sleep`, sync DB driver, requests.get): the handler is on the event loop, the blocking call freezes it, and every other concurrent request stalls until the block returns.",
+      "answer_explanation_md": "Mental model: `async def` lives on the event loop, `def` lives in a thread pool. Blocking calls are fine on a thread (it's the thread's job to block); blocking calls on the event loop freeze the whole server. Pick the function flavor that matches what's inside it. If you have to call sync DB code from an async handler, wrap with `asyncio.to_thread(sync_fn, *args)` so the blocking work goes to a thread."
+    },
+
+    {
+      "id": "m2-s7-c12",
+      "type": "code_trap",
+      "topic": "Blocking sync I/O inside async def blocks the event loop",
+      "topic_ru": "Блокирующий sync I/O в async def блокирует event loop",
+      "difficulty": 4,
+      "tags": ["fastapi", "async", "event-loop", "blocking", "interview-classic"],
+      "code_snippet": "import time\nimport requests   # sync HTTP client\n\n@app.get('/slow')\nasync def slow():\n    time.sleep(2)                              # sync blocking\n    r = requests.get('https://api.example.com/data')   # sync blocking\n    return r.json()",
+      "question": "What's wrong with this `async def` handler, and what happens to other concurrent requests while it runs?",
+      "options": [
+        "Nothing — `async def` automatically runs blocking calls in a thread.",
+        "`time.sleep` and `requests.get` are sync blocking calls executing on the event loop. They freeze the loop for the duration of the call — every concurrent request to *any* endpoint stalls until this handler returns. The fix is either `def slow()` (sync; FastAPI thread-pools it) or `async def` with `await asyncio.sleep(2)` + `httpx.AsyncClient`.",
+        "It raises `RuntimeError: cannot block in async context`.",
+        "Performance suffers but only this endpoint is affected; other endpoints continue."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The event loop is single-threaded. An `async def` handler runs *on the loop*. Any sync blocking call (`time.sleep`, `requests.get`, sync DB driver, CPU-heavy loop) holds the loop for its duration, and *every* other concurrent request — including ones on completely unrelated endpoints — stalls until the block returns. Throughput collapses to one-request-at-a-time.\n\nTwo correct fixes:\n\n```python\n# Option A: sync handler — FastAPI runs it in a thread pool\n@app.get('/slow')\ndef slow():\n    time.sleep(2)\n    r = requests.get(url)\n    return r.json()\n\n# Option B: async all the way down\n@app.get('/slow')\nasync def slow():\n    await asyncio.sleep(2)\n    async with httpx.AsyncClient() as client:\n        r = await client.get(url)\n        return r.json()\n```\n\nThis is the marquee async-FastAPI interview question. Getting it wrong is the difference between a service that handles 1000 concurrent requests and one that handles 1."
+    },
+
+    {
+      "id": "m2-s7-c13",
+      "type": "multiple_choice",
+      "topic": "BackgroundTasks — what it is and what it isn't",
+      "topic_ru": "BackgroundTasks — что это и чем не является",
+      "difficulty": 3,
+      "tags": ["fastapi", "background-tasks", "durability", "interview-classic"],
+      "question": "Which statement about FastAPI's `BackgroundTasks` is correct?",
+      "options": [
+        "It's a job queue — tasks survive process restart and retry on failure.",
+        "It runs tasks *before* the response is sent to the client.",
+        "It runs tasks fire-and-forget *after* the response is sent, in the same process. The task is **not durable** (process restart loses it), **not retried** on failure, and **not scheduled** beyond 'as soon as possible'. Use it for non-critical work (send a welcome email, log to an analytics endpoint). For anything that must complete or retry, use a real queue (Celery, RQ, Cloud Tasks, SQS-backed worker).",
+        "It runs tasks on a separate worker process automatically managed by FastAPI."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — this is the marquee interview trap. `BackgroundTasks` provides none of the queue guarantees: no durability, no retries, no scheduling, no dead-letter handling.",
+        "Wrong — tasks run *after* the response so the client doesn't wait for them. That's the whole point.",
+        "Correct. `BackgroundTasks` is in-process, ephemeral, best-effort. It's a thin convenience for 'after the response, do this'. Treating it as a job queue is the bug that ships welcome emails that quietly fail to send when a deploy happens mid-signup.",
+        "Wrong — there's no separate worker process. The task runs in the same process that handled the request, after the response is sent."
+      ]
+    }
+  ]
+}
