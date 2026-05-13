@@ -1045,3 +1045,47 @@ section 6. Don't pad with "all of the above" or "none of these";
 every option should be a real candidate a junior might genuinely
 write.
 
+---
+
+## N042 — Validator emoji scan covers U+2600–U+27BF, not just colorful pictographs [AUTHORING]
+
+**Phase:** 9 (m3-s0) · **Date:** 2026-05-13 · **Status:** active
+
+The `_check_no_emoji` rule in `scripts/validate_content.py` uses the
+regex `[\U0001F300-\U0001FAFF☀-➿]`. The `☀-➿` range expands to
+**U+2600–U+27BF** — the Unicode "Miscellaneous Symbols" and "Dingbats"
+blocks. This is broader than just decorative emoji: it fires on inline
+status / marker glyphs like:
+
+- `✓` (U+2713) — check mark
+- `✗` (U+2717) — ballot X
+- `→` (U+2192) — rightwards arrow  *(actually U+2192 is in the
+  "Arrows" block U+2190–U+21FF, not the validator range; but `➜`
+  (U+279C) and similar DO match)*
+- `⚠` (U+26A0) — warning sign
+- `☑` (U+2611), `☒` (U+2612) — ballot boxes
+- `✏` (U+270F) — pencil
+- `★ ☆ ♥ ♦` — playing-card and star symbols
+
+**Authoring rule:** in lesson and card text, use plain text or
+markdown formatting for emphasis. No Unicode glyphs from the
+Dingbats / Miscellaneous-Symbols blocks, even as inline status
+markers.
+
+**Acceptable substitutes for common cases:**
+- `✓` → `"passes"` or `"(ok)"` or markdown checklist `- [x]`
+- `✗` → `"fails"` or `"(no)"` or `- [ ]`
+- `→` → `"leads to"` or `"becomes"` or `-->`
+- `⚠` → `"warning:"` or `**bold caution**`
+
+**Discovery:** first-run validation rejection during `m3-s0-c8`
+authoring. The card's explanation used `✓` to mark three "test
+passes" scenarios; replaced with `; passes)` textual marker. Filing
+this so future authoring agents don't trip the same gate.
+
+**Related:** PRODUCT.md §1 principle ("Honest signaling over
+motivational theatre") is the *spirit* of the rule (no decorative
+chrome); N029 / validator's `_check_no_emoji` is the *enforcement*.
+Inline status markers fall under the enforcement even when the
+authoring intent is operational rather than decorative.
+

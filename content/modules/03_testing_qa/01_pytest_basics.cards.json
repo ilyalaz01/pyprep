@@ -1,0 +1,208 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 3,
+  "sphere_id": "m3-s1",
+  "cards": [
+    {
+      "id": "m3-s1-c1",
+      "type": "flip",
+      "topic": "pytest discovery: file / function / class naming",
+      "topic_ru": "Discovery в pytest: имена файлов / функций / классов",
+      "difficulty": 1,
+      "tags": ["pytest", "discovery", "naming", "interview-warmup"],
+      "question": "What are pytest's default discovery rules for files, test functions, and test classes?",
+      "answer": "Files: `test_*.py` or `*_test.py`. Functions: `test_*`. Classes: `Test*` (PascalCase), and the class must NOT define `__init__`. Defaults are configurable via `[tool.pytest.ini_options]` in `pyproject.toml`, but the conventional layout (`tests/` directory mirroring `src/`) is universal and you should not reconfigure without a strong reason.",
+      "answer_explanation_md": "The silent-skip part is the trap. pytest doesn't error on `check_user` or on a `TestCart` class with `__init__` — it just doesn't collect them. You read 'collected 0 items' (or fewer than expected) and have to know naming is the cause. Use `pytest --collect-only` to dump everything pytest sees as tests; missing items there tell you to fix the name."
+    },
+
+    {
+      "id": "m3-s1-c2",
+      "type": "code_trap",
+      "topic": "Function named check_* is silently skipped",
+      "topic_ru": "Функция с именем check_* молча игнорируется",
+      "difficulty": 3,
+      "tags": ["pytest", "discovery", "naming", "silent-skip", "interview-classic"],
+      "code_snippet": "# tests/test_users.py\n\ndef test_create_user():\n    assert create_user('alice').name == 'alice'\n\ndef check_create_admin():\n    assert create_user('root', is_admin=True).is_admin",
+      "question": "You run `pytest tests/test_users.py` and pytest reports `1 passed`. The `check_create_admin` test seems to pass silently. What actually happened?",
+      "options": [
+        "Both tests ran; pytest just reports the count of passes, not per-test.",
+        "Only `test_create_user` ran. `check_create_admin` was silently skipped because pytest only collects functions matching `test_*` by default. The file imported fine (no error) but `check_create_admin` was never executed, so any bug inside it ships to production undetected.",
+        "`check_create_admin` ran but its assertion failure was suppressed by pytest because the function name doesn't start with `test_`.",
+        "pytest raised a `PytestCollectionWarning` that got silently swallowed by the terminal."
+      ],
+      "correct_index": 1,
+      "explanation_md": "pytest's discovery rule is positional: it only collects functions whose name starts with `test_`. `check_create_admin` is a regular function as far as pytest is concerned — it gets imported with the module but is never invoked. No error, no warning, no collection notice. The file's 'tests' count is 1.\n\nThis is the most common reason a 'I added a test but it's not running' question shows up in interviews. The fix is to rename: `check_create_admin` → `test_create_admin`. To verify what pytest actually collects, run `pytest --collect-only`; tests it sees are listed, tests it doesn't are absent.\n\nA related trap: a typo in the prefix (`tset_create_user`, `text_create_user`) skips the test for the same reason. Always run `pytest --collect-only` before relying on a test count."
+    },
+
+    {
+      "id": "m3-s1-c3",
+      "type": "code_task",
+      "topic": "Implement function + verify it via correctly named tests",
+      "topic_ru": "Реализовать функцию + проверить корректно названными тестами",
+      "difficulty": 2,
+      "tags": ["pytest", "discovery", "patterns"],
+      "prompt_md": "Implement `is_prime(n: int) -> bool` returning `True` if `n` is a prime number, `False` otherwise. Treat `n < 2` as not prime (no negatives, 0, or 1 are prime).\n\nThe hidden test file uses pytest's default discovery — `test_*` functions in a `test_solution.py` file. If your `is_prime` is correct, all `test_is_prime_*` functions will be collected and pass.",
+      "starter_code": "def is_prime(n):\n    # your code here\n    pass\n",
+      "solution_code": "def is_prime(n):\n    if n < 2:\n        return False\n    if n < 4:\n        return True\n    if n % 2 == 0:\n        return False\n    i = 3\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 2\n    return True\n",
+      "tests": "import pytest\nfrom solution import is_prime\n\ndef test_is_prime_small_primes():\n    assert is_prime(2)\n    assert is_prime(3)\n    assert is_prime(5)\n    assert is_prime(7)\n\ndef test_is_prime_small_non_primes():\n    assert not is_prime(0)\n    assert not is_prime(1)\n    assert not is_prime(4)\n    assert not is_prime(9)\n\ndef test_is_prime_negative_is_false():\n    assert not is_prime(-1)\n    assert not is_prime(-7)\n\ndef test_is_prime_medium_primes():\n    assert is_prime(97)\n    assert is_prime(101)\n\ndef test_is_prime_medium_composite():\n    assert not is_prime(100)\n    assert not is_prime(91)   # 7 * 13\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s1-c4",
+      "type": "code_trap",
+      "topic": "TestClass with __init__ is silently dropped",
+      "topic_ru": "Класс Test* с __init__ молча игнорируется",
+      "difficulty": 4,
+      "tags": ["pytest", "discovery", "test-class", "subtle", "interview-classic"],
+      "code_snippet": "# tests/test_cart.py\n\nclass TestCart:\n    def __init__(self):\n        self.cart = Cart()\n        self.cart.add('apple')\n\n    def test_total(self):\n        assert self.cart.total() == 10\n\n    def test_count(self):\n        assert self.cart.count() == 1",
+      "question": "How many tests does pytest collect from this class, and what's the warning shape?",
+      "options": [
+        "2 — `test_total` and `test_count` both run; `__init__` acts as setUp.",
+        "0 collected from this class, and pytest emits `PytestCollectionWarning: cannot collect test class 'TestCart' because it has a __init__ constructor`. The class is skipped entirely (silently in older versions, warned in newer). The fix is to drop `__init__` and use a `@pytest.fixture` for setup, or use `setup_method(self)` which pytest honors.",
+        "2 tests run, but `self.cart` is reconstructed before each — pytest calls `__init__` per test.",
+        "Raises `TypeError` because pytest passes no args to `__init__`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Test classes are collected only if they match `Test*` AND have no `__init__`. The reason: pytest constructs each test class once per test method, with no args. A user-defined `__init__` is incompatible with that contract (custom args, custom state, custom initialization order), so pytest punts on the entire class.\n\nNewer pytest emits a `PytestCollectionWarning`; older versions silently dropped it. Either way, you read 'collected 0 items' from the file and have to know that *the entire class was skipped*, not that the methods are empty.\n\nThe canonical fix:\n\n```python\nimport pytest\n\nclass TestCart:\n    @pytest.fixture(autouse=True)\n    def setup_cart(self):\n        self.cart = Cart()\n        self.cart.add('apple')\n\n    def test_total(self):\n        assert self.cart.total() == 10\n```\n\n`autouse=True` runs the fixture before every test method in the class without explicit parameter wiring. Alternative: `setup_method(self)`, which pytest calls before each test method by convention. **Don't use `__init__` in pytest test classes — ever.**"
+    },
+
+    {
+      "id": "m3-s1-c5",
+      "type": "flip",
+      "topic": "Why pytest assert shows actual values — assertion rewriting at import",
+      "topic_ru": "Почему pytest assert показывает реальные значения — assertion rewriting на импорте",
+      "difficulty": 4,
+      "tags": ["pytest", "assert", "introspection", "rewriting", "mechanism", "interview-classic"],
+      "question": "How does pytest produce rich failure messages like `assert 5 == 6` (showing both sides) from a plain Python `assert` statement, when CPython's bare `AssertionError` would just say 'AssertionError'?",
+      "answer": "pytest **rewrites your test file at import time**. The conftest plugin uses Python's import hook to intercept the bytecode of every `test_*.py` file before it's loaded, replaces each bare `assert expr` with an instrumented version that captures the operands and pretty-prints them on failure, then hands the rewritten module to the interpreter. Your source on disk stays as plain `assert`; what runs is the rewritten version with introspection baked in. This is why bare `assert` in pytest gives you the rich output for free — no `self.assertEqual`, no third-party libraries.",
+      "answer_explanation_md": "The rewriting is opt-in per directory (controlled by the presence of `conftest.py` and pytest's `register_assert_rewrite` for non-test packages). Three implications:\n\n- The behavior is invisible at the source level — readers don't see the magic.\n- Files imported *before* pytest gets a chance to rewrite them (e.g., helper modules you `from solution import ...` without registering) get plain `AssertionError`. Use `register_assert_rewrite('solution')` in `conftest.py` if you want rich asserts in non-test files.\n- The rewriting only touches `assert`; other statements pass through unchanged.\n\nKnowing this mechanism is what separates 'I use pytest' from 'I understand pytest'. The interview question is rarely 'how does assertion rewriting work?' verbatim but always 'why does pytest's assert tell you more than CPython's?' — and 'because it rewrites the file at import time' is the right one-line answer."
+    },
+
+    {
+      "id": "m3-s1-c6",
+      "type": "code_trap",
+      "topic": "Float equality fails; pytest.approx is the fix",
+      "topic_ru": "Сравнение float падает; pytest.approx — это фикс",
+      "difficulty": 3,
+      "tags": ["pytest", "approx", "float", "interview-classic"],
+      "code_snippet": "def test_sums_to_three_tenths():\n    assert 0.1 + 0.2 == 0.3",
+      "question": "What does this test do?",
+      "options": [
+        "Passes — `0.1 + 0.2` is exactly `0.3` in Python.",
+        "Fails with `assert 0.30000000000000004 == 0.3`. IEEE-754 floats don't sum exactly; `0.1` and `0.2` can't be represented as finite binary fractions, so the sum drifts by ~10⁻¹⁶. The canonical fix is `pytest.approx`: `assert 0.1 + 0.2 == pytest.approx(0.3)`.",
+        "Raises `TypeError` — pytest forbids float comparisons.",
+        "Passes silently — `assert` rounds floats to 6 decimal places by default."
+      ],
+      "correct_index": 1,
+      "explanation_md": "IEEE-754 double-precision floats represent `0.1` as `0.1000000000000000055511151231257827021181583404541015625`. Adding `0.2` (similarly imprecise) gives `0.30000000000000004`, which is not equal to `0.3` represented as `0.299999999999999988897769753748...`. The difference is real, ~5×10⁻¹⁷, and `==` is bit-for-bit.\n\nThe fix:\n\n```python\nimport pytest\n\ndef test_sums_to_three_tenths():\n    assert 0.1 + 0.2 == pytest.approx(0.3)\n```\n\n`pytest.approx(value)` returns an object whose `__eq__` accepts any number within a tolerance (default: relative `1e-6` plus absolute `1e-12`). You can tighten or loosen: `pytest.approx(0.3, abs=1e-9)` or `pytest.approx(0.3, rel=1e-3)`.\n\n**Rule:** any time floats are involved in a test, use `pytest.approx` instead of `==`. Numpy arrays have their own version (`numpy.testing.assert_allclose`); for plain Python floats, `pytest.approx` is the answer."
+    },
+
+    {
+      "id": "m3-s1-c7",
+      "type": "code_task",
+      "topic": "Exercise multiple assert patterns: ==, in, truthiness",
+      "topic_ru": "Использовать разные паттерны assert: ==, in, truthiness",
+      "difficulty": 2,
+      "tags": ["pytest", "assert", "patterns"],
+      "prompt_md": "Implement `categorize(score: int) -> str` returning:\n\n- `'excellent'` if `score >= 90`\n- `'pass'` if `60 <= score < 90`\n- `'fail'` if `score < 60`\n\nThe hidden tests exercise three pytest assertion forms against your function: equality (`==`), membership (`in`), and truthiness (`assert <expr>` and `assert not <expr>`).",
+      "starter_code": "def categorize(score):\n    # your code here\n    pass\n",
+      "solution_code": "def categorize(score):\n    if score >= 90:\n        return 'excellent'\n    if score >= 60:\n        return 'pass'\n    return 'fail'\n",
+      "tests": "import pytest\nfrom solution import categorize\n\ndef test_equality_excellent():\n    assert categorize(95) == 'excellent'\n\ndef test_equality_pass():\n    assert categorize(75) == 'pass'\n\ndef test_equality_fail():\n    assert categorize(30) == 'fail'\n\ndef test_membership_passing_range():\n    assert categorize(75) in {'pass', 'excellent'}\n\ndef test_membership_failing_excluded():\n    assert categorize(30) not in {'pass', 'excellent'}\n\ndef test_truthiness_string_always_non_empty():\n    assert categorize(50)        # non-empty string is truthy\n    assert categorize(100)\n\ndef test_boundaries():\n    assert categorize(90) == 'excellent'\n    assert categorize(89) == 'pass'\n    assert categorize(60) == 'pass'\n    assert categorize(59) == 'fail'\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s1-c8",
+      "type": "multiple_choice",
+      "topic": "Right assert form for the right job",
+      "topic_ru": "Подходящая форма assert под задачу",
+      "difficulty": 2,
+      "tags": ["pytest", "assert", "patterns"],
+      "question": "Which row uses the most idiomatic pytest assertion form for each case?",
+      "options": [
+        "Equality: `assert result.equals(expected)`. Membership: `assert expected in result`. Truthy: `assert bool(value) == True`.",
+        "Equality: `assert result == expected`. Membership: `assert expected in result`. Truthy: `assert value` (and `assert not value` for falsy). For floats specifically: `assert result == pytest.approx(expected)`.",
+        "All cases: `assert result == expected` — pytest handles everything through equality.",
+        "Use `self.assertEqual(result, expected)` and `self.assertIn(...)`; that's the `unittest` standard pytest also accepts."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `.equals()` isn't a Python built-in; `assert bool(value) == True` is needlessly verbose (just `assert value`).",
+        "Correct. Plain `==`, `in`, and the value itself for truthiness — pytest's assertion rewriting introspects all three forms and produces useful failure messages. `pytest.approx` for floats specifically.",
+        "Wrong — `in` and truthiness need their natural form, not `==`. Also `==` fails on floats without `pytest.approx`.",
+        "Wrong — `self.assertEqual` is the `unittest` API. pytest does NOT use it idiomatically; plain `assert` is the convention. Mixing `unittest`-style asserts into pytest tests is a code-review smell."
+      ]
+    },
+
+    {
+      "id": "m3-s1-c9",
+      "type": "flip",
+      "topic": "Four pytest CLI flags: -v, -s, -k, ::test_id",
+      "topic_ru": "Четыре CLI-флага pytest: -v, -s, -k, ::test_id",
+      "difficulty": 2,
+      "tags": ["pytest", "cli", "flags"],
+      "question": "What do `-v`, `-s`, `-k`, and the `::test_id` node-ID syntax each do?",
+      "answer": "`-v` (**v**erbose) prints each test's name and outcome instead of a single `.` per pass. `-s` (**s**how output) disables pytest's stdout/stderr capture so `print` and log lines appear inline during the run. `-k EXPR` filters tests by a boolean expression matched as substring against the full test ID (`pytest -k 'create and not slow'`). `path::class::method` is the node-ID syntax for running exactly one test, no name-collision risk: `pytest tests/test_users.py::TestCart::test_total`.",
+      "answer_explanation_md": "Reach for `-v` when reading the output, `-s` when debugging with `print` statements, `-k` when you know the test name shape but not the file, `::` when you've found the exact test and want to iterate on it alone. `-x` (stop at first failure) and `--lf` (last failed) are the next two; together with `-v -s -k ::` they cover 95% of the debug loop."
+    },
+
+    {
+      "id": "m3-s1-c10",
+      "type": "multiple_choice",
+      "topic": "-k boolean expression syntax (and / or / not)",
+      "topic_ru": "Синтаксис булевых выражений в -k (and / or / not)",
+      "difficulty": 3,
+      "tags": ["pytest", "cli", "k-expression", "filtering"],
+      "question": "You want to run every test whose name contains `user` OR `auth`, but exclude any test whose name also contains `slow`. Which `-k` invocation is correct?",
+      "options": [
+        "`pytest -k 'user,auth,!slow'` — comma-separated with `!` for negation.",
+        "`pytest -k '(user or auth) and not slow'` — `-k` accepts a Python-like boolean expression with `and` / `or` / `not` and parentheses for grouping.",
+        "`pytest -k 'user|auth&!slow'` — pytest uses regex-style operators.",
+        "`pytest -k user -k auth --exclude slow` — chain multiple `-k` flags."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — pytest doesn't use comma-separated syntax; `,` is treated as a literal substring to match.",
+        "Correct. `-k` arguments are Python boolean expressions evaluated against the substring-match-against-test-ID predicate. Parentheses, `and`, `or`, `not` all work. Quote the whole expression to keep your shell from chewing on the parens.",
+        "Wrong — `|` and `&` are not pytest operators in `-k`; they're treated as literal characters.",
+        "Wrong — multiple `-k` flags don't chain; the last one wins."
+      ]
+    },
+
+    {
+      "id": "m3-s1-c11",
+      "type": "code_trap",
+      "topic": "-k matches substrings; partial names collide",
+      "topic_ru": "-k матчит подстроки; частичные имена пересекаются",
+      "difficulty": 4,
+      "tags": ["pytest", "cli", "k-expression", "subtle"],
+      "code_snippet": "# Test file contains:\n#   def test_fast_path(): ...\n#   def test_slow_path(): ...\n#   def test_breakfast_menu(): ...\n\n# You run:\n# $ pytest -k 'fast'",
+      "question": "Which tests run, and why?",
+      "options": [
+        "Only `test_fast_path` — `-k 'fast'` matches the exact word.",
+        "`test_fast_path` AND `test_breakfast_menu`. `-k` matches **substring** against the full test ID; `'fast'` is a substring of both `test_fast_path` and `test_break**fast**_menu`. There's no word-boundary regex; it's a plain substring check.",
+        "All three — `-k 'fast'` is a regex that matches any test name.",
+        "Nothing — `'fast'` is interpreted as a boolean false."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`-k` matches substring against the dotted test ID. There's no word boundary, no regex anchor, no case sensitivity tweak by default. `'fast'` matches anywhere in any test ID — including the middle of `breakfast`.\n\nThis is the canonical 'why is `pytest -k fast` running tests I didn't expect?' question. The fix is to be specific:\n\n```bash\npytest -k 'fast_path'             # narrows to test_fast_path only\npytest -k 'fast and not breakfast'  # exclude the collision\npytest tests/test_perf.py::test_fast_path  # node-ID, exact one test\n```\n\nGeneral rule: when names collide, prefer the node-ID syntax (`path::test`) over `-k`. Use `-k` for fuzzy 'run all the auth-related tests' filtering where a few extras matching is acceptable; use `::` for exactly-this-test runs."
+    },
+
+    {
+      "id": "m3-s1-c12",
+      "type": "fill_in",
+      "topic": "Canonical pytest CLI invocations",
+      "topic_ru": "Канонические CLI-вызовы pytest",
+      "difficulty": 1,
+      "tags": ["pytest", "cli", "patterns"],
+      "code_snippet_with_blanks": "# Verbose run, see each test name + outcome\n$ pytest ___\n\n# Run only tests whose name contains 'auth'\n$ pytest -___ auth\n\n# Run exactly one test by node ID\n$ pytest tests/test_users.py___test_create_user",
+      "accepted_answers": [
+        ["-v"],
+        ["k"],
+        ["::"]
+      ],
+      "explanation_md": "Three reflexes worth burning in: `-v` for verbose output, `-k <expr>` for substring/expression filtering, `::` as the node-ID separator. The fourth flag (`-s`) is for disabling output capture when you're debugging with `print`; not in this card but equally reflex-worthy."
+    }
+  ]
+}
