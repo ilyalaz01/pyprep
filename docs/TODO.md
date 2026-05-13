@@ -353,12 +353,28 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T9.1 | Module 3 (Testing & QA) — all spheres `m3-s0`–`m3-s5`. | Validator green, ≥ 60 cards | ⬜ |
+| T9.1 | Module 3 (Testing & QA) — all spheres `m3-s0`–`m3-s5`. | Validator green, ≥ 60 cards | ✅ (70 cards shipped vs 60 target = +17%; 10 code_tasks; all 19 sub-tasks ≥ 3 cards; objective + qualitative audit clean — see Module 3 close summary below) |
 | T9.2 | Module 4 (Linux, Docker, SQL, Git, Tooling & Operations) — all spheres `m4-s0`–`m4-s9` (incl. m4-s7 Web Security, m4-s8 CI/CD, m4-s9 Bash, added in `78278a5`). | Validator green, ≥ 100 cards | ⬜ |
 | T9.3 | Coverage check ≥ 95% sub-tasks × 3 cards across Modules 3 + 4. | Script confirms | ⬜ |
 | T9.4 | Spot-check by owner: 20 random cards across both modules for accuracy. | Owner sign-off | ⬜ |
 
 **Phase 9 exit gate:** Coverage check green, owner-spot-check passed.
+
+**Module 3 close summary (2026-05-13):**
+
+- 7 task IDs across 7 commits (T9.1.0–T9.1.5 = 6 sphere commits + T9.1.6 mini-sweep close). No new ADRs; 3 new NOTES (N042 emoji-block-range, N043 single-file-harness constraint, N044 deps-verification rule). Constraint catalog for code_task authoring now N039 + N043 + N044; promotion to `PRD_code_sandbox.md` appendix is post-Module-4 polish per owner brief.
+- Pre-push gates: 9 (unchanged). Validator (`scripts/validate_content.py`) green throughout — schema, ID uniqueness, sphere refs, ≥ 3 cards per sub-task, all 10 code_task pytest executions, emoji lint.
+- Content shipped: **70 cards across 6 spheres** (m3-s0=8, m3-s1=12, m3-s2=12, m3-s3=14, m3-s4=16, m3-s5=8). Six lessons, each ≤ 700 words. One module overview.
+- Card type mix: 20 code_trap (28.6%) / 18 flip (25.7%) / 16 multiple_choice (22.9%) / 10 code_task (14.3%) / 6 fill_in (8.6%). Code_task density higher than Module 2 (14.3% vs 9.6%) because pytest is fully Pyodide-compatible; 0 code_tasks only in m3-s5 (Coverage), where the natural pedagogy is interpretation not execution.
+- Difficulty distribution: d1 17.1% / d2 21.4% / d3 34.3% / d4 27.1%. Skewed toward d3-d4 more than Module 2 (which was d2-d3 dominant) because Module 3 leans interview-grade — most testing knowledge that distinguishes engineers is mechanism / gotcha shaped (d4), not vocabulary shaped (d1). Every sub-task has all PRD §6 bands (1-2 / 3 / 4-5) represented.
+- Per-sphere skew: every sphere stays under the 60% single-band threshold. Max concentration is m3-s4 d3 at 44%.
+- All 36 MC + code_trap cards have exactly 4 options. All 6 fill_in cards: blank count matches `accepted_answers` groups. All 10 code_tasks: stdlib-only imports (N044 compliant), single-file shape (N043 compliant), `allowlist=['pytest']`. 0 emoji hits. ID continuity intact (c1..cN per sphere, no gaps).
+- N041 footgun-pair canonical instance: `m3-s4-c7` (code_trap d4, patch-where-defined) + `m3-s4-c8` (multiple_choice d3, canonical-fix). Trap_diff ≥ fix_diff verified; tags overlap on `patch`/`where-used`/`mock`/`footgun-pair`. Pattern compliance confirmed.
+- Composite-distractor lineage (NOTES candidate for future formalization): 5 Module 3 instances at `m3-s0-c3`, `m3-s1-c11`, `m3-s2-c7`, `m3-s4-c15`, `m3-s5-c7`. Each has 4 options with 3 wrongs-for-different-reasons; total catalog across Modules 2+3 now 6 instances.
+- Recursive meta-pedagogy: 5 code_tasks where hidden tests use what the cards/sphere teach — `m3-s1-c3` (test_* discovery), `m3-s2-c6` (parametrize), `m3-s3-c3` (fixture DI), `m3-s3-c6` (yield-finalizer), `m3-s4-c3` (Mock injection at boundary).
+- Single soft-flag during audit: `m3-s2-c7` distractor explanations at 49 chars each (below the 50-char "substantive" heuristic). Reviewed: explanations are tight, accurate, name the misconception in one sentence each. Quality bar (PRD §6: ≥ 2 of 4 options plausibly wrong-for-interesting-reason) is met with 3/4 wrongs; the heuristic flag is below the bar that matters. NOT a defect; observation only.
+- Single-card d4 footgun candidates worth retroactive N041 fix-MC pair (per N041 future-enhancement clause, owner discretion): top 3 are `m3-s2-c4` (regex `match=`), `m3-s4-c5` (assert_called_with LAST-call), `m3-s3-c10` (session-scope contamination). All three have clean 4-option fix-MC shapes available; deferred unless owner prioritizes.
+- **Owner action:** push the full Module 3 chain (commits `2710deb` through `c0be15a` + this close commit). All 9 pre-push gates run automatically on `git push`; no schema or test changes.
 
 ---
 
