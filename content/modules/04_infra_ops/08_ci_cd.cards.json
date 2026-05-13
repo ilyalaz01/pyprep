@@ -1,0 +1,342 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s8",
+  "cards": [
+    {
+      "id": "m4-s8-c1",
+      "type": "flip",
+      "topic": "Pipeline-as-code structure: workflow → jobs → steps",
+      "topic_ru": "Pipeline-as-code: workflow → jobs → steps",
+      "difficulty": 2,
+      "tags": ["ci", "github-actions", "structure", "foundation"],
+      "question": "What's the hierarchy of a GitHub Actions pipeline? What is 'pipeline-as-code' and why does it beat UI-configured CI?",
+      "answer": "**Hierarchy:** `workflow` → `jobs` → `steps`.\n\n- **Workflow** — the top-level YAML file in `.github/workflows/`. Has a `name`, `on:` (triggers), and `jobs:`. One repo can have multiple workflow files.\n- **Job** — a parallel unit of work. Each job runs on its own fresh runner VM (`ubuntu-latest`, `macos-latest`, `windows-latest`). Multiple jobs in a workflow run **in parallel** by default; `needs: <other_job>` makes a job wait for another.\n- **Step** — a sequential command within a job. Each step is either `uses:` (run a reusable action) or `run:` (execute shell commands directly).\n\n**Pipeline-as-code** means the CI config (`.github/workflows/ci.yml`) lives in the repo, is versioned with the application code, and changes go through the same PR review process as any other code change. The alternative — pipelines configured through a UI (classic Jenkins UI, old Azure DevOps, Bamboo) — has no PR review, no diff history, no rollback, no audit trail of *who changed the pipeline when*. Pipeline-as-code won the last decade because the CI config IS infrastructure; treating it like code makes it reviewable, reproducible, and recoverable.",
+      "answer_explanation_md": "The non-obvious operational consequence of the hierarchy: **jobs run on isolated runners with no shared state**. If `build` produces a binary and `test` needs to consume it, you can't just rely on the filesystem — `test` runs on a different VM. The mechanism is **artifacts**:\n\n```yaml\n- uses: actions/upload-artifact@v4   # in `build` job\n  with: { name: app, path: dist/ }\n\n- uses: actions/download-artifact@v4  # in `test` job (with needs: build)\n  with: { name: app }\n```\n\nOr use a single job with multiple steps if the work is small enough — steps within a job share the filesystem.\n\n**Multiple workflow files** in `.github/workflows/` give you orthogonal pipelines (`ci.yml` for tests, `deploy.yml` for deploys, `release.yml` for tagged releases) triggered by different events. Each is independent."
+    },
+
+    {
+      "id": "m4-s8-c2",
+      "type": "multiple_choice",
+      "topic": "Jobs vs steps — parallel vs sequential, runner isolation",
+      "topic_ru": "Jobs vs steps — параллельные vs последовательные, изоляция runner",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "jobs", "steps", "parallelism"],
+      "question": "Given this workflow, what runs in parallel, what runs sequentially, and what state is shared between which units?\n\n```yaml\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: pip install -e .\n      - run: pytest\n\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ruff check .\n\n  deploy:\n    needs: [test, lint]\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh\n```",
+      "options": [
+        "Everything runs sequentially in the order written.",
+        "**`test` and `lint` run in PARALLEL** (each on its own fresh runner VM); `deploy` runs SEQUENTIALLY after both succeed (because `needs: [test, lint]`). **Within each job, steps run in order** (the `steps:` list is sequential). **State sharing:** **steps within a job share the runner's filesystem** (one step's `pip install` is visible to the next step's `pytest`). **Jobs do NOT share state** — `lint`'s VM and `test`'s VM are independent; the `checkout` in each is necessary because each runner starts blank. To share data between jobs, use `actions/upload-artifact` + `actions/download-artifact`, or compute the data on demand inside each job (cheap things like checkout are duplicated; expensive things may justify a build job + artifact pattern).",
+        "Jobs are sequential; steps are parallel.",
+        "`needs:` is irrelevant — jobs always run in declaration order."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. The default is opposite — jobs run in parallel; only steps within a job are sequential.",
+        "Correct. The mental model: **steps within a job share runner state; jobs are isolated**. This is the most-asked CI question because the parallel/sequential default and the runner-isolation property together explain (a) why CI is fast (parallelism), (b) why duplicate checkouts in every job are normal (no shared state), and (c) why complex pipelines that depend on build artifacts need explicit `upload-artifact` / `download-artifact` calls.",
+        "Wrong on both counts. Jobs are parallel by default; steps are sequential.",
+        "Wrong — `needs:` is the mechanism for serial ordering between jobs. Without it, jobs run in parallel regardless of declaration order in the YAML."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c3",
+      "type": "code_trap",
+      "topic": "Jobs don't share filesystem — the cross-job file-not-found surprise",
+      "topic_ru": "Jobs не делят файловую систему — file-not-found между jobs",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "jobs", "artifacts", "common-mistake"],
+      "code_snippet": "# Workflow that fails surprisingly.\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: python -m build         # produces dist/myapp-1.0.tar.gz\n\n  publish:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: ls dist/                # \"No such file or directory\"\n      - run: twine upload dist/*",
+      "question": "Why does `publish` fail to find `dist/`, and what's the canonical fix?",
+      "options": [
+        "`needs: build` should have copied the workspace automatically.",
+        "**`build` and `publish` ran on DIFFERENT runner VMs. Files produced in `build`'s workspace are gone the moment `build` completes; `publish` starts on a blank VM and has no access to them.** Even with `needs:`, the only thing that's inherited is the SEQUENCING (`publish` waits for `build` to succeed); state is NOT inherited. **The canonical fix is artifacts:**\n\n```yaml\n  build:\n    steps:\n      - uses: actions/checkout@v4\n      - run: python -m build\n      - uses: actions/upload-artifact@v4\n        with: { name: dist, path: dist/ }\n\n  publish:\n    needs: build\n    steps:\n      - uses: actions/download-artifact@v4\n        with: { name: dist, path: dist/ }\n      - run: twine upload dist/*\n```\n\n**Alternative for cheap operations:** just redo the work in `publish` (re-checkout, re-build). Artifacts add overhead (upload + download time, storage retention costs) and are only worth it when the produced data is expensive to recompute. Checkout is so cheap that every job re-runs it; build artifacts are expensive enough that upload/download usually wins.",
+        "GitHub Actions caches the workspace between jobs by default.",
+        "The fix is to add `runs-on: same-as-build` — the OS choice carries state."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**Cross-link to `m4-s8-c2`:** that card establishes the jobs-are-isolated property; this card names the operational footgun that follows from it. Same principle, two facets — recognition of the property vs the failure mode it creates.\n\n**When to use jobs vs steps:** the question to ask is 'do I need parallelism, or just sequencing?'.\n\n- **Steps within one job** — when work is sequential AND you want shared filesystem. Linting + testing + coverage upload all in one `test` job: simple, fast, no artifact dance.\n- **Separate jobs with `needs:`** — when work is sequential but you specifically want isolated environments (e.g., build on Ubuntu, deploy from a different runner with different secrets) or when one stage is expensive and you want to run downstream jobs in parallel after it.\n- **Separate jobs without `needs:`** — when work is genuinely independent (lint, test, type-check can all run in parallel against the same source; if any fail, you see all failures at once instead of fail-fast)."
+    },
+
+    {
+      "id": "m4-s8-c4",
+      "type": "flip",
+      "topic": "GitHub Actions workflow syntax: on, runs-on, uses, run, with, env",
+      "topic_ru": "Синтаксис GitHub Actions: on, runs-on, uses, run, with, env",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "syntax", "yaml"],
+      "question": "What does each of these YAML keys do? Explain each in one sentence.\n\n```yaml\non:\nruns-on:\nuses:\nrun:\nwith:\nenv:\n```",
+      "answer": "- **`on:`** — declares the workflow's triggers. Common values: `push`, `pull_request`, `schedule` (cron), `workflow_dispatch` (manual trigger via UI), `release`, `issue_comment`. Can be a list, a map with branches/paths filters, or both.\n- **`runs-on:`** — declares which runner environment the job runs on. Standard values: `ubuntu-latest`, `macos-latest`, `windows-latest`. Each is a fresh VM provisioned per job.\n- **`uses:`** — invokes a reusable action. The value is `owner/repo@ref` (e.g., `actions/checkout@v4`); the action lives in another repo and runs in this job's context.\n- **`run:`** — executes shell commands directly on the runner. Single-line (`run: pytest`) or multi-line via YAML `|` (`run: |\\n  pip install -r requirements.txt\\n  pytest`).\n- **`with:`** — passes inputs to an action invoked by `uses:`. The action's `inputs:` schema determines what's accepted.\n- **`env:`** — sets environment variables. Can appear at workflow level (every job sees them), job level (every step in that job), or step level (only that step). Step-level overrides job-level overrides workflow-level.",
+      "answer_explanation_md": "**Canonical minimal workflow** for a Python project, illustrating most of these:\n\n```yaml\nname: CI\non: [push, pull_request]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    env:\n      PYTHONUNBUFFERED: \"1\"     # visible to every step in this job\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:                    # inputs to setup-python\n          python-version: \"3.13\"\n      - name: Install deps\n        run: pip install -e \".[dev]\"\n      - run: pytest -q\n        env:\n          LOG_LEVEL: ERROR       # only this step sees LOG_LEVEL\n```\n\nThe `name:` on a step is optional but recommended — it controls the label shown in the CI UI. Without it, GitHub auto-generates a label from the command/action, which can be ugly for long commands."
+    },
+
+    {
+      "id": "m4-s8-c5",
+      "type": "multiple_choice",
+      "topic": "Pinning action versions — @v4 vs @main supply-chain risk",
+      "topic_ru": "Pin версий action — @v4 vs @main риск supply-chain",
+      "difficulty": 4,
+      "tags": ["ci", "github-actions", "security", "supply-chain", "pinning"],
+      "question": "Two ways to reference an action. What's the difference, and which is appropriate when?\n\n```yaml\n(A)  - uses: actions/checkout@main\n(B)  - uses: actions/checkout@v4\n(C)  - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab\n```",
+      "options": [
+        "(A) is the modern best practice — always use the latest version.",
+        "**(A) `@main` is DANGEROUS** — it pulls the latest commit from the action's main branch every time CI runs. If the action's repo is compromised (account takeover, malicious maintainer, accidental bad commit), your CI runs the compromised code on next trigger — which has access to all your repo's secrets and the runner. **(B) `@v4` is the everyday default** — pins to a release tag (a moving label that maintainers update only for patch versions). Safer than `@main` (changes are deliberate releases, not arbitrary commits), but the tag itself is mutable — a maintainer with repo access could re-point `v4` to a different commit. **(C) `@<full-SHA>` is the maximum-strictness pin** — references a specific commit immutably; cannot change without you changing your workflow. **The 2026 best practice for production workflows:** pin to SHA for security-critical actions (`actions/checkout`, anything that touches secrets), accept `@v4`-style tags for low-risk actions (formatters, linters). Tools like Renovate / Dependabot can auto-bump SHA pins with PR review. **Never use `@main`** outside throwaway experiments.",
+        "(B) and (C) are equivalent — tags are immutable on GitHub.",
+        "Always use (C) — anything else is incompetent."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on direction. `@main` is the *most dangerous* option — it auto-pulls future changes that you haven't reviewed.",
+        "Correct. The risk hierarchy is `@main` > `@v4` > `@<SHA>` from most to least exposure. The Tj-actions/changed-files compromise in 2024 (a popular action's release was modified to steal CI secrets) demonstrated this concretely: workflows pinned to `@main` or moving tags were affected; workflows pinned to specific SHAs were not. **Cross-link to `m4-s8-c10`:** secrets in CI live in the runner's process environment; a compromised action sees them all.",
+        "Wrong — tags are MUTABLE on GitHub. A maintainer with push access can delete and recreate a tag pointing at a different commit. Only commit SHAs are truly immutable.",
+        "Wrong — (B) `@v4` is a reasonable choice for most workflows; the maintenance overhead of SHA pinning isn't always worth it. The interview-relevant answer is articulating *when* each level is appropriate, not absolutism."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c6",
+      "type": "multiple_choice",
+      "topic": "env: scoping — workflow vs job vs step level",
+      "topic_ru": "env: scoping — workflow vs job vs step",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "env-vars", "scoping"],
+      "question": "Three `env:` blocks at different levels. What does each step see for `LOG_LEVEL`?\n\n```yaml\nenv:\n  LOG_LEVEL: INFO          # workflow-level\n\njobs:\n  test:\n    env:\n      LOG_LEVEL: DEBUG     # job-level\n    steps:\n      - run: echo \"$LOG_LEVEL\"      # step (A) — no env override\n      - run: echo \"$LOG_LEVEL\"\n        env:\n          LOG_LEVEL: TRACE          # step (B) — step-level override\n      - run: echo \"$LOG_LEVEL\"      # step (C) — no env override\n```",
+      "options": [
+        "All three steps see `INFO` (workflow-level wins).",
+        "**(A) sees `DEBUG`** — job-level overrides workflow-level. **(B) sees `TRACE`** — step-level overrides job-level for this one step. **(C) sees `DEBUG`** — step-level was only for step (B); step (C) is back to job-level. **The precedence rule: step-level overrides job-level overrides workflow-level.** Each level only affects what it's scoped to: workflow-level applies to every step in every job unless overridden; job-level applies to every step in that job unless overridden; step-level applies only to that step. **Practical use:** keep generic config (timezone, locale, log format) at workflow level; per-job config (Python version, target env) at job level; one-off overrides (debug logging for a flaky step) at step level.",
+        "(A) sees `DEBUG`, (B) sees `TRACE`, (C) sees `INFO` — step (C) inherits workflow-level after step (B)'s override.",
+        "Workflow-level always wins; job-level and step-level overrides are syntax errors."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on precedence. Workflow-level is the *fallback*, not the winner; more specific scopes override it.",
+        "Correct. Standard lexical-scoping pattern: inner scopes override outer; each scope's effect ends at its closing brace (in this case, the next step / job / workflow). **Common gotcha:** workflow-level `env:` is convenient but can lead to surprises when a job-specific value silently overrides it. Code-review reflex: when you see `env:` at multiple levels, trace each variable's effective value for each step explicitly.",
+        "Wrong on (C). Once step (B)'s override scope ends, step (C) goes back to the JOB-level value (`DEBUG`), not the workflow-level fallback (`INFO`). The job-level value is still 'live' for step (C); it was just temporarily overridden in step (B).",
+        "Wrong — all three levels are valid and standard. Override precedence is part of the design."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c7",
+      "type": "flip",
+      "topic": "Dependency caching: actions/cache + hashFiles pattern",
+      "topic_ru": "Кэширование зависимостей: actions/cache + hashFiles",
+      "difficulty": 3,
+      "tags": ["ci", "caching", "github-actions", "speed"],
+      "question": "Why does CI re-install dependencies on every run, and what's the canonical pattern to cache them keyed on the lockfile?",
+      "answer": "Each CI job runs on a fresh runner VM with no prior state. Without caching, every run starts from a blank machine and reinstalls every dependency from scratch — typically 1–3 minutes per Python job (download wheels, resolve transitive deps, install). Caching restores a previous run's `~/.cache/pip` (or `node_modules`, etc.) so the install is near-instant when the lockfile hasn't changed.\n\n**Two patterns:**\n\n```yaml\n# Pattern 1: built-in cache parameter (cleaner, preferred when available)\n- uses: actions/setup-python@v5\n  with:\n    python-version: \"3.13\"\n    cache: pip\n    cache-dependency-path: requirements.txt\n\n# Pattern 2: generic actions/cache (when you need control)\n- uses: actions/cache@v4\n  with:\n    path: ~/.cache/pip\n    key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}\n    restore-keys: pip-${{ runner.os }}-\n```\n\n**Cache key is keyed on the lockfile's HASH:**\n\n- `hashFiles('requirements.txt')` computes a SHA-256 over the named file(s). When the file changes, the hash changes, the cache key changes, the cache miss triggers a fresh install.\n- The lockfile is the right thing to hash because it captures the *resolved* dependency graph — changes there are the only thing that should invalidate the cache.\n- **`restore-keys:`** is a prefix fallback: if the exact key isn't found, try keys starting with these prefixes. Gives you a 'partial cache hit' fallback (restore the old cache, install only the diff).\n\n**Cache miss is SILENT** — the pipeline still works, just slower. Watch CI duration over time to detect 'something invalidated the cache' regressions.",
+      "answer_explanation_md": "**What's safe to cache:** pip wheels, `node_modules`, Cargo registry, Go module cache, downloaded toolchains. **What's NOT safe to cache:** anything that depends on machine state, anything where staleness causes incorrect behavior (compiled artifacts that should rebuild on source change, generated code that depends on source files).\n\nThe **`runner.os` segment in the cache key** prevents cross-OS cache pollution. A wheel built for `manylinux` is incompatible with macOS/Windows; sharing the same cache across runner OSes would restore wrong-platform wheels and break the install. Always include `${{ runner.os }}` in cache keys, even when your matrix is currently Ubuntu-only — it's cheap insurance against future matrix expansion."
+    },
+
+    {
+      "id": "m4-s8-c8",
+      "type": "multiple_choice",
+      "topic": "hashFiles cache key — what changes the key and what doesn't",
+      "topic_ru": "hashFiles cache key — что меняет ключ, а что нет",
+      "difficulty": 3,
+      "tags": ["ci", "caching", "hashfiles", "common-mistake"],
+      "question": "Three cache configurations. Which one correctly invalidates the cache when the actual dependency set changes, but NOT on every CI run?\n\n```yaml\n(A)  key: pip-cache\n(B)  key: pip-${{ github.run_id }}\n(C)  key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}\n```",
+      "options": [
+        "(A) is best — simplest cache key.",
+        "**(C) is correct.** `hashFiles('requirements.txt')` hashes the contents of the lockfile; the key changes if and only if the lockfile changes. Adding `${{ runner.os }}` prevents cross-OS cache pollution (Linux wheels are incompatible with macOS/Windows). **What's wrong with the others:** **(A) `pip-cache`** is a CONSTANT key — the cache never invalidates. When you update `requirements.txt` to bump a package version, CI silently restores the stale cache (containing the old package version) and never installs the new one. Your tests pass against old deps and you can spend hours debugging why production behaves differently. **(B) `pip-${{ github.run_id }}`** changes on every CI run — `github.run_id` is a unique per-run identifier. Cache key never matches a previous run's, so cache always misses. Functionally equivalent to no caching at all, but with the overhead of writing a cache that's never read. **The rule:** cache keys should change EXACTLY when the cached content should be invalidated — usually 'when the lockfile changes'.",
+        "(B) is best — guarantees freshness on every run.",
+        "All three are equivalent — the key string doesn't matter."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. A constant cache key means the cache NEVER updates — you'd be running against a stale dependency snapshot indefinitely.",
+        "Correct. Mental model: **the cache key is the question 'has the cached content's INPUT changed?'**. For dep caches, the input is the lockfile. For build artifact caches, the input might be source files. Tune `hashFiles` argument to what actually determines the cached state.",
+        "Wrong — `github.run_id` is unique per run, so the key is never the same twice. The cache writes happen but the cache reads always miss. Worst of both worlds.",
+        "Wrong — the key is the entire cache-validity contract. Cache works correctly only when the key changes exactly when invalidation is needed."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c9",
+      "type": "code_trap",
+      "topic": "Cache miss is silent — slow CI without an error to point at",
+      "topic_ru": "Cache miss молчалив — медленный CI без явной ошибки",
+      "difficulty": 3,
+      "tags": ["ci", "caching", "silent-failure", "operations"],
+      "code_snippet": "# This workflow used to install deps in 5 seconds (cached).\n# After a recent change, it now takes 90 seconds every run.\n# CI is still green. No errors. Just slow.\n\n- uses: actions/cache@v4\n  with:\n    path: ~/.cache/pip\n    key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}\n    restore-keys: pip-${{ runner.os }}-\n\n- run: pip install -e \".[dev]\"",
+      "question": "What likely happened, and how do you diagnose 'cache appears not to be hitting' without an error message?",
+      "options": [
+        "GitHub silently disabled caching for your repo.",
+        "**The cache key changed and isn't matching previous runs anymore.** Possible causes: (1) `hashFiles` now includes `pyproject.toml` in addition to `requirements.txt`; ANY change to either file (including unrelated comment edits) changes the hash and the key. (2) `requirements.txt` was reformatted (newline at end of file, line ending changes from CRLF to LF, etc.) — content-level whitespace changes are real hash changes. (3) The actions/cache action version changed and uses a different hashing approach. (4) The runner OS changed (`runner.os` segment). **How to diagnose:** **(1) Check the cache step's output in the CI run log** — actions/cache prints `Cache restored from key: pip-Linux-abc123` on hit and `Cache not found for input keys: ...` on miss. **(2) Compare keys across recent runs** — if today's key differs from yesterday's, something the key references changed. **(3) Check the actions cache UI** (`https://github.com/<repo>/actions/caches`) — shows what cache entries exist and when they were last accessed. **(4) Manually compute `hashFiles` locally** — `sha256sum requirements.txt pyproject.toml` and verify it matches what actions/cache logs. **The discipline:** add a 'CI duration' check to your dashboard or alerts — slow CI is often a symptom of cache regression and won't surface as a test failure.",
+        "Caching only works for the first 10 runs; you've hit the quota.",
+        "Pip itself stopped using the cache directory in version 25."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**The silent-failure mode** is the operational hazard of CI caching: green CI + slow CI is a regression that doesn't trigger any alarm. Teams that don't watch CI duration over time accumulate cache misses as the codebase changes (new files added to `hashFiles` glob, lockfiles regenerated, runner versions bumped) and don't notice until someone says 'CI used to be fast'.\n\n**Monitoring discipline that prevents this:**\n\n- **Track CI duration in dashboards** — Datadog / Grafana / GitHub Actions Insights all expose per-workflow / per-job timing. Alert on duration above a threshold.\n- **Compare cache-restored vs install-from-scratch run times** in PRs — a PR that bumps a dependency should still hit the partial cache (via `restore-keys:`); a PR that doesn't touch deps should hit the exact cache.\n- **The `hashFiles` argument should reference EXACTLY the files that affect the cached content** — over-broad globs (`hashFiles('**/*.toml')`) invalidate the cache on unrelated changes; under-broad globs miss invalidation when they should.\n\nCross-link to `m4-s8-c7` (caching mechanism) and `m4-s8-c8` (key construction discipline). This is the 'recognize the regression in the absence of an error' card."
+    },
+
+    {
+      "id": "m4-s8-c10",
+      "type": "flip",
+      "topic": "GitHub Secrets — basics, masking, scoping",
+      "topic_ru": "GitHub Secrets — основы, маскирование, скоупы",
+      "difficulty": 2,
+      "tags": ["ci", "secrets", "github-actions", "security"],
+      "question": "How do you reference a secret in a GitHub Actions workflow? What does GitHub do to protect it? What are the scoping levels?",
+      "answer": "**Reference:** `${{ secrets.SECRET_NAME }}`. Available anywhere YAML expressions are allowed — `env:`, `run:`, action inputs via `with:`.\n\n```yaml\nsteps:\n  - run: ./deploy.sh\n    env:\n      API_KEY: ${{ secrets.PROD_API_KEY }}\n```\n\n**Protections GitHub provides:**\n\n1. **Encrypted at rest.** Secrets are encrypted in GitHub's storage; not human-readable from the UI after they're set (you can't view the value, only overwrite it).\n2. **Masked in logs.** The runner replaces secret values with `***` in stdout/stderr. So `echo \"API_KEY=$API_KEY\"` prints `API_KEY=***`. **The masking is best-effort:** complex transformations (base64-encoding, substring extraction, etc.) can leak portions or all of the secret. Don't intentionally try to defeat it.\n3. **Not exposed to forked PR workflows.** Pull requests from forks of a public repo run with secrets *blanked out* by default — a malicious fork can't steal your secrets by submitting a PR. This is one of the most subtle but important GitHub Actions protections.\n\n**Scoping levels:**\n\n- **Repo secrets** — available to all workflows in this one repo.\n- **Environment secrets** — scoped to a deployment environment (`production`, `staging`). Often paired with approval gates: a job that uses production secrets requires manual approval from designated reviewers before running.\n- **Organization secrets** — shared across multiple repos in an org. Configure access by repo allowlist.",
+      "answer_explanation_md": "**Two operational reflexes** worth internalizing:\n\n- **`GITHUB_TOKEN`** is the built-in secret that authenticates the workflow's API calls to GitHub itself (creating PRs, pushing tags, updating statuses). Default permissions vary; explicitly set `permissions:` on each job to minimize scope. See `m4-s8-c12`.\n- **OIDC federation** is the modern preferred shape for cloud credentials — instead of storing long-lived AWS / GCP / Azure tokens as GitHub Secrets, the runner exchanges a short-lived OIDC token from GitHub for short-lived cloud credentials. No long-lived secret to leak; the trust relationship is configured once on the cloud side. Requires `id-token: write` permission on the job. See `m4-s8-c12` for the why.\n\n**Things to avoid:**\n\n- Don't echo secrets to logs, even partial values (`echo \"prefix: ${API_KEY:0:5}\"` may leak the prefix; masking matches the full secret, not substrings).\n- Don't pass secrets as command-line arguments where another process could read them via `ps`; use env vars or stdin instead.\n- Don't store secrets in files committed to the repo, ever (see `m4-s8-c11` for the disaster shape)."
+    },
+
+    {
+      "id": "m4-s8-c11",
+      "type": "code_trap",
+      "topic": "Hardcoded secret in workflow file — permanent git-history exposure",
+      "topic_ru": "Захардкоженный секрет в workflow — навсегда в истории git",
+      "difficulty": 4,
+      "tags": ["ci", "secrets", "git-history", "incident", "interview-classic"],
+      "code_snippet": "# Two months ago, a junior engineer committed this workflow file:\n\nname: Deploy\non: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./deploy.sh\n        env:\n          PROD_API_KEY: \"REDACTED_FAKE_API_KEY_FOR_TEACHING\"   # ← hardcoded\n\n# You just discovered it. What's the recovery procedure?",
+      "question": "Why is it NOT enough to just edit the workflow file to remove the hardcoded key, and what IS the correct recovery procedure?",
+      "options": [
+        "Edit the workflow file, commit the removal, force-push to overwrite history. Done.",
+        "**The secret is in git history PERMANENTLY** — every commit since it was added contains it. Even after you edit the workflow to remove it, the secret remains in the historical commits anyone has cloned, anyone can `git log -p` to find, and GitHub's archived dangling commits hold for a window. **Removing the commit via force-push doesn't help** because: (1) every collaborator who has cloned has a local copy; (2) GitHub keeps dangling commits accessible for a period (and archives them); (3) anyone could have fetched the commit during the two-month window. **CORRECT RECOVERY:** **(1) ROTATE the secret IMMEDIATELY** — go to the issuing system (Stripe, AWS, etc.), revoke `REDACTED_FAKE_API_KEY_FOR_TEACHING`, issue a new one. The leaked value must be assumed compromised. **(2) Replace with `${{ secrets.PROD_API_KEY }}`** in the workflow file (and add the new key to GitHub Secrets). **(3) Audit downstream:** check the issuing service's audit logs for any use of the leaked key between commit time and rotation. Anyone could have stolen it during that window. **(4) Document the incident** so the team learns the lesson. **(5) Optional, do this later:** rewrite history to scrub the secret (git filter-repo, BFG Repo-Cleaner) — useful but not load-bearing; rotation is what actually closes the exposure. **Recovery isn't 'remove the commit'; it's 'rotate the leaked credential and never reuse the value'.**",
+        "GitHub auto-revokes leaked secrets when they're committed.",
+        "The git history is irrelevant — only the current state of the workflow file matters."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**The git-history-is-forever rule** is a structural fact, not a design choice. Distributed VCS means every clone has every commit; you cannot retroactively un-share something. The only meaningful recovery is to assume the leaked value is compromised and invalidate it at the source.\n\n**GitHub Secret Scanning** is a real defense layer worth knowing: GitHub scans commits in public repos for common secret patterns (AWS keys, Stripe keys, etc.) and notifies the affected vendor automatically. The vendor (Stripe, AWS) often auto-revokes the leaked key within minutes. This is helpful but is NOT a replacement for the rotation procedure — you should rotate proactively, not rely on detection.\n\n**Prevention disciplines:**\n\n- **Pre-commit hooks** that scan for secret patterns before commit (`detect-secrets`, `gitleaks`, `truffleHog`).\n- **`.gitignore` for any file that holds secrets** (`.env`, `secrets.yml`, `*.pem`, `*.key`).\n- **Code review reflex** — reviewers should reject any commit that adds a string matching a credential pattern; train this as muscle memory.\n- **Use `${{ secrets.NAME }}`** for any value that shouldn't be in source. The interpolation is verbose; that's the point.\n\nCross-link to `m4-s8-c10` (secrets basics) and `m4-s8-c12` (GITHUB_TOKEN scoping)."
+    },
+
+    {
+      "id": "m4-s8-c12",
+      "type": "multiple_choice",
+      "topic": "GITHUB_TOKEN permissions: block + OIDC federation",
+      "topic_ru": "GITHUB_TOKEN permissions: block + OIDC федерация",
+      "difficulty": 4,
+      "tags": ["ci", "secrets", "github-token", "permissions", "oidc"],
+      "question": "Two issues with default GitHub Actions secrets handling, both with modern fixes:\n\n1. The built-in `GITHUB_TOKEN` (auto-provided to every workflow) often has broader permissions than the workflow needs.\n2. Cloud deploy jobs store long-lived AWS/GCP credentials as GitHub Secrets.\n\nWhat's the fix for each?",
+      "options": [
+        "Both are fine as-is; modern defaults are secure.",
+        "**(1) Limit `GITHUB_TOKEN` with an explicit `permissions:` block.** Default permissions are configured per-org / per-repo and are often too broad (read-write to contents, packages, deployments, etc.). The 2024+ best practice is to start every job with `permissions: {}` (no access) and add only what's needed:\n\n```yaml\njobs:\n  build:\n    permissions:\n      contents: read          # only what this job needs\n      packages: write\n    steps: [...]\n```\n\n**(2) Use OIDC federation instead of long-lived cloud credentials.** Long-lived AWS keys stored as GitHub Secrets are a risk: if the secret leaks (compromised workflow, malicious action — see `m4-s8-c5`), the attacker has indefinite access. **OIDC federation** lets the runner exchange a short-lived GitHub-issued OIDC token for short-lived cloud credentials (typically valid for 15min–1hr), via a trust relationship configured on the cloud side. Requires `id-token: write` permission on the job. Workflow becomes:\n\n```yaml\npermissions:\n  id-token: write\n  contents: read\nsteps:\n  - uses: aws-actions/configure-aws-credentials@v4\n    with:\n      role-to-assume: arn:aws:iam::123456789012:role/GitHubDeployRole\n      aws-region: us-east-1\n  - run: aws s3 sync dist/ s3://my-bucket\n```\n\nNo long-lived secret in GitHub; tokens expire in minutes; revoking access is removing the trust relationship on the cloud side, not rotating a stored credential.",
+        "Replace `GITHUB_TOKEN` with a personal access token (PAT) for fine-grained control.",
+        "GITHUB_TOKEN doesn't exist; you have to create it manually."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on framing. Default GITHUB_TOKEN scope is often broader than needed; long-lived cloud secrets are a known risk. Both have established mitigations.",
+        "Correct. The two fixes are the modern security baseline for GitHub Actions:\n\n- **Minimum-scope `GITHUB_TOKEN`** via explicit `permissions:` blocks — defense in depth against compromised actions or supply-chain attacks (see `m4-s8-c5`). If an action is compromised but the token has `permissions: {}`, the blast radius is limited.\n- **OIDC federation** instead of long-lived cloud credentials — defense against secret leakage. The short token lifetime means even a leak has a small exposure window.\n\nCross-link to `m4-s8-c10` (secrets basics) and `m4-s8-c11` (the disaster shape that minimum-scope + OIDC prevents).",
+        "Wrong — PATs are MORE dangerous than `GITHUB_TOKEN` for CI use. PATs are user-scoped (broad permissions, long-lived); GITHUB_TOKEN is per-workflow (narrow, short-lived). Replacing GITHUB_TOKEN with a PAT is a regression, not a fix.",
+        "Wrong — `GITHUB_TOKEN` is automatically provided to every workflow run by GitHub Actions. You don't create it; it's injected as `${{ secrets.GITHUB_TOKEN }}` or `${{ github.token }}`."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c13",
+      "type": "flip",
+      "topic": "Matrix builds: testing across versions and platforms",
+      "topic_ru": "Matrix builds: тестирование на разных версиях и платформах",
+      "difficulty": 3,
+      "tags": ["ci", "matrix", "github-actions", "parallelism"],
+      "question": "What does `strategy: matrix:` do? When is it appropriate, and when is it just running up the CI bill?",
+      "answer": "`strategy: matrix:` runs the same job multiple times with different parameter combinations — one parallel job per combination.\n\n```yaml\njobs:\n  test:\n    strategy:\n      matrix:\n        python-version: [\"3.11\", \"3.12\", \"3.13\"]\n        os: [ubuntu-latest, macos-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    steps:\n      - uses: actions/setup-python@v5\n        with: { python-version: ${{ matrix.python-version }} }\n      - run: pytest\n```\n\nThis generates **3 × 3 = 9 parallel jobs**, each with a distinct `(python-version, os)` combination accessible via `${{ matrix.* }}` substitutions. Each variant is a separate billable job on shared CI runners.\n\n**When matrix is appropriate:**\n\n- Testing across **language versions** when your code is meant to support multiple (e.g., a library claiming Python 3.10–3.13 support).\n- Testing across **operating systems** when behavior may differ (file paths, line endings, shell semantics).\n- Testing **dependency variants** that might exercise different code paths (e.g., `sqlalchemy 1.x` vs `2.x` if your code supports both).\n\n**When matrix is NOT appropriate:**\n\n- When the variants don't actually exercise different code paths — running the same test on 9 identical runners is 9× the cost for the same information.\n- For environments where one variant is the production target — that variant is the only one that matters; running the others is reassurance theatre.\n\n**`fail-fast: true` (default)** cancels siblings on first failure; **`fail-fast: false`** lets every variant complete (better for diagnostic 'where does it break?' debugging). **`include:` / `exclude:`** add/remove specific combinations.",
+      "answer_explanation_md": "**Reading a matrix in a PR check UI:** GitHub renders each matrix variant as a separate check (e.g., `test (3.11, ubuntu-latest)`, `test (3.13, macos-latest)`). Required status checks (see `m4-s8-c16`) can be applied to specific variants or to the parent job — be deliberate about which variants are merge-blocking. A common pattern: require Linux + Python 3.13 (the production target), but treat Windows / macOS / older Python variants as best-effort signals.\n\n**Cost-control reflex:** matrix grows multiplicatively. Adding one more dimension (e.g., 'database backend: postgres, mysql, sqlite') turns 9 jobs into 27. Always justify each dimension by 'what bug class does this variant catch that the others wouldn't?'."
+    },
+
+    {
+      "id": "m4-s8-c14",
+      "type": "multiple_choice",
+      "topic": "Predicting matrix job count under include/exclude",
+      "topic_ru": "Предсказание числа matrix-jobs с include/exclude",
+      "difficulty": 3,
+      "tags": ["ci", "matrix", "include", "exclude", "discrimination"],
+      "question": "How many parallel jobs does this matrix generate?\n\n```yaml\nstrategy:\n  matrix:\n    python-version: [\"3.11\", \"3.12\", \"3.13\"]\n    os: [ubuntu-latest, macos-latest, windows-latest]\n    exclude:\n      - os: windows-latest\n        python-version: \"3.11\"\n    include:\n      - os: ubuntu-latest\n        python-version: \"3.10\"          # additional non-matrix variant\n```",
+      "options": [
+        "9 — exclude and include cancel out.",
+        "**9 jobs.** Start with the cross-product: 3 versions × 3 OSes = 9 jobs. **Subtract 1 for `exclude:`** (the `(windows-latest, 3.11)` combination is dropped): 8 jobs. **Add 1 for `include:`** (the explicit `(ubuntu-latest, 3.10)` variant is added — this combination wasn't in the matrix, so it's an EXTRA, not a re-add): 9 jobs. **The semantics:** `exclude:` filters the cross-product (specific combinations removed); `include:` adds extra named combinations (one-off variants that need to be tested but aren't part of the cartesian product). **`include:` can also AUGMENT existing combinations** — `include: [{python-version: '3.13', extra-flag: 'turbo'}]` adds a new field to the matching combination without creating a new job. This is the syntax for 'test 3.13 on every OS, AND additionally pass `extra-flag=turbo` to the 3.13 variants'.",
+        "1 — exclude wins, then include only matters if there's no exclude.",
+        "10 — exclude doesn't actually remove jobs; only include does."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong arithmetic. The two operations are independent: exclude removes from the cross-product; include adds beyond it. Cancellation is coincidence in this example, not the rule.",
+        "Correct. The mental model: **start with the cross-product, apply `exclude:` to subtract, then apply `include:` to add**. The order matters because include can target combinations not in the matrix (purely additive) or augment matrix combinations (adds fields without creating new jobs).",
+        "Wrong — exclude removes the specific combination, and include adds a fresh combination not present in the cross-product. Both apply.",
+        "Wrong — `exclude:` does remove jobs. The cross-product is the starting set; exclude filters it before include adds."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c15",
+      "type": "multiple_choice",
+      "topic": "fail-fast: false — when to disable matrix's default cancel-on-first-failure",
+      "topic_ru": "fail-fast: false — когда отключать дефолтную отмену matrix",
+      "difficulty": 3,
+      "tags": ["ci", "matrix", "fail-fast", "debugging"],
+      "question": "Your matrix runs 9 variants and one fails. With the default settings, you see only one failure result; the other 8 are 'cancelled'. What changes if you add `fail-fast: false`, and when is each setting appropriate?",
+      "options": [
+        "`fail-fast: false` errors out the entire workflow instead of one variant.",
+        "**Default (`fail-fast: true`) — the moment any matrix variant fails, GitHub cancels every still-running sibling.** You see one failure and N-1 cancelled jobs; the cancelled ones never report their status. Fast feedback (saves runner minutes when you only care that *something* broke), but lossy for diagnostics. **`fail-fast: false` — every variant runs to completion regardless of sibling failures.** You see all real failures (and successes) at once; 8 variants don't get cancelled because one failed early. **When to pick which:** **fail-fast: true** (default) for PR validation — when one variant fails, the merge is blocked anyway, no point burning extra runner minutes. **fail-fast: false** for diagnostic / nightly runs — when you specifically want to see whether a regression affects all variants or just one ('does Python 3.13 break on Linux only, or on macOS too?'). Also for matrix scheduled runs where the goal is dashboard-style visibility into health across variants, not just go/no-go.",
+        "`fail-fast: false` requires every variant to pass — it's stricter.",
+        "Both settings produce identical results; `fail-fast` is a no-op."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on semantics. `fail-fast` controls SIBLING-CANCELLATION on failure, not the overall workflow outcome. The workflow still fails if any matrix variant failed; the only difference is whether siblings keep running.",
+        "Correct. The choice is between fast-feedback (cancel siblings when one fails) and full-diagnostic (let everything complete to see the failure pattern). Most PR-validation pipelines use the default; diagnostic / nightly pipelines often opt out via `fail-fast: false`.",
+        "Wrong on direction. The strictness criterion (overall workflow passing) is unchanged; both settings fail the workflow if any variant failed. `fail-fast` only affects sibling cancellation.",
+        "Wrong — sibling cancellation is real and has operationally meaningful consequences (cost, diagnostic information)."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c16",
+      "type": "flip",
+      "topic": "PR triggers + branch protection + required status checks",
+      "topic_ru": "PR-триггеры + branch protection + required status checks",
+      "difficulty": 3,
+      "tags": ["ci", "pull-request", "branch-protection", "merge-gates"],
+      "question": "What's the difference between `on: pull_request` and `on: push: branches: [main]`? What does branch protection give you that workflow YAML can't?",
+      "answer": "**`on: pull_request`** — fires when a PR is opened, updated (new commit pushed), or reopened. Runs the workflow against the *PR's merge commit* (a hypothetical merge of the PR branch into the target). Used for pre-merge validation: run tests / lint / type-check on the proposed change.\n\n**`on: push: branches: [main]`** — fires when a commit is pushed directly to `main` (typically after a PR is merged). Used for post-merge actions: deploy, publish, release.\n\nThe two together are the standard split: **PR triggers run validation; push-to-main triggers run deploys**. A typical workflow uses `on: [push, pull_request]` and uses `if:` guards on the deploy job to only run it on push-to-main: `if: github.event_name == 'push' && github.ref == 'refs/heads/main'`.\n\n**Branch protection** (configured in repo settings → branches, not in YAML) is the *enforcement* layer:\n\n- **Require status checks before merging** — list specific CI jobs that must report green. If any is red or pending, the merge button is disabled.\n- **Require pull request reviews** — N approvals from designated reviewers or code-owners.\n- **Prevent force-pushes to main** — protects history.\n- **Require linear history** — disallows merge commits (forces rebase or squash on merge).\n- **Restrict who can push** — only admins / specific teams can push directly.\n\n**Why this matters:** the workflow YAML *describes what runs*; branch protection *enforces what's required to merge*. Without branch protection, a malicious or hasty committer can merge despite red CI; with it, the merge button is mechanically blocked.",
+      "answer_explanation_md": "**The 'required status check' name is a UI concept:** in the workflow YAML, every job is just a job. The check becomes 'required' through branch protection settings naming the job by its display name. This means renaming a job in YAML breaks branch protection silently until you update the protection settings to point at the new name. Common gotcha — track when you rename jobs and update branch protection alongside the YAML PR.\n\n**Common required-check stacks for a Python project:**\n\n```\nRequired checks (configured in branch protection):\n  - test (3.13, ubuntu-latest)        ← the production target\n  - lint                              ← ruff check\n  - typecheck                         ← mypy --strict\n  - format                            ← ruff format --check\n  - coverage                          ← optional: coverage threshold\n```\n\nOlder Python versions and other OSes can be in the matrix as non-required signals — informative but not blocking."
+    },
+
+    {
+      "id": "m4-s8-c17",
+      "type": "multiple_choice",
+      "topic": "if: conditionals — skipping deploy on PR, running only on main push",
+      "topic_ru": "if: условия — пропуск деплоя на PR, запуск только на push в main",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "conditionals", "if"],
+      "question": "You want a single workflow where `test` runs on every PR and push, but `deploy` runs only on direct pushes to `main`. Which `if:` expression on the `deploy` job is correct?",
+      "options": [
+        "`if: always()`",
+        "**`if: github.event_name == 'push' && github.ref == 'refs/heads/main'`.** This guards the `deploy` job: it only runs when the workflow was triggered by a `push` event (not `pull_request`) AND the push target is the `main` branch ref (not a feature branch's tag-creation push or a different branch's push to a workflow listening on `[main, staging]`). **Walking through the context:** `github.event_name` holds the event type (`push`, `pull_request`, `schedule`, `workflow_dispatch`, etc.); `github.ref` holds the git ref that triggered the workflow (`refs/heads/main`, `refs/heads/feat-x`, `refs/tags/v1.0`, etc.). **The `if:` expression is evaluated by GitHub's context engine** — it has access to `github.*`, `env.*`, `secrets.*`, `needs.*`, and various functions like `success()`, `failure()`, `always()`, `cancelled()`. Steps and jobs can both have `if:` conditionals; failing the condition skips (not fails) the job/step. **Cross-link:** the `if:` guard plus `needs: test` on `deploy` gives you the canonical 'deploy only after tests pass, and only on main' shape.",
+        "`if: github.ref == 'main'`",
+        "`if: !pull_request`"
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `always()` is a function that runs the step REGARDLESS of previous outcomes (even on prior failure). It doesn't filter by event type or ref.",
+        "Correct. Two conditions ANDed: 'this was a push event' AND 'the push was to main'. Both are needed because (a) PR events also have a `github.ref`, so checking ref alone isn't enough; (b) pushes can target any branch, not just main. **GitHub Actions expressions** use the `${{ ... }}` syntax in most contexts, but in `if:` at the top level of a job or step, the braces are optional — `if: github.event_name == 'push'` works without `${{ }}`.",
+        "Wrong on two counts: `github.ref` for a branch is `refs/heads/main`, not `main`; and this is missing the event-type check (would match PRs targeting main too).",
+        "Wrong syntactically — there's no `!pull_request` expression. The negation form would be `if: github.event_name != 'pull_request'`, but that allows pushes to ANY branch, not just main."
+      ]
+    },
+
+    {
+      "id": "m4-s8-c18",
+      "type": "multiple_choice",
+      "topic": "concurrency: cancel-in-progress — cancelling old runs on new commits",
+      "topic_ru": "concurrency: cancel-in-progress — отмена старых runs при новом коммите",
+      "difficulty": 3,
+      "tags": ["ci", "github-actions", "concurrency", "cost-control"],
+      "question": "You push commits to a PR rapidly during interactive development; CI starts a new run on each push, and the previous (now-superseded) runs keep going to completion. What's the YAML to make new pushes cancel the older runs?",
+      "options": [
+        "There's no way to cancel running workflows once they've started.",
+        "**Add a `concurrency:` block to the workflow.** It groups runs by a key; when a new run starts in the same group, in-progress runs in that group are cancelled.\n\n```yaml\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n```\n\n**Walking through:** **`group:`** is the key that determines what counts as 'the same logical run'. `${{ github.workflow }}-${{ github.ref }}` says 'same workflow on the same branch is the same group'. Pushing a new commit to PR branch `feat-x` triggers a new run in the group `CI-refs/heads/feat-x`; the existing in-progress run in that group is cancelled. **`cancel-in-progress: true`** is what triggers the cancellation. Without it (or with `false`), the new run *queues* behind the existing one instead. **Benefits:** (1) Saves runner minutes — you're billing for the new run, not the old one too. (2) Faster feedback — the latest commit's CI starts immediately instead of waiting. (3) Avoids the 'old CI just finished and posted a status check for an outdated commit' confusion. **What NOT to do:** apply this to deploy jobs unless you're sure cancelling mid-deploy is safe; cancelled deploys can leave partial state.",
+        "Use `cancel: true` on every job individually.",
+        "Use a separate workflow that polls for new pushes and kills old runs."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `concurrency:` is the standard mechanism for exactly this.",
+        "Correct. The interview-relevant version: senior engineers reach for `concurrency:` on PR-validation workflows reflexively because rapid iteration on a PR otherwise burns runner minutes and queues stale results. **Common groupings:** `${{ github.workflow }}-${{ github.ref }}` for per-branch isolation; `${{ github.workflow }}-${{ github.event.pull_request.number }}` for per-PR (useful if you want a different policy for `main` pushes vs PR runs).",
+        "Wrong — there's no `cancel:` field on jobs. The mechanism is workflow-level `concurrency:`, not per-job.",
+        "Wrong — you don't need a separate polling workflow; `concurrency:` is a first-class feature."
+      ]
+    }
+  ]
+}
