@@ -114,6 +114,57 @@ When authoring Modules 2–4, periodically open Module 1's `.cards.json` files f
 
 ## Module 2 — Practical Automation, Scripting & Infrastructure
 
+Module 2 is the automation-engineer track: handling time, files, text, serialization, networks, subprocesses, and the production-grade glue (argparse / logging / FastAPI) that turns a one-off script into something a team can run on a schedule. Sphere index in bullet form below; per-sphere knowledge points and interview angles follow as `### Sphere` sections.
+
+- `m2-s0` — Time, Dates & Math
+  - `m2-s0-t1` — `datetime.now()` vs `datetime.utcnow()`; tz-aware datetimes
+  - `m2-s0-t2` — `strftime` and `strptime`
+  - `m2-s0-t3` — `timedelta` for time arithmetic
+  - `m2-s0-t4` — `time.sleep`, `time.perf_counter`
+
+- `m2-s1` — Filesystem & OS
+  - `m2-s1-t1` — `pathlib` paths, `resolve()`, `exists()`, `is_file()/is_dir()`
+  - `m2-s1-t2` — `iterdir`, `glob`, `rglob`
+  - `m2-s1-t3` — `os` and `shutil`: `makedirs`, `copy`, `move`, `rmtree`
+  - `m2-s1-t4` — `os.environ.get` for secrets (never hardcode)
+  - `m2-s1-t5` — `sys.exit(0/1)` for CI/CD integration
+
+- `m2-s2` — Text & Regex
+  - `m2-s2-t1` — String methods: `startswith`, `strip`, `splitlines`, `join`
+  - `m2-s2-t2` — `re.search` vs `re.match` vs `re.findall`
+  - `m2-s2-t3` — `re.sub` for substitution
+  - `m2-s2-t4` — Capturing groups; named groups `(?P<name>...)`
+  - `m2-s2-t5` — `re.compile` for performance
+
+- `m2-s3` — Serialization Formats
+  - `m2-s3-t1` — JSON: `loads`/`dumps`, `load`/`dump`, `indent`, `ensure_ascii`
+  - `m2-s3-t2` — CSV: `DictReader`/`DictWriter`
+  - `m2-s3-t3` — YAML: `safe_load` (and why never `load`)
+
+- `m2-s4` — Network & APIs
+  - `m2-s4-t1` — `requests.get/post`, query params, `json=` body
+  - `m2-s4-t2` — Headers, bearer tokens, auth
+  - `m2-s4-t3` — `timeout=`, `raise_for_status`, `RequestException`
+  - `m2-s4-t4` — `pydantic` models for response validation
+
+- `m2-s5` — Subprocess
+  - `m2-s5-t1` — `subprocess.run` with arg list (not `shell=True`)
+  - `m2-s5-t2` — `capture_output`, `text`, `stdout`, `stderr`
+  - `m2-s5-t3` — `check=True` and `CalledProcessError`
+
+- `m2-s6` — Production-grade Scripts
+  - `m2-s6-t1` — `argparse`: required/optional args, boolean flags
+  - `m2-s6-t2` — `logging`: `basicConfig`, format, levels
+  - `m2-s6-t3` — Why `print` is forbidden in production code
+
+- `m2-s7` — Modern Backend Basics
+  - `m2-s7-t1` — FastAPI routing and path/query params
+  - `m2-s7-t2` — Pydantic `BaseModel` for request/response validation
+  - `m2-s7-t3` — Dependency injection with `Depends`
+  - `m2-s7-t4` — Background tasks and async endpoints
+
+---
+
 ### Sphere `m2-s0` — Time, Dates & Math
 
 **Why this sphere matters in interviews:** Automation scripts live and die by time handling — cron triggers, log timestamps, retry windows, scheduled jobs. The mistakes here are subtle (naive vs aware, timezone surprises, NTP clock adjustments) and interviewers love them because they distinguish engineers who've been bitten by timezone bugs from those who haven't.

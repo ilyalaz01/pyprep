@@ -1,0 +1,229 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s0",
+  "cards": [
+    {
+      "id": "m2-s0-c1",
+      "type": "flip",
+      "topic": "Naive vs aware datetimes",
+      "topic_ru": "Naive vs aware datetime-объекты",
+      "difficulty": 2,
+      "tags": ["datetime", "timezone", "interview-warmup"],
+      "question": "What is the difference between a naive and an aware `datetime`, and which one should server code use?",
+      "answer": "A naive datetime has `tzinfo is None` — it's just digits with no timezone attached. An aware datetime has `tzinfo` set to a real timezone (e.g. `timezone.utc` or `ZoneInfo('Asia/Jerusalem')`). Server-side code should always use aware datetimes, stored in UTC; convert to a local timezone only at display time.",
+      "answer_explanation_md": "The reason naive datetimes are dangerous: they look comparable to aware ones, but Python refuses (`TypeError: can't compare offset-naive and offset-aware datetimes`). Any value that crosses a process boundary — log line, DB row, API response — should carry its timezone with it. `datetime.now(tz=timezone.utc)` is the modern correct form; `datetime.utcnow()` is the trap because it returns naive."
+    },
+
+    {
+      "id": "m2-s0-c2",
+      "type": "code_trap",
+      "topic": "Comparing naive and aware datetimes raises TypeError",
+      "topic_ru": "Сравнение naive и aware datetime бросает TypeError",
+      "difficulty": 3,
+      "tags": ["datetime", "timezone", "comparison", "interview-classic"],
+      "code_snippet": "from datetime import datetime, timezone\n\na = datetime.now()                       # naive\nb = datetime.now(tz=timezone.utc)        # aware\n\nprint(a < b)",
+      "question": "What does this print or raise?",
+      "options": [
+        "True",
+        "False",
+        "TypeError: can't compare offset-naive and offset-aware datetimes",
+        "Always False (Python silently treats `a` as UTC)"
+      ],
+      "correct_index": 2,
+      "explanation_md": "Python refuses to guess. `a` is naive (no `tzinfo`), `b` is aware (`tzinfo=timezone.utc`). Any comparison operator (`<`, `>`, `==` between them in some cases, `-`, etc.) raises `TypeError`. \n\nThis is *exactly* the bug that surfaces when you have a script reading `created_at = datetime.now()` locally and then trying to compare it with `created_at` values pulled from a database that stores aware UTC. The fix is to make every datetime aware from the moment of creation: `datetime.now(tz=timezone.utc)`. Never mix the two kinds."
+    },
+
+    {
+      "id": "m2-s0-c3",
+      "type": "multiple_choice",
+      "topic": "Why datetime.utcnow() is deprecated",
+      "topic_ru": "Почему datetime.utcnow() устарел",
+      "difficulty": 3,
+      "tags": ["datetime", "utcnow", "deprecation"],
+      "question": "Why is `datetime.utcnow()` deprecated in Python 3.12 and discouraged in modern code?",
+      "options": [
+        "It's slow on Windows and breaks under daylight saving time.",
+        "It returns a naive datetime — the value is numerically UTC, but `tzinfo is None`, so it can't be compared with aware datetimes without surprises.",
+        "It returns local time, not UTC, despite the name.",
+        "It returns a string instead of a `datetime` object."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — speed and DST aren't the issue. The issue is the type of the return value.",
+        "Correct. The numbers are UTC, but the missing `tzinfo` makes the object a naive datetime, which silently misbehaves the moment it meets an aware datetime in a comparison or DB write. The modern correct form is `datetime.now(tz=timezone.utc)`, which is aware.",
+        "Wrong — `utcnow()` does return UTC numerically. The deprecation is about the missing tzinfo, not the wall-clock value.",
+        "Wrong — `utcnow()` returns a `datetime` object, same as `now()`. The string serialization is `.isoformat()`."
+      ]
+    },
+
+    {
+      "id": "m2-s0-c4",
+      "type": "fill_in",
+      "topic": "Modern correct form for 'now in UTC, aware'",
+      "topic_ru": "Современная корректная форма для 'сейчас в UTC, aware'",
+      "difficulty": 2,
+      "tags": ["datetime", "timezone", "patterns"],
+      "code_snippet_with_blanks": "from datetime import datetime, ___\n\nnow_utc = datetime.now(tz=___.___)\nassert now_utc.tzinfo is not None",
+      "accepted_answers": [
+        ["timezone"],
+        ["timezone"],
+        ["utc"]
+      ],
+      "explanation_md": "The canonical pattern: `datetime.now(tz=timezone.utc)`. This produces an *aware* UTC datetime that you can compare, serialize, and store without ambiguity. `datetime.utcnow()` looks like a shortcut for this but is not — it strips the tzinfo and returns a naive value."
+    },
+
+    {
+      "id": "m2-s0-c5",
+      "type": "flip",
+      "topic": "strftime vs strptime direction",
+      "topic_ru": "Направление strftime vs strptime",
+      "difficulty": 1,
+      "tags": ["datetime", "parsing", "formatting"],
+      "question": "Which one converts a `datetime` to a string, and which converts a string to a `datetime`?",
+      "answer": "`dt.strftime(format)` formats a datetime *to* a string (f = format). `datetime.strptime(string, format)` parses *from* a string into a datetime (p = parse). The mnemonic: 'f for format-out, p for parse-in'.",
+      "answer_explanation_md": "Both take the same format codes (`%Y %m %d %H %M %S %z`...) and both raise `ValueError` on mismatched input. For ISO 8601 strings specifically, prefer `dt.isoformat()` / `datetime.fromisoformat()` — they're faster, handle offsets natively, and need no format string."
+    },
+
+    {
+      "id": "m2-s0-c6",
+      "type": "code_trap",
+      "topic": "strptime fails on format mismatch",
+      "topic_ru": "strptime падает при несовпадении формата",
+      "difficulty": 3,
+      "tags": ["datetime", "strptime", "parsing"],
+      "code_snippet": "from datetime import datetime\n\ndatetime.strptime('2026-05-12 14:30', '%Y-%m-%dT%H:%M')",
+      "question": "What does this raise?",
+      "options": [
+        "Nothing — strptime is forgiving about separators.",
+        "ValueError, because the literal `T` in the format doesn't match the space in the input.",
+        "TypeError, because seconds are missing from both.",
+        "It returns a naive datetime for `2026-05-12 00:00:00`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`strptime` matches **literal characters** in the format string against the input. The format says 'expect a `T` between date and time'; the input has a space. The literal mismatch raises `ValueError: time data '2026-05-12 14:30' does not match format '%Y-%m-%dT%H:%M'`. \n\nThis is why `datetime.fromisoformat('2026-05-12T14:30:00+03:00')` is the better choice for ISO-shaped strings: it knows the ISO grammar without you having to spell out every literal."
+    },
+
+    {
+      "id": "m2-s0-c7",
+      "type": "multiple_choice",
+      "topic": "Preferred parser for ISO 8601 strings with offset",
+      "topic_ru": "Предпочтительный парсер для ISO 8601 со смещением",
+      "difficulty": 3,
+      "tags": ["datetime", "fromisoformat", "iso8601"],
+      "question": "You're handed the log timestamp `2026-05-12T14:30:00+03:00` and need to turn it into a `datetime` in a backend service. Which is the best choice?",
+      "options": [
+        "`datetime.strptime(s, '%Y-%m-%dT%H:%M:%S%z')` — explicit and portable.",
+        "`datetime.fromisoformat(s)` — handles the ISO grammar including the offset, returns an aware datetime, no format string to maintain.",
+        "`datetime.now()` then `.replace(...)` per field — most flexible.",
+        "Parse manually with `s.split('T')` and a `timedelta` — no library dependency."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Works, but the format string is a footgun and the docs themselves recommend `fromisoformat` for ISO-shaped strings since Python 3.11.",
+        "Correct. `fromisoformat` parses ISO 8601 (including the offset, since Python 3.11+), returns an aware datetime, and needs no format-string maintenance. It's also faster than `strptime`.",
+        "Wrong — `.replace` doesn't parse a string at all; it modifies an existing datetime field-by-field.",
+        "Wrong — manual splitting is fragile and re-implements what stdlib already does correctly."
+      ]
+    },
+
+    {
+      "id": "m2-s0-c8",
+      "type": "flip",
+      "topic": "Three timedelta arithmetic rules",
+      "topic_ru": "Три правила арифметики timedelta",
+      "difficulty": 2,
+      "tags": ["timedelta", "arithmetic"],
+      "question": "What are the three legal arithmetic combinations of `datetime` and `timedelta`?",
+      "answer": "`datetime + timedelta` returns a `datetime`. `datetime - datetime` returns a `timedelta`. `datetime - timedelta` returns a `datetime`. (Adding two datetimes is *not* defined and raises `TypeError`.)",
+      "answer_explanation_md": "`timedelta` accepts `days`, `seconds`, `microseconds`, `milliseconds`, `minutes`, `hours`, `weeks` — but **not** `months` or `years`, because neither has a fixed length. For 'one month later' use `dateutil.relativedelta`. Also note `td.total_seconds()` returns a float — useful when you need a duration in seconds regardless of how the `timedelta` was constructed."
+    },
+
+    {
+      "id": "m2-s0-c9",
+      "type": "code_task",
+      "topic": "Filter records older than a cutoff using timedelta",
+      "topic_ru": "Фильтрация записей старше cutoff через timedelta",
+      "difficulty": 3,
+      "tags": ["timedelta", "datetime", "filtering"],
+      "prompt_md": "Implement `older_than(items, cutoff)` where:\n\n- `items` is a list of `(name: str, ts: datetime)` tuples.\n- `cutoff` is a `datetime`.\n- Return the list of `name` values whose `ts` is *strictly* older (less than) `cutoff`, preserving input order.\n\nA record whose timestamp equals the cutoff is **not** older — it must be excluded.",
+      "starter_code": "from datetime import datetime\n\ndef older_than(items, cutoff):\n    # your code here\n    pass\n",
+      "solution_code": "from datetime import datetime\n\ndef older_than(items, cutoff):\n    return [name for name, ts in items if ts < cutoff]\n",
+      "tests": "import pytest\nfrom datetime import datetime, timedelta\nfrom solution import older_than\n\nNOW = datetime(2026, 5, 13, 12, 0, 0)\n\ndef test_filters_items_strictly_older():\n    items = [\n        ('recent', NOW - timedelta(days=1)),\n        ('ancient', NOW - timedelta(days=30)),\n        ('today', NOW),\n    ]\n    cutoff = NOW - timedelta(days=7)\n    assert older_than(items, cutoff) == ['ancient']\n\ndef test_equal_to_cutoff_is_not_older():\n    items = [('exact', NOW)]\n    assert older_than(items, NOW) == []\n\ndef test_preserves_input_order():\n    items = [\n        ('b', NOW - timedelta(days=10)),\n        ('a', NOW - timedelta(days=20)),\n    ]\n    cutoff = NOW - timedelta(days=5)\n    assert older_than(items, cutoff) == ['b', 'a']\n\ndef test_empty_list():\n    assert older_than([], NOW) == []\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s0-c10",
+      "type": "code_trap",
+      "topic": "Subtracting two datetimes yields a timedelta",
+      "topic_ru": "Вычитание двух datetime даёт timedelta",
+      "difficulty": 2,
+      "tags": ["timedelta", "datetime", "arithmetic"],
+      "code_snippet": "from datetime import datetime\n\na = datetime(2026, 5, 13, 12, 0, 0)\nb = datetime(2026, 5, 13, 11, 30, 0)\n\nresult = a - b\nprint(type(result).__name__, result.total_seconds())",
+      "question": "What does this print?",
+      "options": [
+        "datetime 1800.0",
+        "timedelta 1800.0",
+        "timedelta 0.5",
+        "int 1800"
+      ],
+      "correct_index": 1,
+      "explanation_md": "Subtracting two `datetime` instances returns a `timedelta` representing the difference. 30 minutes is 1800 seconds, and `total_seconds()` always returns a float. \n\nThe rule that trips people up: `datetime - datetime → timedelta`, but `datetime + datetime` is **not** defined — it raises `TypeError`. The asymmetry is deliberate; 'datetime plus datetime' has no meaningful answer."
+    },
+
+    {
+      "id": "m2-s0-c11",
+      "type": "multiple_choice",
+      "topic": "Why perf_counter is correct for measuring duration",
+      "topic_ru": "Почему perf_counter подходит для измерения длительности",
+      "difficulty": 3,
+      "tags": ["time", "perf-counter", "monotonic", "interview-classic"],
+      "question": "Why use `time.perf_counter()` instead of `time.time()` to measure how long a block of code took?",
+      "options": [
+        "`perf_counter` returns nanoseconds, `time.time` returns seconds — different units.",
+        "`time.time` is monotonic; `perf_counter` is wall-clock. The reverse of what you want.",
+        "`time.time` can decrement (NTP sync, manual clock changes), making the measured duration negative or wrong. `perf_counter` is monotonic — guaranteed never to go backward.",
+        "`perf_counter` is thread-safe; `time.time` is not."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — both return seconds (floats). `perf_counter` has higher resolution but the units are the same.",
+        "Backward. `time.time` is the wall clock, which is *not* monotonic. `perf_counter` is the monotonic one.",
+        "Correct. Real systems adjust the wall clock — NTP, DST, manual changes. Any of those can make `t2 < t1` even though `t2` was sampled later. `perf_counter` is guaranteed monotonic; it's the right tool for any duration measurement. `time.monotonic()` is the lower-resolution sibling for timeouts.",
+        "Both are thread-safe. Thread safety isn't the distinguishing concern here."
+      ]
+    },
+
+    {
+      "id": "m2-s0-c12",
+      "type": "flip",
+      "topic": "perf_counter vs monotonic — when to use each",
+      "topic_ru": "perf_counter vs monotonic — когда какой",
+      "difficulty": 4,
+      "tags": ["time", "perf-counter", "monotonic", "subtle"],
+      "question": "Both `time.perf_counter()` and `time.monotonic()` are monotonic. When should you use which?",
+      "answer": "Use `time.perf_counter()` for profiling and any measurement that wants the highest resolution available (it's the implementation-defined highest-resolution monotonic clock). Use `time.monotonic()` for timeout / deadline logic, where nanosecond resolution doesn't matter and the lower-overhead clock is enough. Both are guaranteed never to decrement.",
+      "answer_explanation_md": "The practical heuristic: 'How long did this take?' → `perf_counter`. 'Have we exceeded our deadline of 5 seconds?' → `monotonic`. In Pyodide and most modern OS builds the two clocks are backed by the same source and the choice is mostly stylistic, but the API distinction signals intent to the reader."
+    },
+
+    {
+      "id": "m2-s0-c13",
+      "type": "code_trap",
+      "topic": "time.time() can produce a negative elapsed",
+      "topic_ru": "time.time() может дать отрицательное elapsed",
+      "difficulty": 4,
+      "tags": ["time", "ntp", "wall-clock", "subtle"],
+      "code_snippet": "import time\n\nstart = time.time()\n# ... an NTP sync nudges the system clock backward by 200ms ...\ndo_work()\nelapsed = time.time() - start\n\nprint(elapsed)",
+      "question": "Given an NTP correction during `do_work()`, which outcome is possible with this code that is **not** possible if `time.perf_counter()` is used in place of `time.time()`?",
+      "options": [
+        "`elapsed` is rounded to an integer.",
+        "`elapsed` is negative, or noticeably smaller than the real wall-clock duration.",
+        "`elapsed` raises `TimeError`.",
+        "`elapsed` is always exactly zero."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`time.time()` returns the system wall clock. The OS can adjust it backward — NTP corrections, DST transitions on misconfigured boxes, a manual `date -s`. If the clock moves backward between `start` and the second sample, `elapsed = time.time() - start` comes out smaller than reality, and can even be negative.\n\n`time.perf_counter()` (and `time.monotonic()`) are guaranteed never to decrement. They're decoupled from the wall clock for exactly this reason. **Rule of thumb:** if you're measuring a duration, never use `time.time()`. Use it only when you need a Unix epoch timestamp to record or transmit."
+    }
+  ]
+}
