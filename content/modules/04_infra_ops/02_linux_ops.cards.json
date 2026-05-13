@@ -1,0 +1,339 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s2",
+  "cards": [
+    {
+      "id": "m4-s2-c1",
+      "type": "flip",
+      "topic": "cat/less/head/tail basics + when to use which",
+      "topic_ru": "Основы cat/less/head/tail + когда что",
+      "difficulty": 1,
+      "tags": ["linux", "logs", "viewing", "interview-warmup"],
+      "question": "What's the operational difference between `cat`, `less`, `head -n 20`, and `tail -n 50` on a log file?",
+      "answer": "`cat file.log` dumps the **entire** file to stdout — fine for small files, terrible for a 2 GB log (floods the terminal). `less file.log` opens an **interactive paginated viewer**: arrow keys / page-up / page-down to scroll, `/pattern` to search, `G` jumps to end, `g` to start, `q` quits. `head -n 20 file.log` prints the **first 20 lines** (default 10 if `-n` omitted). `tail -n 50 file.log` prints the **last 50 lines** — the standard quick-check for 'what just happened' in a log.",
+      "answer_explanation_md": "Operator reflex: when you don't know how big the file is, default to `less`. It pages, supports search, and doesn't blow up on multi-GB files. `cat` is for piping small files into other commands (`cat config.yml | grep port`) or for files you know are short. `tail -n 100 file | less` is the common combo: get the recent slice, then page through it interactively."
+    },
+
+    {
+      "id": "m4-s2-c2",
+      "type": "multiple_choice",
+      "topic": "tail -f vs tail -F (log rotation)",
+      "topic_ru": "tail -f vs tail -F (ротация логов)",
+      "difficulty": 3,
+      "tags": ["linux", "tail", "logs", "rotation", "interview-classic"],
+      "question": "You're running `tail -f /var/log/app.log` to watch a live application log. At midnight, logrotate renames `/var/log/app.log` to `/var/log/app.log.1` and a fresh empty `/var/log/app.log` is created by the app. What does `tail -f` show after midnight, and how does `tail -F` differ?\n\n```bash\ntail -f /var/log/app.log\n# midnight: logrotate runs, app re-opens app.log\ntail -F /var/log/app.log\n```",
+      "options": [
+        "Both `-f` and `-F` automatically re-open the file by name when rotation occurs. They're aliases.",
+        "`tail -f` keeps reading the **same inode** — which is now `/var/log/app.log.1` (the rotated file). It shows nothing new from the freshly created `app.log` because that's a different inode. `tail -F` watches the **path**: when it detects the file has been replaced (inode changed or file missing), it re-opens by name and resumes tailing the new `app.log`. **In production: always use `-F` for any file under a rotation policy.**",
+        "`tail -f` errors out the moment rotation happens; `-F` is the recover-on-error form.",
+        "Both stop reading entirely after rotation — you need to restart `tail` either way."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. `-f` and `-F` have meaningfully different rotation behavior; that's the whole point of `-F`.",
+        "Correct. `tail -f` is inode-bound — it followed the open file descriptor, which after rotation points to the *renamed* file (`app.log.1`). All new writes go to the new `app.log` inode, which `-f` isn't watching. `tail -F` (`--follow=name --retry`) is path-bound — it polls the path, notices the inode change, and re-opens. The first time you debug 'why doesn't my live tail show anything anymore after midnight?', this is the answer.",
+        "Wrong on the mechanism. `-f` doesn't error on rotation — it just silently keeps reading the rotated (renamed) file, which gets no new writes. The silence is the bug.",
+        "Wrong — `-f` keeps running, just on the wrong file. `-F` is what you want; both running doesn't make sense."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c3",
+      "type": "code_trap",
+      "topic": "cat on a huge file floods the terminal — use less or head/tail",
+      "topic_ru": "cat на огромном файле забивает терминал — нужен less или head/tail",
+      "difficulty": 2,
+      "tags": ["linux", "cat", "logs", "operational-reflex"],
+      "code_snippet": "# You SSH into a prod box and want to look at the app log.\n# Someone tells you it's \"a big log\". You run:\n\n$ cat /var/log/app.log\n\n# /var/log/app.log is 4.2 GB.",
+      "question": "What's the operational failure mode here, and what should you have run instead?",
+      "options": [
+        "Nothing bad happens — `cat` just prints faster than your terminal can render.",
+        "**Operational failure modes:** (1) Your terminal renders 4.2 GB of output (millions of lines), making it unresponsive for minutes. (2) Scrollback is flooded; any previous output is lost. (3) On a slow SSH link, the bytes have to traverse the network — you tie up bandwidth. (4) If you `Ctrl-C` mid-stream, you've still wasted bandwidth + CPU. **Correct reflexes:** `less /var/log/app.log` (paginated, opens instantly, searchable with `/`). `tail -n 200 /var/log/app.log` (recent slice). `grep ERROR /var/log/app.log | tail -100` (recent errors only). `cat` is for short files; on prod logs it's a footgun.",
+        "`cat` refuses to read files larger than 2 GB on Linux — the command errors out immediately.",
+        "Linux automatically pages `cat` output when stdout is a terminal, so it behaves like `less`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The interview-relevant version of this question is the screening probe: 'You SSH'd in, the app is misbehaving, where do you start?' The wrong answer (`cat /var/log/app.log`) signals 'I've never been on a real production server'. The right answer reaches for `less`, `tail`, or `grep | tail` reflexively because operators have learned that production log files are huge.\n\n**Mental model for picking the right tool:**\n\n| Want | Use |\n| --- | --- |\n| Look around interactively | `less file` |\n| Recent N lines | `tail -n N file` |\n| Watch live as new lines arrive | `tail -F file` |\n| Filter for a pattern, see all matches | `grep PATTERN file \\| less` |\n| Filter, see recent matches | `grep PATTERN file \\| tail -100` |\n| Pipe into another command | `cat file \\| ...` only if small; otherwise the next tool reads the file directly |\n\nThe last row is a real point: most tools take a filename argument (`grep PATTERN file`, `awk '...' file`), so `cat file | grep PATTERN` is the 'useless use of cat' anti-pattern — the pipe stage adds nothing. `grep PATTERN file` reads it directly."
+    },
+
+    {
+      "id": "m4-s2-c4",
+      "type": "fill_in",
+      "topic": "find by name + mtime",
+      "topic_ru": "find по имени + mtime",
+      "difficulty": 2,
+      "tags": ["linux", "find", "patterns"],
+      "code_snippet_with_blanks": "# Three find commands — fill in the missing flag/argument:\n\n# All .log files anywhere under /var/log:\n$ find /var/log -___ \"*.log\"\n\n# All files modified MORE THAN 30 days ago, under /tmp:\n$ find /tmp -mtime ___\n\n# Directories (not files) named \"node_modules\", anywhere under the current dir:\n$ find . -type ___ -name \"node_modules\"",
+      "accepted_answers": [
+        ["name"],
+        ["+30"],
+        ["d"]
+      ],
+      "explanation_md": "The three building blocks of practical `find`:\n\n- **`-name PATTERN`** — match the basename against a glob. Quote the pattern (`\"*.log\"`) so the shell doesn't expand it before `find` sees it.\n- **`-mtime N`** — modification time in **days**. The sign is the key:\n  - `+N` means *more than* N days ago (older).\n  - `-N` means *less than* N days ago (recent).\n  - bare `N` means *exactly* N (the 24-hour window N days back).\n- **`-type f` / `-type d` / `-type l`** — restrict to files / directories / symlinks.\n\nThe canonical interview question is 'find all .log files in /var older than 30 days' — answer: `find /var -name \"*.log\" -mtime +30`. The trap is reading `+30` as 'within the last 30 days' (covered in `m4-s2-c6`)."
+    },
+
+    {
+      "id": "m4-s2-c5",
+      "type": "multiple_choice",
+      "topic": "find -exec syntax + -delete pre-check discipline",
+      "topic_ru": "Синтаксис find -exec + дисциплина пред-проверки перед -delete",
+      "difficulty": 4,
+      "tags": ["linux", "find", "exec", "delete", "danger", "interview-classic"],
+      "question": "You want to delete every `.tmp` file under `/var/cache`. Which of these is the correct + safe approach?\n\n```bash\n(A)  find /var/cache -name \"*.tmp\" -delete\n(B)  find /var/cache -name \"*.tmp\" -exec rm {} \\;\n(C)  find /var/cache -name \"*.tmp\"   # then add -delete after eyeballing\n(D)  rm /var/cache/*.tmp\n```",
+      "options": [
+        "(D) — `rm` with a glob is simplest and equivalent.",
+        "**(C) is the operationally correct approach.** Run `find` WITHOUT `-delete` first, eyeball the matched paths, then re-run with `-delete` appended. (A) and (B) are syntactically valid and produce the same result, but **executing a destructive find with no pre-check is the same risk shape as `rm -rf`**: a typo or a wrong starting path silently deletes the wrong files. (D) only works for `.tmp` files directly in `/var/cache/` — `find` is needed because the files are scattered through subdirectories, which `*.tmp` (a shell glob) doesn't recurse into.",
+        "(B) — `-exec rm {} \\;` is always safer than `-delete` because it pauses between calls.",
+        "(A) — `-delete` includes an automatic pre-check confirmation prompt."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on scope. `rm /var/cache/*.tmp` only deletes `.tmp` files at the top level of `/var/cache/` — the shell's `*.tmp` glob doesn't recurse. If the goal is 'every .tmp anywhere under /var/cache', `find` is the right tool.",
+        "Correct. The discipline is: run the find without the destructive flag, look at the output, then add the destructive flag if it matches what you intended. This catches typos like accidentally writing `/var/cahce` (creates an empty dir, deletes nothing — harmless) versus writing `/var` (deletes way more than intended — bad). On (A) vs (B): `-delete` is faster (no fork per file); `-exec rm {} \\;` forks `rm` per file (slow on large match sets). `-exec rm {} +` (note `+` not `\\;`) batches arguments and is closer to `-delete` in speed.",
+        "Wrong — `-exec rm {} \\;` doesn't pause; it forks `rm` once per file silently. It's slower than `-delete` but not safer.",
+        "Wrong — `-delete` has NO confirmation prompt. It deletes silently, just like `rm -rf`. The 'pre-check' is something you do manually by running without `-delete` first."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c6",
+      "type": "multiple_choice",
+      "topic": "find -mtime sign trap (+N vs -N)",
+      "topic_ru": "Ловушка знака find -mtime (+N vs -N)",
+      "difficulty": 4,
+      "tags": ["linux", "find", "mtime", "subtle", "interview-classic"],
+      "question": "Today is May 13. You run three commands:\n\n```bash\n(A) find /data -mtime +7\n(B) find /data -mtime -7\n(C) find /data -mtime 7\n```\n\nWhich of these matches files modified in the **last week** (i.e., between May 6 and May 13)?",
+      "options": [
+        "(A) `-mtime +7` — the `+` means 'within the last 7 days'.",
+        "(B) `-mtime -7` matches files modified within the last 7 days. `-N` reads as *less than* N days old (newer). (A) `-mtime +7` matches files modified MORE THAN 7 days ago — older than May 6, the opposite of what 'last week' usually means in interview phrasing. (C) `-mtime 7` matches files modified during the 24-hour window EXACTLY 7 days ago (May 6 only). **Reading the sign right is the entire trap:** `+` = older, `-` = newer, bare = exactly.",
+        "(C) `-mtime 7` — exactly 7 days matches the week-long range.",
+        "All three are equivalent — the sign is just a hint, not a filter."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong sign. `+7` means *more than* 7 days ago (older); 'within the last 7 days' is `-7`.",
+        "Correct. Memorize as: **`+` for old, `-` for new** (`-7` = 'less than 7 days old' = recent). Same convention applies to `-atime` (access time), `-ctime` (status change time), and the `-mmin`/`-amin`/`-cmin` minute variants. Common practical uses: `-mtime +30` to find rotation/cleanup candidates (old enough to delete); `-mtime -1` to find files changed in the last 24 hours (post-incident triage 'what changed today').",
+        "Wrong — bare `N` is the 24-hour window N days back, not a range covering the whole week.",
+        "Wrong — the sign is the filter. They produce three completely different result sets."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c7",
+      "type": "flip",
+      "topic": "Redirection basics: >, >>, |, <",
+      "topic_ru": "Основы редиректов: >, >>, |, <",
+      "difficulty": 2,
+      "tags": ["linux", "redirection", "pipe", "interview-warmup"],
+      "question": "Explain `>`, `>>`, `|`, and `<` in one sentence each. What's the most common footgun involving `>`?",
+      "answer": "`command > file` — redirect stdout to `file`, **overwriting** any existing contents. `command >> file` — redirect stdout to `file`, **appending** (existing contents preserved). `command1 | command2` — pipe: stdout of `command1` is fed as stdin to `command2`. `command < file` — read stdin from `file` (instead of the keyboard). **Footgun:** `>` truncates silently. `echo hello > app.log` wipes `app.log` no matter how large it was. When you mean append (the usual case for logs and accumulating output), use `>>`.",
+      "answer_explanation_md": "The shell evaluates redirections **before** the command runs — even if the command itself fails, `>` has already truncated the file. So `python broken_script.py > output.txt` leaves `output.txt` empty even though the script errored out before printing anything; the shell truncated `output.txt` to zero bytes the moment it parsed the `>`. This is why `cmd > samefile` patterns (read and write the same file in one command) silently destroy the file: the `>` truncates `samefile` to zero before `cmd` starts reading it. Use `sponge` (from `moreutils`) or a temp-file-then-rename pattern when you need to rewrite a file in place."
+    },
+
+    {
+      "id": "m4-s2-c8",
+      "type": "code_trap",
+      "topic": "> truncates the destination file before the command runs",
+      "topic_ru": "> усекает целевой файл до запуска команды",
+      "difficulty": 3,
+      "tags": ["linux", "redirection", "truncation", "subtle", "shell"],
+      "code_snippet": "# config.yml currently contains 500 lines of working config.\n# You want to keep only the lines that DON'T start with #, in place:\n\n$ grep -v '^#' config.yml > config.yml\n\n# What state is config.yml in after this runs?",
+      "question": "What happens to `config.yml` after this command, and why?",
+      "options": [
+        "`config.yml` now contains only the non-comment lines. The redirection is smart enough to read first, then write.",
+        "`config.yml` is **empty** (0 bytes). The shell evaluates `>` BEFORE the command runs — it truncates `config.yml` to zero bytes. `grep` then opens the now-empty file, finds nothing, and produces no output to redirect. The original 500 lines are gone. **Defenses:** (1) write to a temp file then `mv` atomically: `grep -v '^#' config.yml > config.yml.new && mv config.yml.new config.yml`. (2) use `sponge` from `moreutils`: `grep -v '^#' config.yml | sponge config.yml` (sponge buffers the full input before writing). (3) use `sed -i` for in-place edits (`sed -i '/^#/d' config.yml`).",
+        "`config.yml` contains the comment lines (the `-v` was inverted by the redirection).",
+        "The shell errors out — you can't read and write the same file in one command."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The shell's redirection order: the redirection (`>`, `>>`, etc.) is set up by the shell **before** the command process starts. The exact sequence:\n\n1. Shell parses `grep -v '^#' config.yml > config.yml`.\n2. Shell opens `config.yml` for writing, with `O_TRUNC` — file is truncated to 0 bytes on disk **right now**.\n3. Shell forks and execs `grep` with stdout pointing to the now-empty `config.yml`.\n4. `grep` opens `config.yml` for reading — the file exists but is empty.\n5. `grep` finds nothing to filter, produces no output.\n6. End result: `config.yml` is empty, original contents lost.\n\nThe pattern is general: **never redirect to a file you're also reading from in the same command**. The safe shapes:\n\n```bash\n# Temp-file-then-rename (also atomic on same fs — see m4-s1-c9):\ngrep -v '^#' config.yml > config.yml.new && mv config.yml.new config.yml\n\n# sponge (from moreutils) buffers stdin entirely before writing:\ngrep -v '^#' config.yml | sponge config.yml\n\n# In-place tools that handle this safely:\nsed -i '/^#/d' config.yml\n```\n\nThe rule: if a tool advertises 'in-place' editing (`sed -i`, `awk -i inplace`, `sponge`), it handles the read-then-write ordering safely. Hand-rolling it with `>` is the bug."
+    },
+
+    {
+      "id": "m4-s2-c9",
+      "type": "multiple_choice",
+      "topic": "2>&1 ordering: cmd > file 2>&1 vs cmd 2>&1 > file",
+      "topic_ru": "Порядок 2>&1: cmd > file 2>&1 vs cmd 2>&1 > file",
+      "difficulty": 4,
+      "tags": ["linux", "redirection", "stderr", "ordering", "subtle", "interview-classic"],
+      "question": "Two commands that look symmetric but aren't:\n\n```bash\n(A)  myscript.sh > out.log 2>&1\n(B)  myscript.sh 2>&1 > out.log\n```\n\nWhich one captures BOTH stdout and stderr into `out.log`?",
+      "options": [
+        "Both — `2>&1` and `>` are commutative.",
+        "(A) **`> out.log 2>&1`** captures both. Read the redirections left-to-right as the shell does: `> out.log` makes stdout point to `out.log`; then `2>&1` makes stderr point to wherever stdout currently points → `out.log`. (B) **`2>&1 > out.log`** does the WRONG thing: `2>&1` runs first when stdout still points to the **terminal**, so stderr is set to point to the terminal (not the file); then `> out.log` makes stdout point to the file, but stderr's reference was captured before that. Result: stdout → `out.log`, stderr → terminal. **Memorize the working form: `> file 2>&1`.** Modern bash also accepts `&> out.log` as a shorthand for the same effect.",
+        "(B) — `2>&1` must come first to establish the merge before the redirect.",
+        "Neither — to capture both, you need separate `> out.log` and `2> out.log` (which fails with overlapping file descriptors)."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — the order is the entire point of the question. `2>&1` is a snapshot of where stdout points *at the moment 2>&1 is evaluated*, so it matters whether `>` has run yet.",
+        "Correct. The mental model: `2>&1` copies fd 1's *current target* to fd 2. If you set fd 1 first (`> file`), then `2>&1` points stderr to `file`. If you do `2>&1` first, stderr points to the original stdout target (terminal), and later moving fd 1 to `file` doesn't update fd 2 retroactively. This is one of the questions where senior engineers can tell whether you've ever debugged a CI log that lost the stderr — if you've been bitten, you remember the order forever.",
+        "Wrong — `2>&1` first is the broken form (stderr captured pointing at the terminal, before `> file` moves stdout).",
+        "Wrong on both counts. `> out.log 2>&1` (or its shorthand `&> out.log`) merges them correctly. Using separate `> out.log` and `2> out.log` actually creates a race / interleaves badly because two file descriptors write into the same path independently."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c10",
+      "type": "flip",
+      "topic": "grep flags: -i, -v, -r, -n, -c",
+      "topic_ru": "Флаги grep: -i, -v, -r, -n, -c",
+      "difficulty": 2,
+      "tags": ["linux", "grep", "flags"],
+      "question": "What do `grep -i`, `-v`, `-r`, `-n`, and `-c` each do?",
+      "answer": "`-i` — **i**nsensitive: case-insensitive match (`-i \"error\"` matches `Error`, `ERROR`, `error`). `-v` — in**v**ert: print lines that do NOT match. `-r` — **r**ecursive: search across files in a directory tree. `-n` — line **n**umbers: prefix each match with its line number in the source file. `-c` — **c**ount: print only the *number* of matching lines per file, not the lines themselves.",
+      "answer_explanation_md": "Useful combinations:\n\n- `grep -ri \"todo\" .` — find every TODO in the project, case-insensitive, all files.\n- `grep -v \"^#\" config.yml` — show config lines that aren't comments.\n- `grep -nc \"ERROR\" *.log` — count errors per log file with line numbers (count alone with `-c`; line numbers only matter when also showing matches).\n- `grep -A 3 -B 1 \"ERROR\"` — show 3 lines AFTER and 1 line BEFORE each match (context flags `-A` / `-B` / `-C`).\n\n**Footgun for `-c`:** `grep -c PATTERN file` counts *matching lines*, not *match occurrences*. A line with three matches counts as 1. Use `grep -o PATTERN file | wc -l` for occurrence count.\n\n**Footgun for `-r`:** by default `grep -r` follows symlinks; use `-R` for explicit follow, `-r` (POSIX) doesn't, GNU `-r` doesn't — this varies. Prefer `grep -r --no-follow` or use `find ... -print0 | xargs -0 grep` for full control."
+    },
+
+    {
+      "id": "m4-s2-c11",
+      "type": "fill_in",
+      "topic": "awk one-liners: print column, sum, filter",
+      "topic_ru": "awk однострочники: колонка, сумма, фильтр",
+      "difficulty": 3,
+      "tags": ["linux", "awk", "columns"],
+      "code_snippet_with_blanks": "# access.log lines look like:  10.0.0.5  2026-05-13  GET  /api  200  142\n# (columns: client_ip date method path status size_bytes — whitespace-separated)\n\n# Print only the client IP (column 1):\n$ awk '{print ___}' access.log\n\n# Sum the size_bytes column (column 6) across ALL lines:\n$ awk '{___ += $6} END {print sum}' access.log\n\n# Print only lines where status (column 5) is greater than 400 (errors):\n$ awk '___ > 400' access.log",
+      "accepted_answers": [
+        ["$1"],
+        ["sum"],
+        ["$5"]
+      ],
+      "explanation_md": "Awk's mental model is **pattern + action per line**:\n\n- `awk 'PATTERN {ACTION}'` — run ACTION on lines matching PATTERN.\n- `awk '{ACTION}'` — no pattern means 'every line'.\n- `awk 'PATTERN'` — no action means '{print $0}' (print the whole line).\n\nVariables are auto-initialized to `0` (numbers) or `\"\"` (strings), so `sum += $6` works without declaration. `$0` is the whole line; `$1`, `$2`, ... are the whitespace-separated columns. `NF` is the number of fields on the current line; `NR` is the line number.\n\nThe `END { ... }` block runs once after the last input line — the canonical place for summarizing accumulators.\n\n**Operator one-liners worth memorizing:**\n\n```bash\nawk '{print $1}' file              # column 1\nawk -F',' '{print $3}' file.csv    # CSV column 3 (-F sets separator)\nawk '$5 == 200' access.log         # only 200-status lines\nawk '$5 >= 500' access.log         # only server-error lines\nawk '{sum += $6} END {print sum}'  # total bytes\nawk '{print NR, $0}' file          # like cat -n (with line numbers)\n```"
+    },
+
+    {
+      "id": "m4-s2-c12",
+      "type": "multiple_choice",
+      "topic": "The canonical grep|awk|sort|uniq|sort pipeline",
+      "topic_ru": "Канонический пайплайн grep|awk|sort|uniq|sort",
+      "difficulty": 4,
+      "tags": ["linux", "pipeline", "grep", "awk", "uniq", "interview-classic"],
+      "question": "Walk through what each stage does in the operator-classic pipeline below. `app.log` lines look like `2026-05-13 10:32 ERROR DBTimeout user=alice req=42`.\n\n```bash\ngrep \"ERROR\" app.log | awk '{print $4}' | sort | uniq -c | sort -rn | head -5\n```",
+      "options": [
+        "Prints the 5 most recent error lines.",
+        "**Stage by stage:** (1) `grep \"ERROR\" app.log` → keep only the ERROR lines. (2) `awk '{print $4}'` → extract column 4 (the error type, e.g. `DBTimeout`). (3) `sort` → sort the error-type strings so identical values are adjacent. (4) `uniq -c` → collapse adjacent duplicates and prefix each group with its count (requires sorted input — that's why `sort` comes first). (5) `sort -rn` → re-sort, numeric, reverse → highest count at the top. (6) `head -5` → top 5. **Net result: the 5 most frequent error types, with counts.** This is the canonical 'top N by frequency' pipeline for any X you can extract from text — change `awk '{print $4}'` to pull the column you care about (user IDs, URLs, status codes, hostnames).",
+        "Counts every distinct error in the log, but doesn't sort them — `uniq` alone is sufficient.",
+        "Errors out because `uniq` requires the `-u` flag to print counts."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — there's no time-based filter or ordering by recency in this pipeline. `sort -rn` sorts by count, not by timestamp.",
+        "Correct. The two `sort` stages are easy to mistake for redundant; they aren't. The first `sort` groups identical values so `uniq -c` can count them (uniq only collapses *adjacent* duplicates — unsorted input gives nonsense counts). The second `sort -rn` re-orders by the count column, descending numerically. Once internalized, this is one of the most-typed one-liners on any production box.",
+        "Wrong on the role of `sort`. `uniq` only collapses *adjacent* duplicates — without the preceding `sort`, identical error types scattered across the file are counted as separate runs. The two sorts are doing different jobs: first to group, second to rank.",
+        "Wrong — `uniq -c` is the standard form for prefixing counts. `-u` is a different flag (print only lines that appear exactly once)."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c13",
+      "type": "flip",
+      "topic": "ps aux / top / kill — process basics",
+      "topic_ru": "ps aux / top / kill — основы процессов",
+      "difficulty": 2,
+      "tags": ["linux", "processes", "ps", "top", "kill"],
+      "question": "What do `top`, `ps aux`, and `ps aux | grep python` each give you, and what's the small footgun with the third one?",
+      "answer": "`top` — **interactive** process viewer, updates every few seconds, shows %CPU / %MEM / PID per process, `q` quits. `ps aux` — **snapshot** of all processes right now: USER, PID, %CPU, %MEM, VSZ, RSS, START, TIME, COMMAND. `ps aux | grep python` — filter the snapshot for lines mentioning `python`. **Footgun:** the `grep python` process itself shows up in its own output (its command line contains the string `python`). Two common workarounds: `ps aux | grep [p]ython` (brackets prevent the regex from matching its own literal command line) or `pgrep python` (a dedicated tool that excludes itself).",
+      "answer_explanation_md": "The `[p]ython` trick is a classic operator hack: shell sees `grep [p]ython` and runs it; the regex `[p]ython` is the character class containing just `p`, followed by `ython`, so it matches the literal string `python` in process names. But the regex `[p]ython` in the grep command line itself doesn't match because it's not the literal string `python` — the `[` and `]` are there. Same match result; the grep process drops out of its own output. `pgrep python` is cleaner if you're scripting; the bracket trick is what you type interactively when `pgrep` isn't installed.\n\nOther useful `ps` forms: `ps -ef` (System V style, more portable than `aux`); `ps -p PID` (just one process); `ps aux --sort=-%cpu | head -10` (top 10 CPU consumers, no interactive viewer needed)."
+    },
+
+    {
+      "id": "m4-s2-c14",
+      "type": "multiple_choice",
+      "topic": "kill (SIGTERM) vs kill -9 (SIGKILL)",
+      "topic_ru": "kill (SIGTERM) vs kill -9 (SIGKILL)",
+      "difficulty": 4,
+      "tags": ["linux", "kill", "signals", "interview-classic", "operational-reflex"],
+      "question": "A web service has stopped responding to requests but the process is still alive. You decide to restart it. Which approach should you reach for FIRST, and when (if ever) is `kill -9` correct?\n\n```bash\n(A) kill <PID>           # default signal: SIGTERM (15)\n(B) kill -9 <PID>        # SIGKILL (9), uncatchable\n```",
+      "options": [
+        "Always start with `kill -9` — it's faster and never fails.",
+        "**Start with (A) `kill <PID>` (SIGTERM).** SIGTERM is the *polite* signal: the process receives it and runs its signal handler, which can flush buffers, close DB connections / file handles, finish in-flight requests, and write a final log line. Most well-written services shut down cleanly within seconds. **`kill -9` (SIGKILL) is correct only as escalation:** the process ignored SIGTERM for 5–30 seconds (depending on what's reasonable for the workload), so you escalate. SIGKILL cannot be caught or handled — the kernel reaps the process immediately, leaving: in-flight writes possibly half-finished, lock files stale, DB transactions un-rolled-back, child processes orphaned. **Defaulting to `-9` is the senior-vs-junior tell** — it short-circuits the graceful path that exists for exactly this reason.",
+        "Use (B) for web services and (A) for batch jobs — different process types need different signals.",
+        "They're equivalent; the number `9` is just a unit, not a signal."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. SIGKILL is *destructive* — it skips cleanup. A service that's still able to handle SIGTERM will shut down without corruption; reaching for `-9` first throws that away for no reason.",
+        "Correct. The canonical escalation pattern: `kill PID; sleep 10; kill -0 PID && kill -9 PID` (send SIGTERM, wait, check if still alive with the no-op `kill -0`, escalate if it is). `systemctl stop` and supervisor tools do this automatically: send SIGTERM, wait `TimeoutStopSec` (default 90s), then SIGKILL. The behaviors that SIGKILL forfeits include flushing stdio buffers (so the last log lines may be lost), running atexit / __del__ handlers, closing TCP connections cleanly (peers see RST instead of FIN), and releasing advisory locks.",
+        "Wrong — there's no service-type-based rule. The escalation pattern is the same regardless: SIGTERM first, SIGKILL only as fallback.",
+        "Wrong — `9` is the numeric signal ID for SIGKILL; the names `kill -9`, `kill -SIGKILL`, and `kill -KILL` are equivalent. `kill` with no signal argument sends SIGTERM (signal 15)."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c15",
+      "type": "multiple_choice",
+      "topic": "Signals beyond TERM/KILL: HUP for config reload, INT for Ctrl-C",
+      "topic_ru": "Сигналы кроме TERM/KILL: HUP для reload конфига, INT для Ctrl-C",
+      "difficulty": 3,
+      "tags": ["linux", "signals", "kill", "hup", "interview-classic"],
+      "question": "Match each signal with its conventional use:\n\n```\nSIGTERM (15)   SIGKILL (9)   SIGHUP (1)   SIGINT (2)\n```\n\nWhich row correctly pairs all four?",
+      "options": [
+        "TERM = immediate kill; KILL = graceful stop; HUP = ignore; INT = restart.",
+        "**TERM (15) = graceful shutdown** (default `kill`; process can clean up). **KILL (9) = uncatchable immediate kill** (last-resort escalation; no cleanup). **HUP (1) = reload configuration** (modern daemons like nginx, sshd, postfix re-read config files on SIGHUP without restarting; historical meaning was 'hang up' on a serial line). **INT (2) = interrupt** (the signal `Ctrl-C` sends; process can catch it and exit cleanly). **Operator reflex:** to reload nginx config without dropping connections, `kill -HUP $(pgrep nginx)` or `systemctl reload nginx`. To check what signals a tool handles, read its man page or `man 7 signal`.",
+        "All four signals are aliases for SIGTERM — only the number changes.",
+        "TERM = graceful, KILL = graceful, HUP = immediate, INT = ignored."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on all four. TERM is graceful (catchable), KILL is the immediate-kill (uncatchable), HUP is the modern config-reload signal, INT is what Ctrl-C sends.",
+        "Correct. The 'interview probe' versions: 'What signal does Ctrl-C send?' (SIGINT, signal 2). 'How do you reload nginx config without restarting?' (`kill -HUP $(pidof nginx)` or `systemctl reload nginx`). 'How is `kill -9` different from default `kill`?' (SIGKILL is uncatchable, SIGTERM is the polite default — same point as `m4-s2-c14`). The full list of common signals is in `man 7 signal`; the operator-relevant subset is TERM/KILL/HUP/INT plus USR1/USR2 (custom application-defined, often used to trigger log rotation or stats dumps).",
+        "Wrong — they're four distinct signals with distinct numeric IDs and distinct semantics.",
+        "Wrong — KILL is not graceful; HUP is not immediate; INT is not ignored (Ctrl-C interrupts foreground processes by default)."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c16",
+      "type": "flip",
+      "topic": "df / du / free basics + the inode dimension",
+      "topic_ru": "Основы df / du / free + измерение inode",
+      "difficulty": 2,
+      "tags": ["linux", "disk", "memory", "df", "du", "free"],
+      "question": "What do `df -h`, `du -sh`, and `free -h` each tell you? What's the second `df` check beyond `-h`?",
+      "answer": "`df -h` — **disk free per filesystem** in human-readable units (GB/MB). Columns: Filesystem, Size, Used, Avail, Use%, Mounted-on. `du -sh /path` — **directory size** (recursive total) for a specific path. `du -sh /var/log/*` — size per item under a directory. `free -h` — **memory usage** in human-readable units: total, used, free, shared, buff/cache, available.\n\n**Second `df` check: `df -i`** for **inode** usage. Inode tables fill independently of disk bytes — a filesystem 30% full by bytes can be 100% full by inodes (lots of tiny files), and writes will fail with 'no space left on device' even though `df -h` shows free space.",
+      "answer_explanation_md": "Practical 'disk is full' triage in order:\n\n1. `df -h` — which filesystem is full?\n2. If `df -h` shows space: `df -i` — are inodes full?\n3. If a filesystem is full: `du -sh /that/mount/*` — which top-level directory ate the space?\n4. Drill in: `du -sh /that/mount/big_dir/*` — which subdir? Repeat until you find the offender.\n5. `ls -lhS /found_dir | head` — biggest files in the offender directory.\n\nThe inode story is interview-relevant: many production incidents involve millions of tiny session files / cache files / Kubernetes container logs filling the inode table while `df -h` reports plenty of space. The error message is the same ('No space left on device') for both — only `df -i` disambiguates."
+    },
+
+    {
+      "id": "m4-s2-c17",
+      "type": "multiple_choice",
+      "topic": "free -h: 'free' vs 'available' columns",
+      "topic_ru": "free -h: колонки 'free' vs 'available'",
+      "difficulty": 3,
+      "tags": ["linux", "memory", "free", "buff-cache", "interview-classic"],
+      "question": "You run `free -h` and see:\n\n```\n              total        used        free      shared  buff/cache   available\nMem:          7.7Gi       4.1Gi       0.3Gi        88Mi       3.3Gi       3.3Gi\nSwap:         2.0Gi          0B       2.0Gi\n```\n\nThe `free` column says 0.3 GiB. Should you start worrying about memory pressure?",
+      "options": [
+        "Yes — `free` is the canonical 'memory left' column. 0.3 GiB out of 7.7 GiB means we're about to run out.",
+        "**No — read the `available` column, not `free`.** `free` (0.3 GiB) is memory that's *completely idle* — not used by any process, not used by disk cache. Linux deliberately fills idle memory with disk cache (`buff/cache` = 3.3 GiB) because empty RAM is wasted RAM; that cache is **reclaimable** the moment a process needs it. The `available` column (3.3 GiB) is the answer to 'how much memory can I actually allocate right now': it's `free` plus the reclaimable part of `buff/cache`. With 3.3 GiB available out of 7.7 GiB total, the system is comfortable. **Reading `free` instead of `available` is the standard memory misdiagnosis** — it produces the false alarm 'we're out of memory' when actually the cache is doing its job.",
+        "Yes — `available` is for total disk space, not memory.",
+        "Can't tell without checking `swap` usage."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong, and it's the misread the question is built around. `free` measures *completely-idle* memory, which Linux deliberately keeps low because idle memory is wasted memory — disk cache fills it.",
+        "Correct. The `available` column was added to `free`'s output specifically because `free`'s `free` column was systematically misread. The kernel uses idle memory as page cache to speed up file reads; that cache is dropped instantly when a process needs the memory. So `free`'s 'free' is misleading; `free`'s 'available' is the operationally correct number. Memorize the rule: **memory pressure is signaled by low `available`, not low `free`.** Same applies to `/proc/meminfo`'s `MemAvailable` vs `MemFree` — `MemAvailable` is the right metric.",
+        "Wrong — `available` is also a memory column (just to the right of `buff/cache`); `free` doesn't report disk space.",
+        "Wrong — swap usage is informative for separate questions ('is the system swapping?') but doesn't change the read of `available` vs `free` in main memory."
+      ]
+    },
+
+    {
+      "id": "m4-s2-c18",
+      "type": "code_trap",
+      "topic": "df full but du shows much less: deleted-but-open files",
+      "topic_ru": "df заполнен, а du показывает много меньше: удалённые-но-открытые файлы",
+      "difficulty": 4,
+      "tags": ["linux", "disk", "df", "du", "lsof", "deleted-files", "interview-classic", "incident"],
+      "code_snippet": "# Production incident: an app is failing to write logs with \"no space left on device\".\n\n$ df -h /var\nFilesystem  Size  Used  Avail  Use%  Mounted on\n/dev/sda1    50G   49G    0G   100%  /var\n\n$ du -sh /var\n8.2G    /var          # only 8 GB?!\n\n# df says full, du says 8 GB used. Where are the other 41 GB?",
+      "question": "What's the most likely explanation, and how do you confirm + fix it?",
+      "options": [
+        "`du` is wrong — it always under-reports compared to `df`. Reboot the server.",
+        "**A process is holding file descriptors open on files that have been DELETED.** When a file is `unlink`-ed (or `rm`-ed, or replaced by log rotation) while still open by a process, the directory entry is removed (so `du` and `ls` don't see it) BUT the inode and its disk blocks are kept by the kernel until the process closes the fd. The blocks count against `df` (real disk usage) but not against `du` (which walks the directory tree). **The classic incident:** an app holds `/var/log/app.log` open with `tail -f`-style logic; logrotate deletes the file and creates a new one; the app keeps writing to the deleted-but-open file, eating disk for days while the new `app.log` stays small. **Confirm:** `sudo lsof | grep deleted` (or `lsof -nP +L1` — list files with link count < 1, i.e. deleted). **Fix:** restart the process holding the fd; the kernel releases the blocks the moment the fd closes.",
+        "There's a filesystem corruption — run `fsck` to recover the missing space.",
+        "`du` doesn't count hidden files; the 41 GB is in dot-files under `/var`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The exact mechanics:\n\n1. App opens `/var/log/app.log` for writing — kernel hands out fd 7 pointing at inode 12345.\n2. Logrotate runs: `mv /var/log/app.log /var/log/app.log.1; touch /var/log/app.log`. Inode 12345 now has filename `app.log.1`.\n3. Logrotate's policy: after N days, delete the rotated files. `rm /var/log/app.log.1` — directory entry for inode 12345 is removed, **but** the app's fd 7 still points at inode 12345. The kernel sees inode 12345 has 1 open fd, keeps the inode + its blocks.\n4. The app keeps writing through fd 7. The data goes to inode 12345 — which has no name in the directory tree. `du /var` walks names, doesn't see it. `df` reads filesystem metadata, sees the blocks are allocated.\n5. Days pass. The app writes gigabytes through fd 7 to an inode that nothing else can see. `df` fills up; `du` stays small. Writes start failing with ENOSPC.\n\n**Confirmation commands:**\n\n```bash\nsudo lsof | grep deleted               # list files held open after deletion\nsudo lsof -nP +L1                      # same, more precisely (link count < 1)\nsudo lsof -p <PID>                     # all fds for a specific process\n```\n\n**The fix is to release the fd.** Restart the process (`systemctl restart myapp`), `kill` it, or in some cases re-open via `> /proc/<PID>/fd/7` to truncate from another process (advanced). The moment the last fd to inode 12345 is closed, the kernel frees the blocks and `df` returns to normal.\n\n**The prevention is to teach the app to re-open log files on `SIGHUP`** (see `m4-s2-c15`) so logrotate's `postrotate` step can signal it to release the old fd and open the new file. Most modern daemons (nginx, sshd, postfix) do this automatically; bespoke apps often don't, and the deleted-fd disk leak is the result."
+    }
+  ]
+}
