@@ -1,0 +1,189 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s6",
+  "cards": [
+    {
+      "id": "m2-s6-c1",
+      "type": "flip",
+      "topic": "argparse basics: positional, optional, boolean, type",
+      "topic_ru": "Основы argparse: позиционные, опциональные, булевы, type",
+      "difficulty": 2,
+      "tags": ["argparse", "cli", "interview-warmup"],
+      "question": "Sketch the four argparse argument patterns you reach for most: required positional, optional with default, boolean flag, typed-and-default.",
+      "answer": "Positional (required): `parser.add_argument('input_file')`. Optional with default: `parser.add_argument('--output', '-o', default='out.txt')`. Boolean flag: `parser.add_argument('--verbose', '-v', action='store_true')`. Typed with default: `parser.add_argument('--workers', type=int, default=4)`. All accessed afterward via attribute on the `Namespace` returned by `parser.parse_args()` — `args.input_file`, `args.workers`, etc.",
+      "answer_explanation_md": "argparse auto-generates `--help` from the calls and produces useful error messages on bad input (`invalid int value`, `the following arguments are required`). Add `choices=['fast', 'slow']` to restrict values; add `required=True` on an optional flag to make it mandatory. The Namespace returned by `parse_args` is just an object with attributes for each argument's `dest` (defaulting to the flag name with `--` stripped and `-` turned into `_`)."
+    },
+
+    {
+      "id": "m2-s6-c2",
+      "type": "code_trap",
+      "topic": "argparse type=bool is broken; use action='store_true'",
+      "topic_ru": "argparse type=bool сломан; используй action='store_true'",
+      "difficulty": 3,
+      "tags": ["argparse", "boolean", "type-bool", "interview-classic"],
+      "code_snippet": "import argparse\n\nparser = argparse.ArgumentParser()\nparser.add_argument('--verbose', type=bool, default=False)\n\nargs = parser.parse_args(['--verbose', 'False'])\nprint(args.verbose)",
+      "question": "What does this print?",
+      "options": [
+        "False — argparse honors the literal 'False'.",
+        "True — `bool('False')` is `True`, because any non-empty string is truthy in Python. `type=bool` is essentially always broken; never use it for boolean flags.",
+        "Raises `argparse.ArgumentTypeError` because 'False' isn't a valid bool literal.",
+        "None — `--verbose` consumed the next token but couldn't coerce it."
+      ],
+      "correct_index": 1,
+      "explanation_md": "argparse's `type=` calls the given callable on the string value. `bool('False')` calls Python's `bool` constructor on the *string* `'False'`, which is non-empty, which is truthy → `True`. Same for `bool('0')`, `bool('no')`, anything non-empty.\n\nThe correct pattern for boolean flags is `action='store_true'`:\n\n```python\nparser.add_argument('--verbose', action='store_true')\n# --verbose present → args.verbose = True\n# --verbose absent  → args.verbose = False\n```\n\nNo value follows the flag; presence is the signal. For the opposite (default-on, opt-out), use `action='store_false'`. For genuinely tri-state inputs, use `choices=['true', 'false', 'auto']` with `type=str` and parse explicitly."
+    },
+
+    {
+      "id": "m2-s6-c3",
+      "type": "code_task",
+      "topic": "Build an argparse parser; test via parse_args(list)",
+      "topic_ru": "Построить argparse parser; тестировать через parse_args(list)",
+      "difficulty": 3,
+      "tags": ["argparse", "cli", "patterns"],
+      "prompt_md": "Implement `build_parser()` that returns an `argparse.ArgumentParser` with these arguments:\n\n- `--input` — required string.\n- `--workers` — int, default `4`.\n- `--verbose` — boolean flag (`store_true`, default `False`).\n- `--mode` — string, restricted to `'fast'` or `'slow'`, default `'fast'`.\n\nDon't call `parse_args()` inside `build_parser`; return the parser so tests can drive it with `parser.parse_args([...])`.",
+      "starter_code": "import argparse\n\ndef build_parser():\n    # your code here\n    pass\n",
+      "solution_code": "import argparse\n\ndef build_parser():\n    parser = argparse.ArgumentParser()\n    parser.add_argument('--input', required=True)\n    parser.add_argument('--workers', type=int, default=4)\n    parser.add_argument('--verbose', action='store_true')\n    parser.add_argument('--mode', choices=['fast', 'slow'], default='fast')\n    return parser\n",
+      "tests": "import argparse\nimport pytest\nfrom solution import build_parser\n\ndef test_parses_required_input():\n    args = build_parser().parse_args(['--input', 'file.txt'])\n    assert args.input == 'file.txt'\n\ndef test_workers_defaults_to_four():\n    args = build_parser().parse_args(['--input', 'x'])\n    assert args.workers == 4 and isinstance(args.workers, int)\n\ndef test_workers_coerces_to_int():\n    args = build_parser().parse_args(['--input', 'x', '--workers', '8'])\n    assert args.workers == 8 and isinstance(args.workers, int)\n\ndef test_verbose_defaults_false():\n    args = build_parser().parse_args(['--input', 'x'])\n    assert args.verbose is False\n\ndef test_verbose_true_when_flag_present():\n    args = build_parser().parse_args(['--input', 'x', '--verbose'])\n    assert args.verbose is True\n\ndef test_mode_rejects_unknown_value():\n    with pytest.raises(SystemExit):\n        build_parser().parse_args(['--input', 'x', '--mode', 'wrong'])\n\ndef test_missing_required_input_exits():\n    with pytest.raises(SystemExit):\n        build_parser().parse_args([])\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s6-c4",
+      "type": "multiple_choice",
+      "topic": "argparse required vs optional vs positional",
+      "topic_ru": "argparse required vs optional vs positional",
+      "difficulty": 2,
+      "tags": ["argparse", "required", "positional"],
+      "question": "Which row correctly describes the three ways to make an argparse argument 'required'?",
+      "options": [
+        "Only positional arguments can be required.",
+        "Positional arguments (`'input_file'`) are required by default. Optional arguments (`'--input'`) are NOT required by default; pass `required=True` to make them mandatory. Boolean flags (`action='store_true'`) are never 'required' — they default to `False`.",
+        "All optional arguments are required unless you pass a `default=`.",
+        "argparse has no concept of 'required'; you check after parsing."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `required=True` on an optional argument also enforces it. Common pattern: `--input` as a required *optional* (which reads as a paradox but matches the convention that double-dash flags are the input shape).",
+        "Correct. The three behaviors: positional is required by default; optional defaults to not-required with `default=None` if you don't pass one; boolean flag has presence-or-absence semantics, not required/not-required.",
+        "Wrong — optional arguments default to `None` and are not required unless you pass `required=True`.",
+        "Wrong — argparse handles required-ness itself. If you omit a required argument, `parse_args` prints an error and exits."
+      ]
+    },
+
+    {
+      "id": "m2-s6-c5",
+      "type": "flip",
+      "topic": "logging basicConfig and per-module getLogger",
+      "topic_ru": "logging basicConfig и per-module getLogger",
+      "difficulty": 2,
+      "tags": ["logging", "basicconfig", "getlogger"],
+      "question": "What does `logging.basicConfig(...)` do, and why pair it with `logger = logging.getLogger(__name__)` per module?",
+      "answer": "`logging.basicConfig(level=..., format=...)` configures the root logger *once* at script startup — sets the minimum level that gets through, the output format (timestamps, level name, module name, message), and the handler (default: a `StreamHandler` to stderr). Per-module `logger = logging.getLogger(__name__)` then creates a named logger whose records carry the module name automatically; format tokens like `%(name)s` render it. The combination gives you 'configure once, log per-module with attribution' — the standard production setup.",
+      "answer_explanation_md": "`basicConfig` is intentionally a no-op if the root logger already has handlers — so calling it twice in the same process doesn't double-configure. The `__name__` trick gives you a logger named after the importing module (`myapp.services.users`), which is exactly what you want for filtering and routing in production."
+    },
+
+    {
+      "id": "m2-s6-c6",
+      "type": "code_trap",
+      "topic": "logger.error(str(e)) silently drops the traceback",
+      "topic_ru": "logger.error(str(e)) молча теряет traceback",
+      "difficulty": 4,
+      "tags": ["logging", "exception", "traceback", "interview-classic"],
+      "code_snippet": "import logging\nlogger = logging.getLogger(__name__)\n\ndef process():\n    try:\n        risky()\n    except Exception as e:\n        logger.error(str(e))     # <-- intent: log the failure\n        return None",
+      "question": "What's wrong with this exception-handling pattern in a production script?",
+      "options": [
+        "Nothing — `logger.error` is the correct method for failure cases.",
+        "`logger.error(str(e))` logs only the exception message — the stack trace is silently dropped. In production you see `ValueError: bad input` with no file/line/caller chain and no way to debug from the log alone. The correct call is `logger.exception('process failed')` inside the except block: same severity as `error`, plus the traceback of the currently-handled exception automatically attached.",
+        "`logger.error` should be `logger.warning` for caught exceptions.",
+        "The bug is `return None` — the script should re-raise."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`logger.exception(msg)` is `logger.error(msg)` plus `exc_info=True`, which the logging machinery uses to format the full traceback of the currently-handled exception into the log record. It works *only* inside an `except` block (it reads `sys.exc_info()` to find the exception).\n\nThe fix:\n\n```python\nexcept Exception:\n    logger.exception('process failed')   # message AND traceback\n    return None\n```\n\nDon't `str(e)`-interpolate; the message argument is a fixed string describing the operation, and the exception detail comes from the traceback the logger adds for free. \n\nThis is the single most-asked logging question in junior interviews and the bug that ships most often: the script appears to log the error, the on-call engineer reads 'ValueError: bad input' in the log, has no idea where it came from, opens the source, can't reproduce. Use `logger.exception` reflexively in except blocks."
+    },
+
+    {
+      "id": "m2-s6-c7",
+      "type": "code_task",
+      "topic": "Configure a logger; test via pytest caplog fixture",
+      "topic_ru": "Сконфигурировать logger; тест через pytest caplog",
+      "difficulty": 3,
+      "tags": ["logging", "pytest", "caplog", "patterns"],
+      "prompt_md": "Implement two functions:\n\n- `get_app_logger() -> logging.Logger` — returns a logger named `'app'` set to `INFO` level. No handlers — let pytest's caplog capture records.\n- `log_event(logger, kind: str, detail: str) -> None` — logs `f'{kind}: {detail}'` at `INFO` level if `kind == 'event'`; at `ERROR` level otherwise.\n\nThe tests use pytest's built-in `caplog` fixture (no install needed) to assert on the captured records.",
+      "starter_code": "import logging\n\ndef get_app_logger():\n    # your code here\n    pass\n\ndef log_event(logger, kind, detail):\n    # your code here\n    pass\n",
+      "solution_code": "import logging\n\ndef get_app_logger():\n    logger = logging.getLogger('app')\n    logger.setLevel(logging.INFO)\n    return logger\n\ndef log_event(logger, kind, detail):\n    msg = f'{kind}: {detail}'\n    if kind == 'event':\n        logger.info(msg)\n    else:\n        logger.error(msg)\n",
+      "tests": "import logging\nimport pytest\nfrom solution import get_app_logger, log_event\n\ndef test_logger_named_app_at_info_level():\n    logger = get_app_logger()\n    assert logger.name == 'app'\n    assert logger.level == logging.INFO\n\ndef test_logs_event_at_info_level(caplog):\n    logger = get_app_logger()\n    with caplog.at_level(logging.INFO, logger='app'):\n        log_event(logger, 'event', 'started')\n    assert len(caplog.records) == 1\n    record = caplog.records[0]\n    assert record.levelname == 'INFO'\n    assert 'event: started' in record.message\n\ndef test_logs_non_event_at_error_level(caplog):\n    logger = get_app_logger()\n    with caplog.at_level(logging.INFO, logger='app'):\n        log_event(logger, 'failure', 'db down')\n    assert len(caplog.records) == 1\n    record = caplog.records[0]\n    assert record.levelname == 'ERROR'\n    assert 'failure: db down' in record.message\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s6-c8",
+      "type": "multiple_choice",
+      "topic": "Logging level hierarchy and filtering semantics",
+      "topic_ru": "Иерархия уровней logging и семантика фильтрации",
+      "difficulty": 2,
+      "tags": ["logging", "levels", "filtering"],
+      "question": "You configured `logging.basicConfig(level=logging.WARNING)`. Which records get emitted?",
+      "options": [
+        "Only `WARNING` — exactly that level, nothing else.",
+        "`WARNING`, `ERROR`, and `CRITICAL` — `level=X` is the *minimum* level that passes; `DEBUG` and `INFO` are filtered out as below the threshold.",
+        "`DEBUG`, `INFO`, and `WARNING` — `level=X` caps the upper bound.",
+        "All five levels — the parameter only changes the format, not what's emitted."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `level=` sets the floor, not an exact match.",
+        "Correct. Level order: `DEBUG (10) < INFO (20) < WARNING (30) < ERROR (40) < CRITICAL (50)`. Records at or above the configured level are emitted; below it, dropped. Production scripts usually run at `INFO`; bump to `DEBUG` temporarily when investigating.",
+        "Wrong — backwards. The floor cuts off the *lower* levels.",
+        "Wrong — `level=` is exactly the filter threshold; it does control what's emitted."
+      ]
+    },
+
+    {
+      "id": "m2-s6-c9",
+      "type": "flip",
+      "topic": "When print is acceptable in 2026 production Python",
+      "topic_ru": "Когда print допустим в production-коде Python 2026 года",
+      "difficulty": 2,
+      "tags": ["print", "logging", "cli"],
+      "question": "When is `print(...)` still the right call in production Python, and when is it forbidden?",
+      "answer": "`print` is appropriate for the actual user-facing *output* of a CLI tool — the answer the user invoked the script to receive (a number to stdout, a JSON blob, a generated file path). It is forbidden for everything diagnostic: status messages, progress, errors, debug output, anything someone might want to filter, search, route to a file, or send to Datadog. Diagnostic output is `logger.info` / `logger.warning` / `logger.error` / `logger.exception`. The rule of thumb: if the line might be read by a human after the fact (in a log file, in a dashboard), it's `logger.*`. If the line *is* the answer the script was asked to produce, it's `print`.",
+      "answer_explanation_md": "The split maps to the two audiences of a CLI: the user who invoked it (`print`, reading stdout right now) and the operator who runs it on a schedule (`logger`, reading aggregated logs later). Mixing them — printing diagnostics, or logging the answer — breaks both audiences. CLI tools that emit JSON on stdout (`kubectl get -o json`, `jq`, `gh api`) use `print`; CLI tools that emit status (`kubectl rollout status`) use `print` for the visible answer and `logger` for anything they'd also want in `journalctl`."
+    },
+
+    {
+      "id": "m2-s6-c10",
+      "type": "code_trap",
+      "topic": "What print() loses that logger.info gives you for free",
+      "topic_ru": "Что print() теряет, а logger.info даёт бесплатно",
+      "difficulty": 3,
+      "tags": ["print", "logging", "production", "observability", "interview-classic"],
+      "code_snippet": "# scheduled job, runs every 10 minutes in production\ndef sync_users():\n    print('starting user sync')\n    for u in fetch_users():\n        try:\n            upsert(u)\n        except Exception as e:\n            print(f'failed: {e}')\n    print('done')",
+      "question": "An on-call engineer at 2am needs to know whether last night's sync succeeded for one specific user. What's wrong with this script's observability?",
+      "options": [
+        "Nothing — the print statements give exactly the info needed.",
+        "Only the timestamps are missing; everything else is fine.",
+        "Only the severity levels are missing; you can't grep for ERROR.",
+        "Composite: no timestamps (can't correlate with the incident window), no severity levels (can't filter for ERROR), no module name (can't tell which file produced the line), no structured fields the aggregator can index (Datadog / ELK / Splunk can't tag by user_id), and no routing (errors can't go to PagerDuty while INFO stays in the log file). All four are missing because `print` is bare stdout text; `logger.*` would carry every one for free."
+      ],
+      "correct_index": 3,
+      "explanation_md": "Each of the first three options is true but incomplete — they're plausible-sounding distractors that each name one missing piece. The right answer is the composite, because `print` strips all of them at once.\n\nThe rewrite turns the script into something the on-call engineer can actually use:\n\n```python\nimport logging\nlogger = logging.getLogger(__name__)\n\ndef sync_users():\n    logger.info('starting user sync')\n    for u in fetch_users():\n        try:\n            upsert(u)\n        except Exception:\n            logger.exception('upsert failed for user_id=%s', u.id)\n    logger.info('user sync complete')\n```\n\nNow every line carries timestamp, level, module name, and structured args (the aggregator can index `user_id`). Errors carry tracebacks via `logger.exception`. Routing happens at the handler level — INFO to the log file, ERROR to PagerDuty — without rewriting the call sites. This is the entire reason `logging` exists; `print` was never the right tool for diagnostic output."
+    },
+
+    {
+      "id": "m2-s6-c11",
+      "type": "fill_in",
+      "topic": "Canonical per-module logger setup",
+      "topic_ru": "Канонический per-module logger setup",
+      "difficulty": 2,
+      "tags": ["logging", "getlogger", "patterns"],
+      "code_snippet_with_blanks": "import logging\n\nlogger = logging.___(___)\n\ndef process():\n    try:\n        risky()\n    except Exception:\n        logger.___('process failed')   # message AND traceback",
+      "accepted_answers": [
+        ["getLogger"],
+        ["__name__"],
+        ["exception"]
+      ],
+      "explanation_md": "Three pieces of the production shape: `logging.getLogger(__name__)` at module top (named logger that carries the module path automatically), and `logger.exception(...)` inside `except` blocks (same severity as `error`, plus the traceback of the currently-handled exception). `__name__` is the only correct argument here — passing a literal string like `'app'` works but loses the per-module attribution that filtering and routing rely on."
+    }
+  ]
+}
