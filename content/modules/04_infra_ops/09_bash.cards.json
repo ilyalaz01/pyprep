@@ -1,0 +1,330 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s9",
+  "cards": [
+    {
+      "id": "m4-s9-c1",
+      "type": "flip",
+      "topic": "Bash variables: assignment, expansion, special parameters",
+      "topic_ru": "Bash переменные: присваивание, expansion, специальные параметры",
+      "difficulty": 2,
+      "tags": ["bash", "variables", "expansion", "interview-warmup"],
+      "question": "How do you assign and expand a bash variable? What do `$0`, `$1`, `$#`, `$@`, `$?`, `${VAR}`, `${VAR:-default}` mean?",
+      "answer": "**Assignment** — `NAME=alice` with **no spaces around `=`** (`NAME = alice` is interpreted as 'run command NAME with arguments `=` and `alice`' and errors).\n\n**Expansion** — `$NAME` or `${NAME}`. The braces are required when the variable is followed by alphanumerics that would otherwise be part of the name: `${NAME}_suffix` (correct) vs `$NAME_suffix` (looks for variable `NAME_suffix`, gets nothing).\n\n**Special parameters:**\n\n- **`$0`** — script name (or shell name in interactive use)\n- **`$1`, `$2`, ...** — positional arguments to the script or function\n- **`$#`** — number of positional arguments\n- **`$@`** — all positional arguments. When quoted (`\"$@\"`), expands to each arg as a separate word — the form you almost always want.\n- **`$*`** — all positional args. When quoted (`\"$*\"`), expands to one concatenated string. Rarely the right choice.\n- **`$?`** — exit code of the last command (`0` = success, non-zero = failure)\n- **`$$`** — current shell's PID\n\n**Parameter expansion** (the `${VAR:-...}` family):\n\n- **`${VAR:-default}`** — use `$VAR` if set AND non-empty, else `default`. Doesn't assign to `VAR`.\n- **`${VAR:=default}`** — use `$VAR` if set; else assign `default` to `VAR` and use it.\n- **`${VAR:?error message}`** — use `$VAR` if set; else exit with `error message`. The defensive form for required vars.\n- **`${VAR:+alternative}`** — use `alternative` if `$VAR` is set and non-empty, else empty string.",
+      "answer_explanation_md": "Two practical defaults:\n\n- **`$@` not `$*`.** `\"$@\"` preserves each argument as a separate token (so `cmd \"a b\" c` passes `\"a b\"` and `c` as two args); `\"$*\"` joins them into one string. Almost all forwarding (`function inner(); inner \"$@\"`) wants `\"$@\"`.\n- **`${REQUIRED:?must be set}`** is the production discipline for required env vars / args. Combined with `set -u` (see `m4-s9-c11`), it makes 'forgot to set this variable' fail loudly at the top of the script rather than silently propagate empty strings into commands.\n\n**Arithmetic** uses a different syntax: `RESULT=$((5 + 3))` (note the double parens). Bash variables in arithmetic context don't need `$`: `RESULT=$((NUM + 3))` works as if `NUM` were `$NUM`."
+    },
+
+    {
+      "id": "m4-s9-c2",
+      "type": "code_trap",
+      "topic": "Unquoted variable expansion: word splitting + glob expansion",
+      "topic_ru": "Unquoted-переменные: word splitting + glob",
+      "difficulty": 4,
+      "tags": ["bash", "quoting", "word-splitting", "glob", "interview-classic"],
+      "code_snippet": "#!/usr/bin/env bash\n\nSRC=\"my report.pdf\"\nDEST=\"/backup\"\ncp $SRC $DEST\n\n# Why does this fail, and what happens if SRC=\"*\" instead?",
+      "question": "Why does `cp $SRC $DEST` fail when `SRC=\"my report.pdf\"`, and what's the worse outcome if `SRC=\"*\"`?",
+      "options": [
+        "Nothing fails — bash automatically quotes variables.",
+        "**Two distinct issues, same root cause: unquoted variable expansion.** **(1) Word splitting:** `$SRC` is unquoted, so bash splits its value on whitespace before passing to `cp`. `cp $SRC $DEST` becomes `cp my report.pdf /backup` — THREE arguments. `cp` interprets this as 'copy `my` and `report.pdf` to `/backup`', errors because `my` doesn't exist. **(2) Glob expansion:** if `SRC=\"*\"`, unquoted `$SRC` expands to every filename in the current directory before `cp` runs. `cp $SRC $DEST` with `SRC=\"*\"` becomes `cp file1 file2 file3 ... fileN /backup` — copies the entire current directory contents. Worse, `SRC=\"*\"` combined with `rm -rf $SRC` becomes `rm -rf` over every visible file. **The fix is always-quote:** `cp \"$SRC\" \"$DEST\"`. Quoted variables undergo NEITHER word splitting NOR glob expansion — the value is passed as a single argument exactly as stored. **The rule:** `\"$VAR\"` every time, unless you specifically want splitting (very rare, and there are usually better tools — `read -a` for arrays, etc.).",
+        "Only the second case (glob) is dangerous; word splitting is harmless.",
+        "Bash 5+ deprecated unquoted variables; the script errors with a syntax warning."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Bash performs several expansions on an unquoted variable in order: **parameter expansion → word splitting → pathname (glob) expansion**. Quoting (`\"$VAR\"`) suppresses word splitting AND glob expansion but still allows parameter expansion (so `\"$VAR\"` still expands `$VAR`, just doesn't split the result).\n\n**Cross-link to `m4-s1-c6`** (`rm -rf $UNSET_VAR/path` becoming `rm -rf /path`): same family of bug. The defenses layer:\n\n```bash\nset -u                            # error on unset variable use\n[[ -n \"$VAR\" ]] || exit 1         # explicit emptiness check\ncp -- \"$SRC\" \"$DEST\"              # quoted variables + `--` to stop option parsing\n```\n\n**The `--` after `cp`** is a defense against filenames that start with `-` (e.g., `SRC=\"-rf\"` would otherwise be parsed as `cp -rf $DEST`, which is an entirely different command). The `--` tells the parser 'no more options after this point'. Production scripts that handle user-provided paths should use it.\n\n**`shellcheck`** is a static analyzer that catches unquoted-variable bugs automatically. Run it on every script (`shellcheck script.sh`) and as a pre-commit hook. It's the single highest-leverage bash tool you can adopt."
+    },
+
+    {
+      "id": "m4-s9-c3",
+      "type": "multiple_choice",
+      "topic": "Command substitution: $(cmd) vs backticks vs $((arith))",
+      "topic_ru": "Command substitution: $(cmd) vs backticks vs $((arith))",
+      "difficulty": 3,
+      "tags": ["bash", "command-substitution", "arithmetic"],
+      "question": "Three substitution forms. Which is which?\n\n```bash\n(A)  TODAY=$(date +%Y-%m-%d)\n(B)  TODAY=`date +%Y-%m-%d`\n(C)  SUM=$((5 + 3))\n```",
+      "options": [
+        "All three are equivalent — pick whichever looks nicest.",
+        "**(A) and (B) are COMMAND SUBSTITUTION** — run `date +%Y-%m-%d` as a command and substitute its stdout. `(A) $( ... )` is the modern form; `(B) backticks` is the legacy POSIX form. **Always prefer (A) `$( ... )`** because: (1) backticks DON'T nest cleanly (`` ` ` ` ` `` is ambiguous), but `$(...)` nests freely; (2) backticks interact badly with quotes and escapes; (3) `$(...)` is more readable in long expressions. **(C) is ARITHMETIC EXPANSION** — evaluate the expression `5 + 3` as integer math and substitute the result. Different operation, different syntax: `$((expr))` (double parens), not `$(expr)`. **Inside `$(())`** you can use `+ - * / % **` (power), and bash variables don't need a `$` prefix (`$((NUM * 2))` works as if `NUM` were `$NUM`). For floating-point math, bash doesn't help — pipe through `awk` or `bc`.",
+        "(B) and (C) are equivalent; (A) is a typo.",
+        "(C) is broken syntax."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — (A)/(B) are command substitution; (C) is arithmetic. Different operations with similar-looking syntax.",
+        "Correct. The two substitution syntaxes do entirely different things: `$(cmd)` runs a command and gives you its output; `$((expr))` does integer arithmetic. Confusing them is rare once you've seen both. **Common patterns:**\n\n```bash\nTODAY=$(date +%Y-%m-%d)              # command output as string\nCOUNT=$(grep -c ERROR app.log)        # command output as number-ish\nNEW=$((COUNT + 1))                   # arithmetic\nfor ((i=0; i<10; i++)); do ... done  # C-style for loop (uses arithmetic context internally)\n```\n\n**`shellcheck` flags backticks** as legacy and recommends `$(...)` — another reason to keep shellcheck in your toolchain.",
+        "Wrong — (B) backticks and (C) arithmetic are entirely different operations.",
+        "Wrong — `$((5 + 3))` is standard bash arithmetic expansion."
+      ]
+    },
+
+    {
+      "id": "m4-s9-c4",
+      "type": "flip",
+      "topic": "Conditionals: if/then/else, [[ ]], file tests, && / ||",
+      "topic_ru": "Conditionals: if/then/else, [[ ]], file тесты, && / ||",
+      "difficulty": 2,
+      "tags": ["bash", "conditionals", "tests", "interview-warmup"],
+      "question": "Write the canonical bash `if` form. Name the most-used file-test flags. What does `cmd1 && cmd2` mean differently from `cmd1; cmd2`?",
+      "answer": "**Canonical `if`:**\n\n```bash\nif [[ \"$NAME\" == \"alice\" ]]; then\n  echo \"hi alice\"\nelif [[ \"$NAME\" == \"bob\" ]]; then\n  echo \"hi bob\"\nelse\n  echo \"stranger\"\nfi\n```\n\n**File tests** (inside `[[ ]]`):\n\n- **`-f \"$path\"`** — regular file exists at `$path`\n- **`-d \"$path\"`** — directory exists\n- **`-e \"$path\"`** — anything exists (file, dir, symlink, ...)\n- **`-r \"$path\"`** — readable\n- **`-w \"$path\"`** — writable\n- **`-x \"$path\"`** — executable\n- **`-L \"$path\"`** — is a symlink\n- **`-s \"$path\"`** — exists and non-empty\n\n**Short-circuit chains:**\n\n- **`cmd1 && cmd2`** — run `cmd2` ONLY IF `cmd1` succeeded (exit 0). Conditional execution.\n- **`cmd1 || cmd2`** — run `cmd2` ONLY IF `cmd1` failed (non-zero). Fallback execution.\n- **`cmd1; cmd2`** — run both regardless. Just sequencing.\n- Compare to commit-message workflows: `make test && git push` is 'push if tests pass'; `make test; git push` is 'always push, regardless of test result'.\n\n**String emptiness tests:**\n\n- **`[[ -z \"$VAR\" ]]`** — `$VAR` is empty / zero-length\n- **`[[ -n \"$VAR\" ]]`** — `$VAR` is non-empty",
+      "answer_explanation_md": "**Modern bash conditional shape** uses `[[ ]]` (double brackets) — bash-specific, more powerful and safer than POSIX `[ ]`. See `m4-s9-c5` for the discriminating differences.\n\n**Multi-condition** examples:\n\n```bash\n# AND inside [[ ]]:\nif [[ -f \"$path\" && -r \"$path\" ]]; then echo \"readable file\"; fi\n\n# OR:\nif [[ \"$NAME\" == \"alice\" || \"$NAME\" == \"bob\" ]]; then echo \"known\"; fi\n\n# Negation:\nif [[ ! -f \"$path\" ]]; then echo \"no such file\"; fi\n```\n\n**Regex matching** is bash-only (not POSIX), uses `=~`:\n\n```bash\nif [[ \"$EMAIL\" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$ ]]; then\n  echo \"looks like an email\"\nfi\n```\n\nMatches go into `${BASH_REMATCH[0]}` (full match), `[1]`, `[2]`, ... (capture groups). For complex pattern work, reach for `grep`, `awk`, or — better — Python."
+    },
+
+    {
+      "id": "m4-s9-c5",
+      "type": "multiple_choice",
+      "topic": "[[ ]] vs [ ] — when to use each",
+      "topic_ru": "[[ ]] vs [ ] — когда какие",
+      "difficulty": 3,
+      "tags": ["bash", "conditionals", "double-bracket", "posix"],
+      "question": "Both `[[ ]]` and `[ ]` perform conditional tests in bash. What can `[[ ]]` do that `[ ]` cannot, and when should you reach for each?",
+      "options": [
+        "They're identical — `[[ ]]` is just a typo of `[ ]`.",
+        "**`[[ ]]` is bash-specific; `[ ]` is POSIX shell (works in `sh`, `dash`, `bash`).** What `[[ ]]` can do that `[ ]` cannot: (1) **regex matching with `=~`** — `[[ \"$str\" =~ ^[a-z]+$ ]]`. (2) **No word splitting on unquoted vars** — `[[ $UNQUOTED == 'x' ]]` is safe even unquoted (still recommended to quote for habit). (3) **Pattern matching with `==`** — `[[ \"$file\" == *.log ]]` does a glob match (NOT regex). (4) **`&&` / `||` inside the test** — `[[ -f \"$x\" && -r \"$x\" ]]` (with `[ ]` you'd need `[ -f \"$x\" ] && [ -r \"$x\" ]`). (5) **`<` and `>` as STRING comparison** without needing escape — `[[ \"$a\" < \"$b\" ]]` (with `[ ]`, `<` is redirection unless escaped: `[ \"$a\" \\< \"$b\" ]`). **Use `[[ ]]` for any bash script** unless you need POSIX-shell portability (busybox, dash, alpine /bin/sh). Use `[ ]` for portable POSIX scripts. **`shellcheck` will warn you** when you're using bash-specific features in a script with a `#!/bin/sh` shebang.",
+        "`[ ]` is faster than `[[ ]]`, so prefer single brackets.",
+        "`[[ ]]` is deprecated; modern bash uses only `[ ]`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — they have meaningfully different syntax and capabilities.",
+        "Correct. **The shebang choice** determines which test syntax is appropriate. `#!/usr/bin/env bash` → use `[[ ]]`. `#!/bin/sh` → use `[ ]` (and avoid other bashisms like arrays). Most production scripts use bash; pure POSIX is mostly relevant for embedded systems (BusyBox), small Alpine images without bash, or system init scripts. **`shellcheck` is the tool** that catches accidental bashisms in POSIX scripts and vice versa.",
+        "Wrong on direction. `[[ ]]` is a bash *built-in* (parsed at the syntax level), so it's actually slightly faster than `[ ]` which historically was a separate executable. Performance is essentially irrelevant; the real benefit of `[[ ]]` is safety and expressiveness.",
+        "Wrong — `[[ ]]` is the modern, recommended form for bash scripts. `[ ]` (POSIX) is still standard but more limited."
+      ]
+    },
+
+    {
+      "id": "m4-s9-c6",
+      "type": "code_trap",
+      "topic": "String == vs numeric -eq — silent wrong-answer on string comparison",
+      "topic_ru": "String == vs numeric -eq — тихий неправильный ответ",
+      "difficulty": 3,
+      "tags": ["bash", "comparison", "string", "numeric", "subtle"],
+      "code_snippet": "#!/usr/bin/env bash\n# CI script that should run on version 18 of Node:\n\nNODE_VERSION=$(node --version | grep -oE '[0-9]+' | head -1)\n# NODE_VERSION is \"18\" or \"20\" or \"022\" (zero-prefixed string)\n\nif [[ \"$NODE_VERSION\" == 18 ]]; then\n  echo \"running Node 18\"\nfi\n\n# Now what if NODE_VERSION=\"018\"?",
+      "question": "Why does `[[ \"$NODE_VERSION\" == 18 ]]` not match when `NODE_VERSION=\"018\"`, and what's the fix?",
+      "options": [
+        "Bash auto-converts strings to numbers; the comparison succeeds.",
+        "**`[[ \"$NODE_VERSION\" == 18 ]]` is STRING equality.** Bash compares the literal string `\"018\"` to the literal string `\"18\"` — they're different strings (one is 3 chars, the other 2), so the comparison returns false. **The fix is NUMERIC comparison with `-eq`:**\n\n```bash\nif [[ \"$NODE_VERSION\" -eq 18 ]]; then\n  echo \"running Node 18\"\nfi\n```\n\n`-eq` (and its family `-ne`, `-lt`, `-le`, `-gt`, `-ge`) interprets both sides as integers and compares numerically — `018` parses as `18`, so the comparison succeeds. **The asymmetry:** `==` is for strings; `-eq` is for numbers. Confusing them silently produces wrong results — there's no error message, the comparison just returns false when you expected true. **Operator table** for tests:\n\n| Operation | String | Numeric |\n| --- | --- | --- |\n| Equal | `==` (or `=`) | `-eq` |\n| Not equal | `!=` | `-ne` |\n| Less than | `<` | `-lt` |\n| Less or equal | n/a | `-le` |\n| Greater than | `>` | `-gt` |\n| Greater or equal | n/a | `-ge` |",
+        "Bash deprecated string `==` in version 5; use only `-eq`.",
+        "The braces are wrong — should be `[ ]` not `[[ ]]`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**Why this is a subtle bug:** the comparison silently returns false instead of erroring. The script continues executing with the if-block skipped, and downstream behavior diverges from expected without any visible failure. Compare to the missing-WHERE-clause in SQL (`m4-s4-c5`) — same operational shape: valid syntax, wrong semantics, no error.\n\n**Common contexts where this bites:**\n\n- Version strings: `\"3.9\"` vs `\"3.10\"` — string comparison says `3.9 > 3.10` (lexicographic); numeric comparison would need parsing.\n- Zero-padded values: `\"08\"` (zero-padded month) vs `\"8\"` — strings differ; numbers don't.\n- Numbers with leading whitespace: `\" 5\"` vs `\"5\"` — string differs; numeric comparison strips whitespace.\n\n**When all values are reliably-formatted integers,** prefer `-eq` for numeric comparison. **When comparing version strings,** use proper version parsing (`sort -V`, `dpkg --compare-versions`, or Python `packaging.version`). String `==` works only when you're genuinely comparing strings as strings (names, labels, identifiers).\n\n`shellcheck` catches some of these (specifically `[[ \"$x\" == 0 ]]` is flagged if `x` is used numerically elsewhere). Run shellcheck."
+    },
+
+    {
+      "id": "m4-s9-c7",
+      "type": "flip",
+      "topic": "Loops: for, while, c-style, read-from-file idiom",
+      "topic_ru": "Циклы: for, while, c-style, чтение файла",
+      "difficulty": 3,
+      "tags": ["bash", "loops", "for", "while", "read"],
+      "question": "Show the four common loop shapes: `for item in list`, `for ((i=0; i<N; i++))`, `while [[ ... ]]`, and the canonical 'read a file line by line' idiom.",
+      "answer": "```bash\n# (1) For loop over a list (literal or glob):\nfor item in apple banana cherry; do\n  echo \"$item\"\ndone\n\nfor f in *.log; do          # glob expansion\n  process \"$f\"\ndone\n\n# (2) C-style for loop (numeric range):\nfor ((i=0; i<10; i++)); do\n  echo \"$i\"\ndone\n\n# (3) While loop (condition-driven):\ncount=0\nwhile [[ \"$count\" -lt 10 ]]; do\n  echo \"$count\"\n  count=$((count + 1))\ndone\n\n# (4) READ A FILE LINE BY LINE — the canonical idiom:\nwhile IFS= read -r line; do\n  echo \"got: $line\"\ndone < input.txt\n```\n\nThe **`while IFS= read -r line`** pattern is the only line-by-line idiom that handles real-world filenames correctly:\n\n- **`IFS=`** (empty internal field separator) prevents `read` from stripping leading/trailing whitespace.\n- **`-r`** (raw mode) prevents `read` from interpreting backslash escapes (so `\\n` stays as literal backslash-n, not newline).\n- **`< input.txt`** redirects the file to stdin so `read` consumes from it.\n\nMemorize the full incantation. Half-quoted versions (`while read line; do`) work in trivial cases but break on whitespace, backslashes, lines without trailing newlines — exactly the inputs you eventually meet in production.",
+      "answer_explanation_md": "**The anti-pattern this idiom replaces** is `for line in $(cat file.txt); do ...`. It looks shorter but word-splits on every whitespace character (not lines) and glob-expands, producing wrong iteration. See `m4-s9-c8` for the trap.\n\n**Loop over command output** (when you genuinely want lines, not whitespace-separated tokens):\n\n```bash\nwhile IFS= read -r line; do\n  process \"$line\"\ndone < <(some_command)        # process substitution: redirect output of cmd as a file\n\n# Or:\nsome_command | while IFS= read -r line; do\n  process \"$line\"\ndone\n```\n\n**Process substitution `<(cmd)`** is the bash-only feature that lets you treat a command's output as a file path. The `while ... done < <(cmd)` form avoids the subshell trap (next bullet); the `cmd | while ...` form puts the loop body in a subshell, so variable assignments inside the loop don't persist to the outer script — a common surprise. Prefer `done < <(cmd)` over `cmd | while` when you need to mutate state from inside the loop."
+    },
+
+    {
+      "id": "m4-s9-c8",
+      "type": "code_trap",
+      "topic": "for line in $(cat file) — word-splits, not line-splits",
+      "topic_ru": "for line in $(cat file) — split по словам, а не строкам",
+      "difficulty": 4,
+      "tags": ["bash", "loops", "word-splitting", "subtle", "interview-classic"],
+      "code_snippet": "#!/usr/bin/env bash\n# Reads file 'users.txt' which contains one user per line:\n#   Alice Smith\n#   Bob Jones\n#   Carol Davis\n\nfor line in $(cat users.txt); do\n  echo \"processing: $line\"\ndone",
+      "question": "What does this loop actually print, and what's the canonical fix?",
+      "options": [
+        "Three lines: 'processing: Alice Smith', 'processing: Bob Jones', 'processing: Carol Davis'.",
+        "**Six lines, not three: 'processing: Alice', 'processing: Smith', 'processing: Bob', 'processing: Jones', 'processing: Carol', 'processing: Davis'.** **Mechanism:** `$(cat users.txt)` returns the entire file contents as one string. The UNQUOTED command substitution then undergoes **word splitting on `IFS`** (default: space, tab, newline) — `for` iterates over TOKENS, not lines. The newlines and the internal spaces are both treated as separators. Worse, the unquoted substitution also undergoes **glob expansion** — if the file contains `*` as a value, you get a directory listing instead. **The canonical fix:**\n\n```bash\nwhile IFS= read -r line; do\n  echo \"processing: $line\"\ndone < users.txt\n```\n\n**`IFS=`** prevents whitespace stripping; **`-r`** prevents backslash interpretation; **`< users.txt`** redirects the file as stdin. This is the only line-by-line idiom that handles real-world filenames (spaces, special chars, missing trailing newline).",
+        "Three lines correctly — `for` knows to split on newlines.",
+        "An error — `cat` requires `-l` flag to output line-by-line."
+      ],
+      "correct_index": 1,
+      "explanation_md": "This is one of the most common bash bugs in junior-written scripts. The `for line in $(cat file.txt)` shape *looks* like it iterates over lines because each line is on its own line in the file — but bash sees only a string and splits on whitespace generically.\n\n**The full set of fixes** to know:\n\n```bash\n# (1) Canonical — read file line by line:\nwhile IFS= read -r line; do echo \"$line\"; done < file.txt\n\n# (2) Process substitution — read command output line by line:\nwhile IFS= read -r line; do echo \"$line\"; done < <(some_command)\n\n# (3) mapfile / readarray (bash 4+) — load file into array:\nmapfile -t lines < file.txt\nfor line in \"${lines[@]}\"; do echo \"$line\"; done\n\n# (4) When you DO want tokens, not lines:\nIFS=',' read -ra fields <<< \"$csv_line\"   # split on comma into array\n```\n\n**Cross-link to `m4-s9-c2`** (unquoted-variable word-splitting): same family of bug. The defensive habits are the same — quote your expansions, use `IFS=` when you need to control splitting, prefer `read -r` over implicit interpretation.\n\n`shellcheck` flags `for x in $(cat ...)` with SC2013: 'To read lines rather than words, pipe/redirect to a `while read` loop.' Run shellcheck."
+    },
+
+    {
+      "id": "m4-s9-c9",
+      "type": "multiple_choice",
+      "topic": "IFS= and -r on read — what each protects against",
+      "topic_ru": "IFS= и -r у read — что защищает каждый",
+      "difficulty": 4,
+      "tags": ["bash", "read", "ifs", "loop", "subtle"],
+      "question": "Why is `while IFS= read -r line; do ... done < file` the canonical idiom rather than just `while read line; do ... done < file`? What does EACH modification protect against?",
+      "options": [
+        "They're equivalent; `IFS=` and `-r` are stylistic.",
+        "**The naive `while read line` form does TWO undesired transformations to the input.** **`IFS=` protects against whitespace stripping:** by default, `read` uses IFS (Internal Field Separator, default: space-tab-newline) to delimit fields AND to strip leading/trailing whitespace from each line it reads. So a line `    hello world    ` becomes `hello world` (leading/trailing spaces eaten). **Setting `IFS=` empty (only for this command — note the inline scoping) suppresses both behaviors** — the line is preserved verbatim. **`-r` (raw mode) protects against backslash interpretation:** without `-r`, `read` interprets backslashes as line-continuation characters. A line ending with `\\` causes `read` to consume the NEXT line and concatenate them. With `-r`, backslashes are preserved as literal characters. **Together, `IFS= read -r line`** reads the line exactly as it appears in the file, without stripping or escape-processing. **For real-world file processing** (filenames with spaces, paths with backslashes, indentation-preserving input), the canonical form is required, not optional. **Mnemonic:** `IFS=` for whitespace, `-r` for backslashes.",
+        "`-r` is required; `IFS=` is optional.",
+        "`IFS=` is required; `-r` is optional."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — both modifications change observable behavior. Stripping whitespace and backslash interpretation are real transformations.",
+        "Correct. The full incantation is `while IFS= read -r line; do ... done < file`. **Three other `read` flags worth knowing:**\n\n- **`-p \"prompt\"`** — print prompt before reading (interactive use)\n- **`-s`** — silent mode (don't echo what's typed; for password input)\n- **`-t N`** — timeout in N seconds; exits non-zero if no input within timeout\n- **`-a array`** — split into array elements (with IFS-driven word splitting)\n\nFor interactive prompts: `read -p \"Continue? \" -t 10 ANSWER` (prompt + 10-second timeout). For password prompts: `read -s -p \"Password: \" PW`.",
+        "Wrong — both are needed for production-grade line reading. Skipping either has observable wrong-output failure modes for real-world input.",
+        "Wrong — both are needed."
+      ]
+    },
+
+    {
+      "id": "m4-s9-c10",
+      "type": "code_trap",
+      "topic": "Script without set -e silently continues past failure",
+      "topic_ru": "Скрипт без set -e молча продолжает после ошибки",
+      "difficulty": 4,
+      "tags": ["bash", "set-e", "exit-codes", "footgun-pair", "interview-classic"],
+      "code_snippet": "#!/usr/bin/env bash\n# Deploy script. Looks fine, runs every day.\n\nmake build\ncp dist/app.tar.gz /tmp/release.tar.gz\nrsync /tmp/release.tar.gz prod-server:/opt/app/\nssh prod-server 'systemctl restart app'\n\necho \"Deploy complete!\"",
+      "question": "What's the structural problem with this script, and what happens if `make build` fails today?",
+      "options": [
+        "Nothing — bash auto-exits on the first failure.",
+        "**Bash by DEFAULT continues after a command fails.** If `make build` fails (compilation error, missing dep, etc.), the script keeps running: `cp dist/app.tar.gz /tmp/release.tar.gz` fails too (no `dist/app.tar.gz` was produced) — but the script CONTINUES. `rsync` then copies whatever stale `/tmp/release.tar.gz` is sitting there from yesterday's run (or empty). `ssh ... systemctl restart` succeeds (the SSH command works; what gets restarted is yesterday's binary). **The script exits 0** ('Deploy complete!') even though the deploy is broken. **The fix is the canonical production-script header:**\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail        # fail-fast on ANY error\n\nmake build\ncp dist/app.tar.gz /tmp/release.tar.gz\n...\n```\n\nWith `set -e`, the moment `make build` exits non-zero, the script halts. With `set -u`, any unset variable also halts the script (defensive). With `set -o pipefail`, pipeline failures propagate (without it, `cmd_that_fails | sort` exits 0 because sort succeeded, masking the upstream failure). **Together: `set -euo pipefail` is the production-script standard.** See `m4-s9-c11` for the component-by-component breakdown.",
+        "The script is fine because exit codes are tracked in `$?`.",
+        "Bash 5+ auto-enables `set -e`; this script is safe."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**This is the canonical bash production-script disaster** — a script that 'usually works' silently breaks when an upstream step fails. The deploy completes 'successfully' (exit 0); yesterday's stale artifact is in production; nobody knows until users notice the bug.\n\n**The same shape recurs across CI scripts, cron jobs, and deploy automation:** any multi-step bash script that doesn't fail-fast on intermediate errors is one upstream failure away from a silent partial-success bug.\n\n**Defensive layering** for production scripts:\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n\n# Validate required env vars before doing anything:\n: \"${RELEASE_VERSION:?must be set}\"\n: \"${PROD_HOST:?must be set}\"\n\n# Use temp files to avoid stale-state risk:\nTEMP=$(mktemp -d)\ntrap 'rm -rf \"$TEMP\"' EXIT     # cleanup on any exit (success, failure, signal)\n\nmake build\ncp dist/app.tar.gz \"$TEMP/release.tar.gz\"     # writes to fresh temp dir\nrsync \"$TEMP/release.tar.gz\" \"$PROD_HOST:/opt/app/\"\nssh \"$PROD_HOST\" 'systemctl restart app'\n\necho \"Deploy of $RELEASE_VERSION complete!\"\n```\n\nThe `trap '... EXIT'` runs on any script exit (success, error, signal); it's the bash equivalent of Python's `try/finally`. Use it for cleanup that must happen regardless of how the script exits.\n\nThis card is the recognition half of the N041 footgun-pair; `m4-s9-c11` is the prescription half (component-by-component explanation of the fix)."
+    },
+
+    {
+      "id": "m4-s9-c11",
+      "type": "multiple_choice",
+      "topic": "set -euo pipefail — what each flag protects against",
+      "topic_ru": "set -euo pipefail — что защищает каждый флаг",
+      "difficulty": 3,
+      "tags": ["bash", "set-e", "set-u", "pipefail", "footgun-pair", "interview-classic"],
+      "question": "`set -euo pipefail` at the top of a production bash script. Three flags. What does each one protect against?",
+      "options": [
+        "All three flags do the same thing — they're redundant.",
+        "**`set -e` (errexit)** — exit the script IMMEDIATELY on ANY command's non-zero exit. Protects against the script silently continuing past a failed step (see `m4-s9-c10` for the disaster shape). Without it, the default bash behavior is to keep going. **`set -u` (nounset)** — error on use of an UNSET variable. Protects against typos: `echo \"$NAEM\"` (typo for `$NAME`) errors with `NAEM: unbound variable` instead of silently echoing empty string. Cross-link to `m4-s1-c6`: `set -u` is the structural defense against `rm -rf $UNSET_VAR/path` becoming `rm -rf /path`. **`set -o pipefail`** — the exit code of a pipeline is the RIGHTMOST NON-ZERO exit, not just the last command's. Without it, `failing_cmd | sort` exits 0 (sort succeeded), and `set -e` doesn't fire because the pipeline 'succeeded'. With pipefail, the upstream failure propagates and triggers errexit. **Together: `set -euo pipefail` is the production-script standard reflex.** Write it as the first non-shebang line of every script as a habit; code review should flag scripts without it.",
+        "`set -e` is the only useful one; `-u` and `pipefail` are noise.",
+        "These flags only work on Linux; on macOS they're silently ignored."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — three distinct protections, three distinct failure modes they prevent.",
+        "Correct. This is the prescription half of the N041 footgun-pair (m4-s9-c10 was the recognition half). **The three flags map to three distinct bash defaults that are wrong for production scripts:** (1) Bash continues after failure → `set -e` fixes. (2) Bash treats unset variables as empty strings → `set -u` fixes. (3) Pipeline exit code is only the last command's → `set -o pipefail` fixes. **Escape hatches when you need a command to be allowed to fail without exiting:** `command || true` (allow failure), `if ! command; then ...; fi` (branch on failure), `RESULT=$(command || echo default)` (capture with fallback). The flags interact with `&&`/`||` chains — commands in chains are 'tested' rather than 'asserted'.",
+        "Wrong — all three are widely used in real production scripts. Skipping `-u` and `pipefail` leaves real footguns active.",
+        "Wrong — these are POSIX shell features (well, `pipefail` is bash-specific but supported on every bash everywhere). Identical behavior on Linux, macOS, BSD."
+      ]
+    },
+
+    {
+      "id": "m4-s9-c12",
+      "type": "flip",
+      "topic": "Exit codes: $?, conventions, capturing, || true escape hatch",
+      "topic_ru": "Exit codes: $?, конвенции, захват, || true",
+      "difficulty": 3,
+      "tags": ["bash", "exit-codes", "$?", "set-e-escape-hatch"],
+      "question": "What does `$?` hold? How do you capture an exit code into a variable? What does `command || true` do, and when is it appropriate?",
+      "answer": "**`$?` holds the exit code of the LAST command.** `0` means success; non-zero means failure (specific non-zero values often have meaning — `grep` returns `1` for 'no match', `2` for 'error'; the exact code is command-specific).\n\n**Critical: `$?` only holds the LAST command.** It's overwritten by every subsequent command. Capture immediately if you need to use it:\n\n```bash\nmake build\nRC=$?               # capture exit code\necho \"build exit code: $RC\"   # this echo's exit code is now in $?\n```\n\nOr inline-check:\n\n```bash\nif make build; then\n  echo \"build succeeded\"\nelse\n  echo \"build failed (exit $?)\"   # $? is the failed build's code\nfi\n```\n\n**`command || true` is the canonical 'allow this command to fail without triggering `set -e`'.** Bash evaluates the `||` chain: if `command` fails, the chain runs `true` (which exits 0); the whole expression's exit code is 0; `set -e` doesn't fire.\n\n**When `|| true` is appropriate:**\n\n- Cleanup commands that should run even if they fail (`rm tempfile.txt || true`).\n- Optional best-effort steps (`brew install foo || true` — install if homebrew is around, ignore if not).\n- Grep used as 'does this match' check where 'no match' is a normal expected outcome (`grep ERROR file.log || true`).\n\n**When `|| true` is INAPPROPRIATE:**\n\n- Silencing errors you don't understand. If a command failed, you should know why, not just suppress.\n- Around `cp`, `mv`, `make` — those failures usually matter. Bypassing them silently produces partial-success disasters (see `m4-s9-c10`).",
+      "answer_explanation_md": "**Custom exit codes** for your own scripts:\n\n```bash\nif [[ ! -f \"$CONFIG\" ]]; then\n  echo \"config missing: $CONFIG\" >&2\n  exit 1                       # generic failure\nfi\n\nif [[ ! -r \"$CONFIG\" ]]; then\n  echo \"config not readable\" >&2\n  exit 2                       # specific non-success code\nfi\n```\n\nThe convention is `0`=success, `1`=generic failure, `2`+ for specific errors. Many tools follow stricter conventions (`grep`: 0=match, 1=no-match, 2=error). Callers (CI, shell `&&`/`||`, supervisors) only check `0` vs non-zero by default; specific codes are useful when you want to differentiate.\n\n**stderr vs stdout:** error messages should go to stderr (`echo \"error\" >&2`), not stdout. This is the convention so callers can separate diagnostic output from data output: `output=$(script.sh)` captures stdout (the data); diagnostic messages go to the terminal via stderr unaffected."
+    },
+
+    {
+      "id": "m4-s9-c13",
+      "type": "flip",
+      "topic": "Reading input: read, heredoc, here-string, > >> 2>&1 /dev/null tee",
+      "topic_ru": "Ввод-вывод: read, heredoc, here-string, > >> 2>&1 /dev/null tee",
+      "difficulty": 2,
+      "tags": ["bash", "read", "heredoc", "redirection", "tee", "interview-warmup"],
+      "question": "Show the canonical forms for: interactive prompt with timeout, multi-line literal stdin, single-line stdin from a variable, discarding all output, saving output to a file while also seeing it in the terminal.",
+      "answer": "```bash\n# Interactive prompt with timeout:\nread -t 10 -p \"Continue? \" ANSWER       # -p prompt, -t 10-second timeout\nread -s -p \"Password: \" PW              # -s silent (no echo) for passwords\n\n# Multi-line literal stdin (HEREDOC):\ncat <<EOF\nLine 1\nLine 2 with $VAR (this expands)\nEOF\n\ncat <<'EOF'\nNo $VAR expansion (single-quoted EOF marker)\nEOF\n\n# Single-line stdin from variable (HERE-STRING):\ngrep \"ERROR\" <<< \"$LOG_LINE\"\n\n# Discard all output:\ncommand > /dev/null 2>&1                # stdout AND stderr to /dev/null\n\n# Save to file AND see in terminal:\ncommand | tee out.log                   # stdout to file AND terminal\ncommand | tee -a out.log                # append instead of overwrite\ncommand 2>&1 | tee out.log              # capture both stdout AND stderr to file+terminal\n```\n\n**Heredoc with quoted delimiter** (`<<'EOF'`) suppresses variable expansion — useful for shipping literal `$VAR` strings into config files or generated scripts. Unquoted delimiter (`<<EOF`) expands `$VAR` inside the heredoc.\n\n**`/dev/null` is the canonical 'discard'** — a special file that accepts any input and produces no output. `> /dev/null` discards stdout; `2> /dev/null` discards stderr; `> /dev/null 2>&1` discards both.",
+      "answer_explanation_md": "**`tee` is the answer to 'see live AND save'.** Common in CI debugging or long-running deploy scripts where you want to follow progress live in the terminal but also archive the full output for later review:\n\n```bash\n./long_running_deploy.sh 2>&1 | tee deploy-$(date +%Y%m%d).log\n# Live output AND saved to file with date in name.\n```\n\n**Process substitution `<(cmd)`** — treat command output as a file path:\n\n```bash\ndiff <(sort file1) <(sort file2)    # diff the sorted versions without temp files\n```\n\nBash-only (not POSIX); useful for piping multiple commands as 'pseudo-files' to tools that expect file arguments.\n\n**Cross-link to `m4-s2-c9`** — `2>&1` ordering matters. `> file 2>&1` works (stdout to file, then stderr to wherever stdout points); `2>&1 > file` does NOT (the `2>&1` captures stderr's target *before* `> file` runs, so stderr stays on the terminal). Same rule applies in bash as in any shell."
+    },
+
+    {
+      "id": "m4-s9-c14",
+      "type": "code_trap",
+      "topic": "while-loop-in-pipe subshell — variable assignments don't persist",
+      "topic_ru": "while-цикл в pipe выполняется в subshell — присваивания не сохраняются",
+      "difficulty": 4,
+      "tags": ["bash", "subshell", "pipe", "while", "scope", "subtle"],
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\n\ncount=0\ncat numbers.txt | while IFS= read -r n; do\n  count=$((count + n))\ndone\n\necho \"Total: $count\"        # prints \"Total: 0\" — why?",
+      "question": "Why does `$count` stay at 0 even though the loop body increments it, and what's the fix?",
+      "options": [
+        "`set -euo pipefail` silently reset count to 0.",
+        "**The `while` loop runs in a SUBSHELL when it's on the right side of a pipe.** Each side of a `|` pipe is its own subshell (forked process); variable assignments inside the subshell are local to it. The loop increments `count` from `0` to (say) `15` inside the subshell, then the subshell exits and `count` in the parent shell is still `0`. The pipe never propagates the variable back. **Two canonical fixes:**\n\n```bash\n# (1) Process substitution — no subshell on the loop side:\ncount=0\nwhile IFS= read -r n; do\n  count=$((count + n))\ndone < <(cat numbers.txt)\necho \"Total: $count\"   # works\n\n# (2) Redirect the file directly — no pipe at all:\ncount=0\nwhile IFS= read -r n; do\n  count=$((count + n))\ndone < numbers.txt\necho \"Total: $count\"   # works\n```\n\n**Mental model:** any process on the right side of a `|` is a fork. Mutations inside don't reach the parent. Process substitution `< <(cmd)` puts the command's output where the loop reads but keeps the loop body in the parent shell.",
+        "`IFS=` accidentally cleared count.",
+        "The pipe to `while` is invalid syntax; bash errors out."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**Why this is one of the more subtle bash bugs:** the loop body LOOKS like it's modifying the outer-scope variable. There's no error, no warning — the script just produces the wrong total. Cross-link to `m4-s9-c8` (other unexpected loop behaviors with pipes and command substitution).\n\n**Other operations that DO require subshell awareness:**\n\n```bash\n# (echo \"$count\") | sed ...        # parens are a subshell too\n# (cd /tmp; ls) | grep foo         # the cd is subshell-scoped\n```\n\n**The opposite trap** is using `cd` in a script and expecting the cwd to persist after a subshell exits — `(cd /tmp; do_thing)` returns you to the original directory after the parens close. Useful when intentional; surprising when accidental.\n\n**Real-world refactor pattern** when you need accumulator state across pipe boundaries: either use process substitution (`< <(cmd)`), or use a temporary file, or rewrite the pipeline as a single function:\n\n```bash\ncount_total() {\n  local count=0\n  while IFS= read -r n; do\n    count=$((count + n))\n  done\n  echo \"$count\"\n}\n\nTOTAL=$(count_total < numbers.txt)   # capture via stdout, not variable mutation\n```\n\nThis is the bash equivalent of Python's 'functions return values; don't mutate globals'."
+    },
+
+    {
+      "id": "m4-s9-c15",
+      "type": "multiple_choice",
+      "topic": "stderr redirection: 2>&1 ordering and /dev/null discard",
+      "topic_ru": "Редирект stderr: порядок 2>&1 и /dev/null",
+      "difficulty": 3,
+      "tags": ["bash", "redirection", "stderr", "ordering"],
+      "question": "You want to discard BOTH stdout and stderr from a noisy command. Which forms work, which don't, and why?\n\n```bash\n(A)  noisy_cmd > /dev/null 2>&1\n(B)  noisy_cmd 2>&1 > /dev/null\n(C)  noisy_cmd &> /dev/null\n(D)  noisy_cmd >& /dev/null\n```",
+      "options": [
+        "All four work equivalently.",
+        "**(A) and (C) work; (B) and (D) have issues.** **(A) `> /dev/null 2>&1` works** — shell processes left to right: stdout → `/dev/null`; then `2>&1` makes stderr go where stdout currently points → `/dev/null`. Both discarded. **(B) `2>&1 > /dev/null` does NOT work** — `2>&1` runs first when stdout still points to the terminal, so stderr is captured pointing at the terminal; then `> /dev/null` moves stdout to /dev/null, but stderr's reference was already set. Result: stdout discarded, stderr still on terminal. (Same trap as `m4-s2-c9`.) **(C) `&> /dev/null` works** — modern bash shortcut for 'both stdout and stderr to this destination'. Equivalent to (A). **(D) `>& /dev/null` is bash-specific syntax** — works in modern bash as an alias for `&>`, but bash documentation prefers `&>` form. Avoid `>&` in scripts; it's confusable with `2>&1` to readers. **The memorize-this form:** `> /dev/null 2>&1` (works everywhere, including POSIX `sh`) or `&> /dev/null` (bash shorthand). **Rule:** redirect stdout FIRST, then `2>&1`.",
+        "(B) is correct; (A) is reversed.",
+        "Only (D) is correct; modern bash deprecated the others."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on (B). The ordering of `2>&1` vs `>` is semantically meaningful and produces different outcomes.",
+        "Correct. **Cross-link to `m4-s2-c9`** (the Linux Operations sphere covers this exact ordering issue). Same rule in any shell context: `2>&1` is a snapshot of where stdout points *at the moment 2>&1 is evaluated*. Move stdout first, then `2>&1` captures the new target.",
+        "Wrong — (A) is correct and (B) is broken on ordering grounds.",
+        "Wrong — `> /dev/null 2>&1` is the most portable form, supported in every POSIX shell. `&>` is bash-only but standard for bash scripts."
+      ]
+    },
+
+    {
+      "id": "m4-s9-c16",
+      "type": "flip",
+      "topic": "Functions: definition, local keyword, return semantics",
+      "topic_ru": "Функции: определение, local, return-семантика",
+      "difficulty": 3,
+      "tags": ["bash", "functions", "local", "return", "interview-classic"],
+      "question": "Define a bash function that takes two arguments and returns a string. What's `local`, why is it important, and how does bash 'return' differ from Python's `return`?",
+      "answer": "```bash\ngreet() {\n  local name=\"$1\"\n  local greeting=\"${2:-Hello}\"\n  echo \"$greeting, $name\"        # printing to stdout IS the 'return'\n}\n\nresult=$(greet \"Alice\")             # capture stdout via $(...)\necho \"$result\"                       # \"Hello, Alice\"\n\ngreet \"Bob\" \"Hi\"                    # call without capture; output goes to stdout\n```\n\n**`local` is critical.** Without it, every variable inside a function is GLOBAL — it persists into the caller's scope after the function returns. Forgetting `local` is one of the most common bash bugs:\n\n```bash\n# WITHOUT local — function pollutes caller's scope:\nprocess() {\n  result=\"processed\"          # NOT local — leaks to caller\n}\nresult=\"original\"\nprocess\necho \"$result\"                 # \"processed\", not \"original\" — overwritten\n```\n\n`local` makes the variable scoped to the function — it goes out of scope when the function returns, and any same-named variable in the caller is untouched.\n\n**Bash 'return' is different from Python:**\n\n- **Python `return value`** sends a value back to the caller.\n- **Bash `return N`** sets the function's EXIT CODE (0–255 integer); does not 'return data'. Like `exit` for scripts.\n- **To 'return data' from a bash function**, the convention is print to stdout: `echo \"$result\"` inside the function, capture with `result=$(func args)` from the caller.\n- **`$?` after a function call** holds the function's exit code (default: the exit code of the last command in the function body, or whatever `return N` set).",
+      "answer_explanation_md": "**Function argument syntax is identical to script arguments:**\n\n- `$1`, `$2`, ... — positional args to the function\n- `$@` — all args (use `\"$@\"` quoted)\n- `$#` — argument count\n- `$0` inside a function is still the SCRIPT name (not the function name). Use `${FUNCNAME[0]}` for the function's own name.\n\n**Forwarding args** to another command: `inner \"$@\"` passes all the function's args through, each as a separate token. This is the canonical wrapper-function pattern.\n\n**A defensive function template:**\n\n```bash\nmy_func() {\n  local arg1=\"${1:?missing arg1}\"     # required — error if not provided\n  local arg2=\"${2:-default_value}\"    # optional with default\n  local result\n\n  result=\"$(do_some_work \"$arg1\" \"$arg2\")\"\n  echo \"$result\"\n}\n```\n\n`${1:?missing arg1}` is the parameter-expansion form that errors with the given message if `$1` is unset or empty. Combined with `set -u`, it's the structural way to require function arguments without writing manual checks."
+    },
+
+    {
+      "id": "m4-s9-c17",
+      "type": "code_trap",
+      "topic": "Missing local — function variables leak into caller's scope",
+      "topic_ru": "Забыл local — переменные функции утекают в caller",
+      "difficulty": 4,
+      "tags": ["bash", "functions", "local", "scope-pollution", "subtle", "interview-classic"],
+      "code_snippet": "#!/usr/bin/env bash\nset -euo pipefail\n\nprocess_user() {\n  user=\"$1\"                       # NOT local\n  result=\"processed-$user\"        # NOT local\n  echo \"$result\"\n}\n\nuser=\"system_admin\"\nresult=$(process_user \"alice\")\necho \"user: $user\"                 # what's printed?\necho \"result: $result\"",
+      "question": "What does `echo \"user: $user\"` print, and what's the fix?",
+      "options": [
+        "Prints 'user: system_admin' because bash automatically scopes function variables.",
+        "**Prints 'user: alice'.** `process_user` assigned `user=\"$1\"` (i.e., `user=\"alice\"`) WITHOUT `local`, so the assignment overwrote the GLOBAL `user` variable in the caller's scope. After `process_user` returns, the caller's `user` is no longer `\"system_admin\"` — it's `\"alice\"`. Same for `result` (which was overwritten too, but the caller immediately reassigns `result=$(...)`, so the damage isn't visible there). **The fix is `local`:**\n\n```bash\nprocess_user() {\n  local user=\"$1\"               # scoped to function\n  local result=\"processed-$user\"\n  echo \"$result\"\n}\n```\n\nNow the function has its own `user` and `result`; the caller's variables are untouched. **Why this is a particularly nasty bug:** it doesn't fail; it produces wrong values silently. The caller's `user=\"system_admin\"` setup gets overwritten by an unrelated function call, and subsequent code runs with the wrong value. Debugging is hard because the symptom is far from the cause. **The discipline:** **declare every function-internal variable with `local`** — make it muscle memory, not optional. shellcheck warns when it spots non-local assignments inside functions (SC2034 and related).",
+        "Prints 'user: alice' but the fix is to use `unset user` at function start.",
+        "Prints an error — bash refuses to overwrite caller variables."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**Cross-link to `m4-s9-c16`** (function basics): that card establishes the `local` keyword; this card is the disaster shape it prevents. Two-card pair around the function-scope concept.\n\n**Why bash defaults to global scope** (instead of local): historical, partly stylistic. The shell originally didn't have functions; when added (POSIX-style), variables remained global by default to avoid breaking older shell idioms. `local` was added as opt-in (and is bash-specific; pure POSIX has no `local` keyword). Modern bash style demands `local` on every function-internal variable, but the default is still global, so the discipline is on the author.\n\n**`declare` and `readonly`** are alternatives in some contexts:\n\n```bash\nmy_func() {\n  declare counter=0           # equivalent to local inside a function\n  readonly CONSTANT=\"value\"   # immutable; can't be reassigned\n}\n```\n\nFor production scripts: **every variable inside a function gets `local`** unless you have a documented reason to share state with the caller (rare; usually a smell). The discipline is the same shape as Python's 'avoid global state' and JavaScript's `const`/`let` (vs `var`): explicit scoping prevents accidental cross-contamination."
+    },
+
+    {
+      "id": "m4-s9-c18",
+      "type": "multiple_choice",
+      "topic": "$@ vs $* vs $1 vs $# — positional parameters",
+      "topic_ru": "$@ vs $* vs $1 vs $# — позиционные параметры",
+      "difficulty": 3,
+      "tags": ["bash", "positional-params", "arguments", "interview-classic"],
+      "question": "You write a wrapper function that forwards all its arguments to an inner command. Inner needs each original argument preserved as a separate token (e.g., quoted strings stay quoted). Which forwarding form is correct?\n\n```bash\nwrapper() {\n  inner ???                        # ← what goes here?\n}\nwrapper \"hello world\" foo\n```",
+      "options": [
+        "`inner $1 $2 $3 ...` — list each positional manually.",
+        "**`inner \"$@\"` (quoted).** `\"$@\"` expands to each positional argument as a SEPARATE WORD, preserving spaces in individual args. So `wrapper \"hello world\" foo` → `inner \"hello world\" foo` (inner sees two args: `\"hello world\"` and `foo`). **What goes wrong with the alternatives:** **`$@` (unquoted)** — undergoes word splitting, so `\"hello world\"` splits into two tokens: `inner hello world foo` (inner sees three args). **`\"$*\"` (quoted star)** — concatenates ALL args into ONE string separated by IFS's first char (default space): `inner \"hello world foo\"` (inner sees one arg). **`$*` (unquoted)** — same word-splitting as `$@` unquoted: `inner hello world foo` (three args). **The rule:** for forwarding, use **`\"$@\"`** (quoted at-sign). It's the only form that preserves the original argument structure. Memorize this — it's the bash equivalent of Python's `*args` for tuples.",
+        "`inner \"$*\"` — collected into one string is safer.",
+        "`inner $@` — quoting is unnecessary."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — listing manually doesn't scale (what if there are 5 args? 10? variable count?). `\"$@\"` handles any count.",
+        "Correct. The full positional-parameter quick-reference:\n\n| Form | Behavior | Result for `wrapper \"hello world\" foo` |\n| --- | --- | --- |\n| `\"$@\"` | Each arg as separate word | `\"hello world\"`, `foo` (2 args) — RIGHT |\n| `$@` (unquoted) | Each arg, word-split | `hello`, `world`, `foo` (3 args) — WRONG |\n| `\"$*\"` | All args as one string | `\"hello world foo\"` (1 arg) — WRONG (usually) |\n| `$*` (unquoted) | All args, word-split | `hello`, `world`, `foo` (3 args) — WRONG |\n| `$#` | Argument count | `2` |\n| `$1`, `$2`, ... | Specific positional | `\"hello world\"`, `foo` |\n\n**Reflexive habit:** `\"$@\"` for forwarding, `$#` for arg count, `$1`/`$2` for specific args. Cross-link to `m4-s9-c1` (special parameters foundation).",
+        "Wrong — `\"$*\"` joins everything into one string. Useful occasionally (e.g., for printing a friendly arg summary), but wrong for forwarding to a command that expects multiple args.",
+        "Wrong — unquoted `$@` undergoes word splitting and breaks args with spaces. The quoted form `\"$@\"` is mandatory for correctness."
+      ]
+    }
+  ]
+}
