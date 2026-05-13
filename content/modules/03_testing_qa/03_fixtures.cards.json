@@ -1,0 +1,242 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 3,
+  "sphere_id": "m3-s3",
+  "cards": [
+    {
+      "id": "m3-s3-c1",
+      "type": "flip",
+      "topic": "@pytest.fixture and name-matching DI",
+      "topic_ru": "@pytest.fixture и DI по имени",
+      "difficulty": 1,
+      "tags": ["pytest", "fixture", "dependency-injection", "interview-warmup"],
+      "question": "How does pytest decide which fixture to pass to a test function's `cart` parameter?",
+      "answer": "By **name matching**, not by type. pytest sees `cart` in the parameter list, searches for a fixture *named* `cart` (defined in the same file via `@pytest.fixture`, or in a `conftest.py` above the test, or in a registered plugin), calls it, and passes the return value as the `cart` argument. There's no type-based resolution — `cart: Cart` annotation is documentation only; the type is ignored by pytest's resolver.",
+      "answer_explanation_md": "This is the dependency-injection part of pytest. Tests declare what they need by parameter name; pytest builds it. The DI graph supports chaining: `def repo(db_session): ...` is itself a fixture that takes a `db_session` fixture as input, resolved the same way. Deepest dependencies run first; the test runs last. This is how production test suites stay readable — each fixture is one job."
+    },
+
+    {
+      "id": "m3-s3-c2",
+      "type": "code_trap",
+      "topic": "Missing fixture parameter — test doesn't get it",
+      "topic_ru": "Отсутствующий параметр fixture — тест её не получает",
+      "difficulty": 3,
+      "tags": ["pytest", "fixture", "dependency-injection", "discovery"],
+      "code_snippet": "import pytest\n\n@pytest.fixture\ndef cart():\n    return Cart()\n\ndef test_cart_empty():           # note: no 'cart' parameter\n    assert cart.total() == 0",
+      "question": "What happens when this test runs?",
+      "options": [
+        "Passes — pytest auto-injects all fixtures in the file.",
+        "Fails with `NameError: name 'cart' is not defined`. The fixture is *defined* but the test doesn't *request* it (the parameter is missing), so pytest never calls the fixture. The bare `cart` reference inside the test body resolves against module globals, finds nothing, and raises NameError. Fix: add `cart` to the test signature: `def test_cart_empty(cart):`.",
+        "Fails with `pytest.UsageError: fixture not requested`.",
+        "The fixture function itself runs and `cart` refers to it (a function object)."
+      ],
+      "correct_index": 1,
+      "explanation_md": "pytest's fixture system is **explicit**: a test gets a fixture only when it declares the fixture name as a parameter. Defining `@pytest.fixture def cart()` doesn't put `cart` in any namespace the test body can see — fixtures aren't globals. The test body's `cart` is a bare name lookup, which falls through the module's globals (where it finds the *function* `cart`, not the `Cart` instance) and then fails on `.total()` because functions don't have a `.total` method (`AttributeError`, not `NameError` — but similar surprise).\n\nThe canonical mistake when learning pytest: copy a fixture from a tutorial, forget to add the parameter, see a confusing error. The fix is one parameter:\n\n```python\ndef test_cart_empty(cart):\n    assert cart.total() == 0\n```\n\n**Rule:** every fixture your test uses must appear in the test's parameter list. If you don't request it, you don't get it."
+    },
+
+    {
+      "id": "m3-s3-c3",
+      "type": "code_task",
+      "topic": "Define a fixture and use it from a test",
+      "topic_ru": "Определить fixture и использовать в тесте",
+      "difficulty": 2,
+      "tags": ["pytest", "fixture", "patterns"],
+      "prompt_md": "Implement a `Counter` class with:\n\n- `__init__()` initializing the count to 0.\n- `increment()` adding 1 to the count.\n- `value` property returning the current count.\n\nThe hidden tests define a `@pytest.fixture` that returns a fresh `Counter()` per test and request it by name. Your job is just the `Counter` class — if it works, the fixture-driven tests pass.",
+      "starter_code": "class Counter:\n    # your code here\n    pass\n",
+      "solution_code": "class Counter:\n    def __init__(self):\n        self._count = 0\n\n    def increment(self):\n        self._count += 1\n\n    @property\n    def value(self):\n        return self._count\n",
+      "tests": "import pytest\nfrom solution import Counter\n\n@pytest.fixture\ndef counter():\n    return Counter()\n\ndef test_starts_at_zero(counter):\n    assert counter.value == 0\n\ndef test_increment_adds_one(counter):\n    counter.increment()\n    assert counter.value == 1\n\ndef test_increments_compound(counter):\n    counter.increment()\n    counter.increment()\n    counter.increment()\n    assert counter.value == 3\n\ndef test_fixture_is_fresh_per_test(counter):\n    # If the fixture were session-scoped, this test would see count > 0\n    # because the previous tests incremented. Default scope is function,\n    # so each test gets a fresh Counter.\n    assert counter.value == 0\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s3-c4",
+      "type": "multiple_choice",
+      "topic": "Fixture chaining for DI hierarchies",
+      "topic_ru": "Цепочка fixtures для иерархий DI",
+      "difficulty": 4,
+      "tags": ["pytest", "fixture", "chaining", "dependency-injection", "advanced"],
+      "question": "You want a `repo` fixture that needs a `db_session`, which needs a `db` connection. How do you wire the DI hierarchy in pytest?",
+      "options": [
+        "Build them all inside `repo`: `@pytest.fixture def repo(): db = connect(); session = db.session(); return Repo(session)`.",
+        "Each layer is a separate fixture; later layers declare earlier ones as parameters. pytest resolves the graph deepest-first.\n\n```python\n@pytest.fixture\ndef db():\n    return connect()\n\n@pytest.fixture\ndef db_session(db):\n    return db.session()\n\n@pytest.fixture\ndef repo(db_session):\n    return Repo(db_session)\n```\n\nA test asking for `repo` triggers the whole chain; a test asking for just `db` gets only `db`. Each layer is reusable in isolation.",
+        "Use `@pytest.fixture(depends_on=['db', 'session'])` to declare dependencies.",
+        "pytest doesn't support fixture chaining; flatten everything into one fixture."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Works but loses the reusability benefit — a test that needs only `db_session` (not the full repo) still pays the cost of building one, AND if multiple test files need `db_session`, the construction logic is duplicated.",
+        "Correct. Fixtures-using-fixtures is the canonical pytest DI pattern. Each layer is a separate `@pytest.fixture` that declares its upstream layers as parameters. pytest topologically sorts the graph and resolves deepest-first. The wider implication: this is how you separate slow/expensive setup (a single shared `db` at session scope) from cheap setup (a fresh `db_session` per test) cleanly.",
+        "Wrong — there's no `depends_on` parameter. The parameter list IS the dependency declaration; that's the whole point of name-matching DI.",
+        "Wrong — fixture chaining is supported and idiomatic. The misconception comes from frameworks (e.g., older `unittest`) where setup couldn't compose."
+      ]
+    },
+
+    {
+      "id": "m3-s3-c5",
+      "type": "flip",
+      "topic": "yield-based fixture + cleanup-on-failure property",
+      "topic_ru": "yield-fixture и cleanup при провале теста",
+      "difficulty": 2,
+      "tags": ["pytest", "fixture", "yield", "teardown"],
+      "question": "What does the `yield` form of a pytest fixture give you, and what's the critical reliability property?",
+      "answer": "The `yield` form lets a fixture do setup, hand a value to the test via `yield`, and run cleanup code afterward. **Critical property:** the cleanup runs **even if the test raises or asserts false**. pytest catches the test's exception, re-enters the generator (running the code after `yield`), then re-raises. You get guaranteed teardown without a `try/except` in the test body.\n\n```python\n@pytest.fixture\ndef db_session():\n    session = SessionFactory()\n    try:\n        yield session            # test runs here\n    finally:\n        session.rollback()       # ALWAYS runs\n        session.close()\n```",
+      "answer_explanation_md": "Before yield-fixtures, pytest used `request.addfinalizer(cleanup)` callbacks for the same purpose. That style still works but reads worse — the cleanup is registered imperatively instead of structured as a `finally` block. New code uses `yield` exclusively. The `try/finally` around `yield` is good practice when the setup itself can raise after the resource is acquired; for simple cases, `yield` followed by cleanup statements is enough."
+    },
+
+    {
+      "id": "m3-s3-c6",
+      "type": "code_task",
+      "topic": "yield fixture with finalizer; verify teardown via state",
+      "topic_ru": "yield-fixture с финализатором; проверить teardown через состояние",
+      "difficulty": 3,
+      "tags": ["pytest", "fixture", "yield", "teardown", "patterns"],
+      "prompt_md": "Implement a `Resource` class that:\n\n- Has a class attribute `open_count` tracking how many `Resource` instances are currently 'open'.\n- `__init__()` increments `Resource.open_count`.\n- `close()` decrements `Resource.open_count` (only if currently > 0; never goes negative).\n- Has a class method `reset()` that resets `open_count` to 0 (for test isolation).\n\nThe hidden tests use a `yield` fixture that constructs a `Resource`, yields it, and calls `.close()` in the cleanup. They verify the teardown ran by checking `open_count` at the start of the next test.",
+      "starter_code": "class Resource:\n    open_count = 0\n\n    # your code here\n",
+      "solution_code": "class Resource:\n    open_count = 0\n\n    def __init__(self):\n        Resource.open_count += 1\n\n    def close(self):\n        if Resource.open_count > 0:\n            Resource.open_count -= 1\n\n    @classmethod\n    def reset(cls):\n        cls.open_count = 0\n",
+      "tests": "import pytest\nfrom solution import Resource\n\n@pytest.fixture(autouse=True)\ndef reset_resource_state():\n    Resource.reset()\n    yield\n\n@pytest.fixture\ndef resource():\n    r = Resource()\n    yield r\n    r.close()\n\ndef test_resource_is_open_during_test(resource):\n    assert Resource.open_count == 1\n\ndef test_resource_was_closed_after_previous_test():\n    # Without the yield-finalizer in the `resource` fixture, this would be 1\n    # (the previous test would have leaked an open Resource).\n    assert Resource.open_count == 0\n\ndef test_double_close_safe(resource):\n    resource.close()\n    resource.close()\n    assert Resource.open_count == 0\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s3-c7",
+      "type": "code_trap",
+      "topic": "Teardown runs even when the test fails",
+      "topic_ru": "Teardown выполняется, даже если тест упал",
+      "difficulty": 4,
+      "tags": ["pytest", "fixture", "yield", "teardown", "reliability", "interview-classic"],
+      "code_snippet": "log = []\n\n@pytest.fixture\ndef tracked():\n    log.append('setup')\n    yield 'value'\n    log.append('teardown')\n\ndef test_that_fails(tracked):\n    log.append('test-body-start')\n    assert tracked == 'wrong'        # FAILS\n    log.append('test-body-end')      # never reached",
+      "question": "After this failing test runs, what does `log` contain?",
+      "options": [
+        "`['setup', 'test-body-start']` — the test failed, so teardown is skipped.",
+        "`['setup', 'test-body-start', 'teardown']`. The assertion fails, the test-body never reaches `test-body-end`, but pytest re-enters the fixture generator to run the code after `yield` anyway. This is the **guaranteed cleanup** property: teardown runs whether the test passes or fails. It's the entire reliability argument for `yield` fixtures.",
+        "`['setup', 'test-body-start', 'test-body-end', 'teardown']`.",
+        "`['setup', 'test-body-start', 'teardown', 'test-body-end']` — pytest runs teardown before the assertion error propagates."
+      ],
+      "correct_index": 1,
+      "explanation_md": "pytest's fixture cleanup is the *whole point* of yield-fixtures. When the test raises (assertion failure, runtime exception, anything), pytest catches it, re-enters the generator to run the post-`yield` code, then re-raises the original exception. You get the guarantee that `session.rollback()`, `tempfile.cleanup()`, `socket.close()`, etc. ALL run, regardless of test outcome.\n\nThis is *why* `yield` fixtures replaced the older `setUp` / `tearDown` class methods: with classes, a `tearDown` is run by the harness but it's separated from the matching `setUp`, easy to forget, and doesn't naturally express the resource-acquisition-is-initialization pattern. `yield` puts setup and cleanup in the same function, structured as `try: yield ... finally: cleanup()` — same shape as a Python context manager.\n\nThe interview question: 'what happens to my fixture cleanup if the test asserts False?' — Answer: 'It still runs. That's the guarantee.' Getting this wrong signals 'I've never relied on fixture cleanup in anger.'"
+    },
+
+    {
+      "id": "m3-s3-c8",
+      "type": "flip",
+      "topic": "Four fixture scopes — function / class / module / session",
+      "topic_ru": "Четыре scope fixtures — function / class / module / session",
+      "difficulty": 2,
+      "tags": ["pytest", "fixture", "scope"],
+      "question": "Name the four pytest fixture scopes and what each one means.",
+      "answer": "`function` (default): fresh fixture per test function. `class`: one fixture per test class — same instance reused across that class's test methods. `module`: one fixture per `.py` file — shared across every test in the module. `session`: one fixture per `pytest` invocation — shared across the entire test run.\n\nDeclared via `@pytest.fixture(scope=\"session\")` (or `class` / `module`). Wider scopes amortize expensive setup (DB connection, Docker container, large dataset) across more tests, at the cost of state sharing.",
+      "answer_explanation_md": "Default to `function` and widen only when setup is genuinely expensive (>100ms) AND the fixture is **read-only** within tests. Mutable shared state at wider scope is the classic test-suite poison: test A modifies the fixture, test B reads it after, intermittent failures depending on which order pytest happens to run them. There's also `package` scope (per-package, between module and session) but it's rarely used; the four canonical scopes are the ones interviewers ask about."
+    },
+
+    {
+      "id": "m3-s3-c9",
+      "type": "multiple_choice",
+      "topic": "Choosing the right scope for the resource",
+      "topic_ru": "Выбор scope под ресурс",
+      "difficulty": 3,
+      "tags": ["pytest", "fixture", "scope", "patterns"],
+      "question": "Which scope is correct for each resource?",
+      "options": [
+        "DB connection pool: `session`. Per-test fresh DB session for ORM work: `function`. Read-only loaded config: `module` or `session`. Temp directory for one test's file I/O: `function`.",
+        "All four: `session` — wider is always faster and pytest handles isolation automatically.",
+        "All four: `function` — anything wider is unsafe.",
+        "DB connection pool: `function`. Per-test session: `session`. Config: `class`. Temp directory: `module`."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. Match the scope to the resource's actual lifetime + mutability. A connection pool is expensive to build and read-only-shared → `session`. A DB session (transactional state per test) is cheap to build and inherently per-test → `function`. Config loaded from disk doesn't change → `module` or `session`. A temp directory is one test's scratch space → `function` (and pytest's built-in `tmp_path` fixture handles this).",
+        "Wrong — pytest does NOT handle isolation for mutable state at `session` scope. Sharing a mutable fixture across all tests is exactly the contamination trap.",
+        "Wrong — using `function` everywhere is safe but slow. A genuinely-expensive read-only fixture (DB connection, large model load) at `function` scope wastes minutes per CI run for no isolation benefit.",
+        "Backward. Connection pool at `function` re-creates the pool per test (slow); DB session at `session` shares transactional state across tests (broken)."
+      ]
+    },
+
+    {
+      "id": "m3-s3-c10",
+      "type": "code_trap",
+      "topic": "Session-scoped mutable state contaminates later tests",
+      "topic_ru": "Session-scoped mutable state контаминирует поздние тесты",
+      "difficulty": 4,
+      "tags": ["pytest", "fixture", "scope", "mutable-state", "contamination", "interview-classic"],
+      "code_snippet": "@pytest.fixture(scope='session')\ndef users():\n    return []                  # SHARED across the entire test run\n\ndef test_add_alice(users):\n    users.append({'name': 'alice'})\n    assert len(users) == 1     # passes — first to run\n\ndef test_add_bob(users):\n    users.append({'name': 'bob'})\n    assert len(users) == 1     # FAILS — sees alice from previous test",
+      "question": "What kind of bug is hiding here, and why might it appear intermittently?",
+      "options": [
+        "A logic bug; the count should be 2 in `test_add_bob`.",
+        "A **scope contamination** bug. `users = []` is session-scoped, meaning *one list is shared across every test in the run*. `test_add_alice` appends, `test_add_bob` sees the alice already there, and `len(users) == 1` fails. Worse, pytest can run tests in arbitrary order (alphabetical, by file, with `--last-failed`, parallelized), so the failure depends on order — green locally where `test_add_bob` ran first, red in CI where it runs second. Fix: drop to `scope='function'` (default), or make the fixture return an immutable snapshot.",
+        "A pytest bug — fixtures should be isolated.",
+        "Nothing — the test expectations are just wrong."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Wider scope means longer-lived fixture; mutable fixture means tests can change it; the combination means tests can affect each other.\n\nThis is the canonical session-scope poison. Symptoms:\n\n- Tests pass locally where you happen to run them in one order, fail in CI where they run in another.\n- `pytest test_add_bob.py` alone passes; `pytest tests/` fails on `test_add_bob`.\n- Adding `pytest -p no:randomly` (or removing it) flips the outcome.\n- A new test introduced six months later breaks two unrelated tests that 'were passing yesterday'.\n\nThe fix is to use `function` scope (the default) so each test gets a fresh list:\n\n```python\n@pytest.fixture\ndef users():\n    return []                 # fresh per test\n```\n\nIf the *expensive* part is something else (DB connection), split: session-scoped *immutable* DB connection + function-scoped *mutable* session built on top. **Rule:** wider scope is only safe for read-only fixtures. Mutable state at wider-than-function is a code-review blocker."
+    },
+
+    {
+      "id": "m3-s3-c11",
+      "type": "flip",
+      "topic": "conftest.py auto-discovery — no import needed",
+      "topic_ru": "conftest.py автоматическое обнаружение — импорт не нужен",
+      "difficulty": 2,
+      "tags": ["pytest", "conftest", "discovery"],
+      "question": "What does `conftest.py` do, and why don't tests import it?",
+      "answer": "`conftest.py` is a pytest-recognized filename for sharing fixtures (and hooks, plugins, custom markers) across multiple test files. pytest **automatically discovers** every `conftest.py` from each test file's location up to the project root and makes fixtures defined in them available *by name* to tests under that directory tree. The auto-discovery is the whole reason — tests don't `import conftest`, and you should never write that import in your code (it's wrong and would shadow pytest's discovery).",
+      "answer_explanation_md": "Reach for `conftest.py` when ≥2 test files need the same fixture. For one file, define the fixture inline (no benefit to splitting). Hierarchy: a `tests/integration/conftest.py` is visible only to tests under `tests/integration/`; a `tests/conftest.py` is visible to everything in `tests/`. A fixture in a nearer `conftest.py` **overrides** one with the same name from a farther one — this is how a subdirectory can specialize a shared fixture."
+    },
+
+    {
+      "id": "m3-s3-c12",
+      "type": "multiple_choice",
+      "topic": "conftest.py visibility rules",
+      "topic_ru": "Правила видимости conftest.py",
+      "difficulty": 3,
+      "tags": ["pytest", "conftest", "scope", "hierarchy"],
+      "question": "You have this layout. Which fixtures are visible to `tests/integration/test_db.py`?\n\n```\ntests/\n├── conftest.py            # defines fixture `app_config`\n├── unit/\n│   ├── conftest.py        # defines fixture `mock_user`\n│   └── test_users.py\n└── integration/\n    ├── conftest.py        # defines fixture `db_session`\n    └── test_db.py\n```",
+      "options": [
+        "Only `db_session` — the nearest conftest wins, others are hidden.",
+        "All three — every conftest.py in the project is visible to every test.",
+        "`db_session` (from `tests/integration/conftest.py`, the nearest) AND `app_config` (from `tests/conftest.py`, an ancestor directory). `mock_user` is NOT visible — it lives in a *sibling* directory (`tests/unit/`), not an ancestor, so pytest doesn't make it available here.",
+        "Only `app_config` — root conftest wins."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — `app_config` from the parent conftest IS visible. Fixtures cascade *down* the directory tree, they don't get hidden by closer conftests unless there's a name collision.",
+        "Wrong — sibling conftests are isolated. `tests/unit/conftest.py` is visible only under `tests/unit/`.",
+        "Correct. pytest walks from the test file's location up to the root, collecting conftest.py files; every fixture in those is visible to the test. Sibling directories are out of scope. Same-named fixture in a nearer conftest overrides a farther one (which is how you specialize per-subtree).",
+        "Wrong — fixtures cascade down, not up; both ancestor conftests contribute. `db_session` is also visible because it's right next to the test."
+      ]
+    },
+
+    {
+      "id": "m3-s3-c13",
+      "type": "fill_in",
+      "topic": "Canonical conftest.py shared-fixture pattern",
+      "topic_ru": "Канонический conftest.py паттерн с общей fixture",
+      "difficulty": 1,
+      "tags": ["pytest", "conftest", "patterns"],
+      "code_snippet_with_blanks": "# tests/conftest.py\n\nimport pytest\n\n@pytest.___\ndef app_config():\n    return {'debug': True, 'port': 8080}\n\n# tests/test_routes.py (no import of conftest needed)\n\ndef test_uses_config(___):\n    assert app_config['port'] == 8080",
+      "accepted_answers": [
+        ["fixture"],
+        ["app_config"]
+      ],
+      "explanation_md": "Two reflexes: `@pytest.fixture` decorates the function in `conftest.py` (no scope= because the default `function` is right for most cases); the test in any sibling or descendant file declares `app_config` as a parameter and gets it by name — no `import conftest`, no `from conftest import app_config`. The auto-discovery is what makes the pattern work; bypassing it with an explicit import is wrong and breaks pytest's resolution graph."
+    },
+
+    {
+      "id": "m3-s3-c14",
+      "type": "code_trap",
+      "topic": "Nearer conftest fixture overrides farther one",
+      "topic_ru": "Ближайший conftest fixture перекрывает более далёкий",
+      "difficulty": 4,
+      "tags": ["pytest", "conftest", "hierarchy", "override", "subtle"],
+      "code_snippet": "# tests/conftest.py\n@pytest.fixture\ndef db_session():\n    return RealDBSession()    # talks to a real test DB\n\n# tests/unit/conftest.py\n@pytest.fixture\ndef db_session():\n    return MockDBSession()    # in-memory mock\n\n# tests/unit/test_users.py\ndef test_create_user(db_session):\n    ...",
+      "question": "Which `db_session` does `test_create_user` receive, and what's the design lesson?",
+      "options": [
+        "`RealDBSession` — the root conftest wins; subdirectory conftests don't override.",
+        "Both, somehow merged — pytest combines fixtures with the same name.",
+        "Raises `pytest.FixtureLookupError: ambiguous fixture` because two definitions exist.",
+        "`MockDBSession`. The **nearer** conftest (`tests/unit/conftest.py`) overrides the farther one (`tests/conftest.py`) when their fixture names collide. The design pattern: define a default fixture at a higher level (e.g. `tests/conftest.py` gives a real DB session), and let a subdirectory specialize it (`tests/unit/conftest.py` swaps to a mock so unit tests don't hit a real DB). The specialization happens by name collision; no explicit `override=True` needed."
+      ],
+      "correct_index": 3,
+      "explanation_md": "pytest resolves fixture names by walking from the test file's location up the directory tree, taking the **first** fixture with the matching name. The nearest conftest wins. This isn't a bug — it's the deliberate mechanism for sub-tree specialization:\n\n- Default fixture (real DB, full network, slow setup) at `tests/conftest.py`.\n- Faster / mocked variant for one subtree (`tests/unit/conftest.py` overrides with `MockDBSession`).\n- Tests under `tests/integration/` keep the real version (no override there).\n\nThe footgun: an override added in a subdirectory conftest silently changes the behavior of tests below it. A reviewer reading just `test_users.py` doesn't see the override; they have to walk up the tree to know which `db_session` is in scope. Mitigation: keep the override fixtures *visibly distinct* (different `RealDBSession` vs `MockDBSession` types), and document the specialization rationale in the conftest where it lives.\n\nThe interview question: 'how do you make unit tests use a mock DB while integration tests use the real one, with no test-file changes?' — Answer: 'override the fixture in the unit-tests subdirectory's conftest.'"
+    }
+  ]
+}
