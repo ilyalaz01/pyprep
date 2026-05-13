@@ -1,0 +1,257 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s1",
+  "cards": [
+    {
+      "id": "m4-s1-c1",
+      "type": "flip",
+      "topic": "pwd/cd/ls basics + cd shortcuts (~, .., -)",
+      "topic_ru": "Основы pwd/cd/ls + сокращения cd (~, .., -)",
+      "difficulty": 2,
+      "tags": ["linux", "cli", "navigation", "interview-warmup"],
+      "question": "What do `pwd`, `cd ~`, `cd ../..`, and `cd -` each do?",
+      "answer": "`pwd` prints the current working directory (an absolute path). `cd ~` (or bare `cd`) goes to your home directory. `cd ../..` goes up two levels from the current directory (`..` is one level up). `cd -` jumps to the **previous** directory — whatever you were in before the last `cd`. The shell tracks the previous location in `$OLDPWD` and `cd -` swaps the two, so calling `cd -` again returns you to where you started. Useful for ping-ponging between two paths without retyping.",
+      "answer_explanation_md": "`ls -la` adds long format (`-l`: perms/owner/group/size/date) and includes hidden dot-files (`-a`). `ls -lh` adds human-readable sizes (`1.4K` instead of `1432`). Knowing `cd -` and `cd ~` reflexively is one of the cheapest interview signals — it's the cost of zero, and not having it suggests you've never lived in a terminal."
+    },
+
+    {
+      "id": "m4-s1-c2",
+      "type": "multiple_choice",
+      "topic": "Reading ls -l output columns",
+      "topic_ru": "Чтение колонок вывода ls -l",
+      "difficulty": 3,
+      "tags": ["linux", "ls", "permissions", "metadata"],
+      "question": "Given the `ls -l` line below, which row correctly identifies all of: file type, owner, group, size, and the permission for **other** users?\n\n```\ndrwxr-x---  3 alice  staff   96  May 13 14:30  secrets\n```",
+      "options": [
+        "Type: regular file. Owner: alice. Group: staff. Size: 96 bytes. Other-permissions: r-x.",
+        "Type: directory (`d` prefix). Owner: alice. Group: staff. Size: 96 bytes. Other-permissions: `---` (no read, no write, no execute — completely locked out).",
+        "Type: symlink. Owner: staff. Group: alice. Size: 3 (links count). Other-permissions: rwx.",
+        "Type: directory. Owner: alice. Group: staff. Size: 3. Other-permissions: r-x."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on the type (`d` prefix means directory, not regular file) and on other-permissions (last three chars are `---`, not `r-x`).",
+        "Correct. Read the first character for type (`-` file, `d` directory, `l` symlink). The next 9 split as `rwx` × 3 groups: owner / group / other. Last three (`---`) here means 'other' has zero permissions. The single number after perms (`3`) is the link count (number of hard links / for directories, includes `.` and `..`); the size column (`96`) is bytes.",
+        "Wrong on type, on owner/group ordering, and on other-permissions.",
+        "Wrong on size — `3` is the link count, not the size; size is `96`. The `r-x` for other is also wrong; it's `---`."
+      ]
+    },
+
+    {
+      "id": "m4-s1-c3",
+      "type": "code_trap",
+      "topic": "Bash glob `*` does NOT match hidden (dot) files by default",
+      "topic_ru": "Bash glob * НЕ матчит скрытые (dot) файлы по умолчанию",
+      "difficulty": 4,
+      "tags": ["linux", "bash", "globbing", "hidden-files", "subtle", "interview-classic"],
+      "code_snippet": "# Directory contents:\n#   notes.txt\n#   .env\n#   .git/  (directory)\n#   draft.md\n\n$ cp -r * /backup/",
+      "question": "What does this command actually copy to `/backup/`, and what does it MISS?",
+      "options": [
+        "Everything in the current directory, including `.env` and `.git/`.",
+        "Only `notes.txt` and `draft.md`. **`*` does NOT match hidden (dot) files in bash by default** — the glob expansion deliberately excludes anything starting with `.` (controlled by the `dotglob` shopt option, off by default). So `.env` and `.git/` are silently left behind. The fix depends on intent: `cp -r * .* /backup/` is wrong too (`.* ` matches `.` and `..` which causes infinite recursion); `cp -r .[!.]* * /backup/` or enabling `shopt -s dotglob` first, or just `cp -a . /backup/` (the safe-default archive form that uses the directory directly, not a glob).",
+        "All files except `.git/` (which is a directory and not file-globbed).",
+        "Raises `cp: cannot stat '*': No such file or directory` because shell didn't expand."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The hidden-files-not-globbed-by-default rule is bash's deliberate guard against the original `cp * /dest/` mistake of accidentally copying `.git/`, `.env`, `.ssh/`, etc. when you meant 'the project files'. It's a feature, but it also means automated scripts that mean 'copy the whole directory' need to use `cp -a source/. dest/` or `rsync`, not `cp -r *`.\n\nThe shell options:\n\n```bash\nshopt -s dotglob      # globs (including *) now match dot-files\nshopt -u dotglob      # back to default (don't match)\n```\n\nThe footgun is the *silent* miss — no error, no warning, just incomplete copy. Six months later someone notices `.env` wasn't backed up. **Rule:** when copying 'everything', prefer `cp -a source_dir/ dest_dir/` (operates on the directory, not its expansion) or `rsync -av source_dir/ dest_dir/` (explicit, well-known, handles hidden files correctly by default)."
+    },
+
+    {
+      "id": "m4-s1-c4",
+      "type": "flip",
+      "topic": "touch/mkdir/rm basics",
+      "topic_ru": "Базовые touch/mkdir/rm",
+      "difficulty": 1,
+      "tags": ["linux", "cli", "files", "interview-warmup"],
+      "question": "What do `touch foo`, `mkdir bar`, `rm foo`, and `rm -rf bar/` each do?",
+      "answer": "`touch foo` creates an empty file `foo` if it doesn't exist (or updates its modification time if it does). `mkdir bar` creates a directory `bar`. `rm foo` deletes the file `foo` — there is no Trash on Linux CLI; the file is gone immediately, no recovery. `rm -rf bar/` recursively deletes the directory `bar` and everything inside it, no prompts (`-f` suppresses confirmations and missing-file errors), no recovery.",
+      "answer_explanation_md": "The blast radius asymmetry: `rm foo` deletes one file. `rm -rf bar/` deletes a directory tree of arbitrary depth. The `-rf` combination is the one to be careful with — `r` recurses, `f` silences the safety prompts. A typo in the path passed to `rm -rf` is one of the most common production-incident shapes. Never type `rm -rf` against a path you constructed via string interpolation without explicit validation."
+    },
+
+    {
+      "id": "m4-s1-c5",
+      "type": "multiple_choice",
+      "topic": "mkdir -p semantics",
+      "topic_ru": "Семантика mkdir -p",
+      "difficulty": 2,
+      "tags": ["linux", "mkdir", "idempotency"],
+      "question": "What does `mkdir -p a/b/c/d` do, and how does it differ from `mkdir a/b/c/d`?",
+      "options": [
+        "Both commands fail unless `a`, `a/b`, and `a/b/c` already exist. `-p` is just a verbose alias.",
+        "`mkdir a/b/c/d` (no `-p`) fails with `No such file or directory` if any intermediate (`a`, `a/b`, `a/b/c`) doesn't exist. `mkdir -p a/b/c/d` creates the whole chain in one call AND is idempotent — if `a/b/c/d` already exists, it exits 0 silently instead of erroring. Use `-p` whenever the path-already-exists case is acceptable (almost always in scripts).",
+        "`-p` makes the directory hidden.",
+        "`-p` sets permissions to 700 by default."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `-p` has real semantics: create-intermediates AND idempotent-if-exists.",
+        "Correct. The two effects together (create chain + idempotent) make `mkdir -p` the default for scripts. Without `-p`, scripts that re-run partway through fail on the second run because the directory already exists; with `-p`, re-runs are safe. Same shape as `os.makedirs(path, exist_ok=True)` in Python (covered in m2-s1).",
+        "Wrong — `-p` doesn't affect visibility. The directory name controls that (leading `.` makes it hidden).",
+        "Wrong — `-p` doesn't change perms. Default perms come from `umask` — typically `0022` mask gives `0755` (rwxr-xr-x) for new directories."
+      ]
+    },
+
+    {
+      "id": "m4-s1-c6",
+      "type": "code_trap",
+      "topic": "rm -rf with unset variable becomes rm -rf /",
+      "topic_ru": "rm -rf с unset-переменной превращается в rm -rf /",
+      "difficulty": 4,
+      "tags": ["linux", "rm", "danger", "shell", "incident", "interview-classic"],
+      "code_snippet": "#!/bin/bash\n# Cleanup script (with a bug)\n\nBUILD_DIR=$BUILD_DIR_OVERRIDE   # caller forgot to set this\nrm -rf $BUILD_DIR/*\n\n# If $BUILD_DIR_OVERRIDE is unset, what runs?",
+      "question": "When `$BUILD_DIR_OVERRIDE` is unset, `$BUILD_DIR` is empty. What does `rm -rf $BUILD_DIR/*` expand to and execute?",
+      "options": [
+        "`rm -rf /*` — wipes the entire root filesystem (excluding `/` itself thanks to `--preserve-root`).",
+        "`rm -rf /*` — wipes everything under root. `$BUILD_DIR` expands to nothing, leaving `/*` which the shell globs to every top-level entry (`/etc`, `/var`, `/home`, etc.). `--preserve-root` protects `rm -rf /` itself but NOT `rm -rf /*` because the glob already expanded to individual paths the kernel sees as legitimate top-level deletions. This is the Steam Linux 2015 bug shape. **Defenses:** `set -u` (unset variable → fail before the call); always quote `\"$VAR\"`; validate paths before passing to `rm -rf` (e.g., `[[ \"$BUILD_DIR\" == /opt/build/* ]] || exit 1`).",
+        "Nothing — bash errors out on the unset variable before running.",
+        "`rm -rf /BUILD_DIR/*` — the literal variable name is preserved."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The exact bytes of the failure:\n\n1. `$BUILD_DIR_OVERRIDE` is unset; bash expands to empty string.\n2. `BUILD_DIR=` (the empty string).\n3. `rm -rf $BUILD_DIR/*` expands to `rm -rf /*`.\n4. The shell globs `/*` into every top-level path (`/etc`, `/usr`, `/var`, `/home`, ...).\n5. `--preserve-root` protects against `rm -rf /` (root itself), but each individual top-level path is a valid target.\n6. Filesystem destruction proceeds until the kernel or a permission error stops it.\n\nThe canonical defenses, layered:\n\n```bash\n#!/bin/bash\nset -euo pipefail            # unset var → script fails BEFORE the call\n\nBUILD_DIR=${BUILD_DIR_OVERRIDE:?BUILD_DIR_OVERRIDE must be set}\n# OR:\n: \"${BUILD_DIR_OVERRIDE:?must be set}\"\nBUILD_DIR=\"$BUILD_DIR_OVERRIDE\"\n\n# Defensive path validation\n[[ \"$BUILD_DIR\" == /opt/build/* ]] || { echo 'invalid BUILD_DIR'; exit 1; }\n\nrm -rf \"$BUILD_DIR\"/*\n```\n\nThe `${VAR:?error}` form fails the script if `VAR` is unset OR empty. `set -u` catches the same case earlier. Both are reflexes worth having; relying on neither and writing `rm -rf $VAR/*` is the line that ends up in postmortems."
+    },
+
+    {
+      "id": "m4-s1-c7",
+      "type": "code_trap",
+      "topic": "--preserve-root and the modern GNU coreutils protection",
+      "topic_ru": "--preserve-root и защита в современном GNU coreutils",
+      "difficulty": 3,
+      "tags": ["linux", "rm", "preserve-root", "coreutils"],
+      "code_snippet": "# Three commands, three different outcomes:\n\n(A)  rm -rf /\n(B)  rm -rf /home/alice/oldproject\n(C)  rm -rf $UNSET_VAR/some/path",
+      "question": "On a modern Linux (GNU coreutils 8.x+, `--preserve-root` default), which of these is rejected outright, and which still goes through?",
+      "options": [
+        "All three are rejected — modern Linux refuses any `rm -rf` on a root-anchored path.",
+        "All three succeed — `--preserve-root` is opt-in, not default.",
+        "(A) is **rejected** outright (`rm: it is dangerous to operate recursively on '/'`). (B) **succeeds** — it's a legitimate, well-scoped delete. (C) **succeeds** silently — `$UNSET_VAR` is empty, so the path becomes `/some/path`, which is root-anchored but NOT exactly `/`. `--preserve-root` protects only the literal root; subpaths of root are fair game. This is why the empty-variable trap (`m4-s1-c6`) is more dangerous than `rm -rf /` itself — modern coreutils caught the latter and forgot the former.",
+        "Only (A) is rejected. (B) and (C) both succeed, but for the same reason."
+      ],
+      "correct_index": 2,
+      "explanation_md": "`--preserve-root` was added to GNU coreutils in 2006 specifically to refuse `rm -rf /`. It's been the default since coreutils 6.x. BUT — and this is the operational point — it only fires on `/` itself. Any other root-anchored path is considered a legitimate deletion request because the shell already resolved the path to a specific target.\n\nThe consequence: defensive programming around `rm -rf` cannot rely on `--preserve-root`. You have to validate the path *before* the shell expands it. The right reflexes:\n\n- `set -u` (or `set -euo pipefail` as the standard 'safe bash' triple).\n- `${VAR:?reason}` to fail-with-message when a required variable is unset or empty.\n- Path-prefix validation: `[[ \"$path\" == /opt/myapp/* ]] || exit 1` before any destructive operation.\n\nThe coreutils developers can't tell `rm -rf /home/alice/oldproject` (valid) from `rm -rf /home/alice/wrongdir` (typo). That distinction lives in your script; `--preserve-root` is the floor, not the ceiling."
+    },
+
+    {
+      "id": "m4-s1-c8",
+      "type": "flip",
+      "topic": "cp/mv basics + directory flag asymmetry",
+      "topic_ru": "Основы cp/mv + асимметрия флага для директорий",
+      "difficulty": 2,
+      "tags": ["linux", "cp", "mv", "patterns"],
+      "question": "What's the difference between `cp` and `mv`, and what's the trap for new users around directories?",
+      "answer": "`cp source dest` **copies** (two files exist after). `mv source dest` **moves or renames** (only the destination exists after). The trap: `cp source_dir dest_dir` **fails by default** when the source is a directory — you need `cp -r source_dir dest_dir` for recursive copy. `mv` has no such flag — moving a directory just works (it's renaming an inode if on the same filesystem; copy + delete otherwise).",
+      "answer_explanation_md": "`cp -p` preserves mode / ownership / timestamps; `cp -a` is the archive omnibus (preserves everything, doesn't follow symlinks, recurses). `mv` is atomic on the same filesystem (just renames the inode, no data is moved) but becomes copy-then-delete across filesystems, which is non-atomic — a crash mid-`mv` between filesystems can leave the file half-copied at the destination AND still present at the source."
+    },
+
+    {
+      "id": "m4-s1-c9",
+      "type": "code_trap",
+      "topic": "mv atomic on same filesystem, non-atomic across",
+      "topic_ru": "mv атомарен в пределах ФС, не атомарен через ФС",
+      "difficulty": 3,
+      "tags": ["linux", "mv", "atomic", "filesystem", "subtle"],
+      "code_snippet": "# Configuration deploy script:\n#   /etc/myapp/  is on /  (root filesystem)\n#   /mnt/staging/  is mounted from a network volume (different filesystem)\n\n$ mv /etc/myapp/config.yml.new /etc/myapp/config.yml       # same filesystem\n$ mv /mnt/staging/config.yml.new /etc/myapp/config.yml     # cross filesystem",
+      "question": "If the machine crashes mid-`mv` in each case, what state can the filesystem be left in?",
+      "options": [
+        "Both commands are atomic — a crash leaves either the old or new file, never a partial.",
+        "Both can leave a partial — `mv` is never atomic.",
+        "First `mv` (same filesystem): **atomic** — the kernel renames the inode, no data is read or written. A crash leaves either the old or the new `config.yml`, never partial. Second `mv` (cross-filesystem): **not atomic** — internally it's `cp source dest && rm source`. A crash can leave `config.yml` half-written at the destination AND `config.yml.new` still present at the source. **Rule:** atomic config swaps require the temp file to be on the **same filesystem** as the target.",
+        "Both are atomic, but the second one fails entirely if the network volume disconnects."
+      ],
+      "correct_index": 2,
+      "explanation_md": "The Linux `rename(2)` syscall is atomic at the inode level — it swaps the directory entry pointing at the file in one operation. As long as source and destination live on the **same filesystem**, the kernel does this in one step.\n\nAcross filesystems, the file's inode would have to move between two different filesystem trees, which `rename(2)` doesn't support. `mv` falls back to copy-then-delete (or `sendfile` + `unlink`). That's two operations, and a crash between them leaves partial state.\n\nThe atomic-config-swap pattern that production systems use:\n\n```bash\n# Write the new config to a TEMP file on the SAME filesystem as the destination\nwrite_config > /etc/myapp/config.yml.new   # same fs as /etc/myapp/config.yml\nmv /etc/myapp/config.yml.new /etc/myapp/config.yml   # atomic rename\n```\n\nIf the temp file is on a different filesystem (e.g., `/tmp` mounted as `tmpfs`), the `mv` is non-atomic and the safety property is lost. Same applies to systemd, nginx config reloads, and any config-file rotation in production."
+    },
+
+    {
+      "id": "m4-s1-c10",
+      "type": "multiple_choice",
+      "topic": "cp -p / -a / symlink handling",
+      "topic_ru": "cp -p / -a / обработка симлинков",
+      "difficulty": 4,
+      "tags": ["linux", "cp", "symlinks", "metadata", "subtle"],
+      "question": "You have `original.conf` and a symlink `current.conf -> original.conf`. You run `cp current.conf /backup/`. What ends up in `/backup/`?",
+      "options": [
+        "A symlink named `current.conf` pointing to `original.conf`.",
+        "A regular file named `current.conf` containing a *copy of original.conf's contents*. `cp` **follows symlinks by default** — it copies the file the link points to, not the link itself. The symlink shape is lost.",
+        "Nothing — `cp` refuses to copy symlinks.",
+        "Both the symlink and `original.conf` (cp auto-resolves and copies both)."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `cp` follows the symlink by default and copies the file it points to. The symlink shape is lost; the destination is a regular file, not a link.",
+        "Correct. `cp` defaults to follow-symlinks (`--dereference`); the copy is a regular file containing the target's contents. To preserve the link itself, use `cp -d` (or `cp -P`, `--no-dereference`). For whole-tree faithful duplication, `cp -a` (archive mode: preserves everything including symlinks-as-links, doesn't follow, recurses) is the safe-default omnibus. Interview probe: 'how do you copy a symlink AS a symlink?' Answer: `cp -d` / `cp -P`, or `cp -a` for the whole tree.",
+        "Wrong — `cp` doesn't refuse symlinks; it just copies the target by default.",
+        "Wrong — there's no auto-resolve-and-copy-both behavior. `cp` either follows (default) or doesn't (`-d` / `-P`)."
+      ]
+    },
+
+    {
+      "id": "m4-s1-c11",
+      "type": "flip",
+      "topic": "9-bit permission model (r/w/x × u/g/o)",
+      "topic_ru": "9-битная модель прав (r/w/x × u/g/o)",
+      "difficulty": 2,
+      "tags": ["linux", "permissions", "rwx", "ugo"],
+      "question": "Explain the nine permission bits Linux shows in `ls -l` output (`rwxr-xr--`). What does each character mean?",
+      "answer": "Three groups of three characters: **u**ser/owner, **g**roup, **o**ther. Each group has three flags: **r**ead, **w**rite, e**x**ecute. A dash (`-`) means the flag is off.\n\n`rwxr-xr--` breaks down as:\n- Owner (positions 1–3): `rwx` — full access.\n- Group (positions 4–6): `r-x` — read and execute, no write.\n- Other (positions 7–9): `r--` — read only.\n\nOn a **file**, `x` means 'can be run as a program'. On a **directory**, `x` means 'can `cd` into it / can resolve its contents'.",
+      "answer_explanation_md": "Subtle point: on a directory, `r` lets you `ls` it (see filenames) but you can't actually access files inside without `x`. So a directory with `r--` (read but no execute) lets you read the *name list* but every file access inside fails with permission-denied. `--x` (execute only) lets you `cd` in and access named files (if you already know the name), but `ls` fails. Real-world deployments sometimes use `--x` on parent directories to hide structure while still permitting access to known paths."
+    },
+
+    {
+      "id": "m4-s1-c12",
+      "type": "fill_in",
+      "topic": "chmod numeric values for common permission patterns",
+      "topic_ru": "chmod числовые значения для типовых паттернов",
+      "difficulty": 2,
+      "tags": ["linux", "chmod", "permissions", "octal"],
+      "code_snippet_with_blanks": "# Fill in the numeric (octal) chmod value for each scenario:\n\n# Executable script — owner full, group + other read+execute\n$ chmod ___ deploy.sh\n\n# Regular file — owner read+write, group + other read-only\n$ chmod ___ notes.txt\n\n# SSH private key — owner read-only, group + other locked out\n$ chmod ___ ~/.ssh/id_rsa",
+      "accepted_answers": [
+        ["755"],
+        ["644"],
+        ["600"]
+      ],
+      "explanation_md": "Three patterns to memorize cold:\n\n- **755** (`rwxr-xr-x`): executable scripts and directories. Owner can do anything; others can read and run.\n- **644** (`rw-r--r--`): regular files. Owner can read/write; others read-only. Default for new files in most umasks.\n- **600** (`rw-------`): private files. Owner only. Mandatory for SSH private keys — `ssh` refuses to use a key file with broader perms (`Permissions 0644 for '...' are too open`).\n\nMental math: `r=4, w=2, x=1`. Sum within each group. `7=4+2+1` (rwx), `6=4+2` (rw-), `5=4+1` (r-x), `4=4` (r--), `0=---`. Other common combos: **700** (private directory), **777** (everything for everyone — anti-pattern in production)."
+    },
+
+    {
+      "id": "m4-s1-c13",
+      "type": "multiple_choice",
+      "topic": "chmod symbolic vs numeric forms",
+      "topic_ru": "chmod символическая vs числовая форма",
+      "difficulty": 3,
+      "tags": ["linux", "chmod", "symbolic", "permissions"],
+      "question": "Which chmod command adds **execute permission for the owner only**, without affecting any other bits on the file?",
+      "options": [
+        "`chmod 100 file` — sets just the owner-execute bit numerically.",
+        "`chmod u+x file` — the symbolic `+x` adds execute for the named class (`u` = owner); other bits are unchanged. Numeric forms (`chmod 755`) replace the *whole* permission set, which is wrong if the current perms are something else you want to preserve. Symbolic `+` adds; `-` removes; `=` replaces just that class.",
+        "`chmod +x file` — adds execute for everyone, which is what `+x` always means.",
+        "`chmod x file` — single letter chmod sets all bits."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on intent: `chmod 100` (octal `100` = owner-execute-only, no read/write for anyone) replaces the whole permission set with `--x------`, blowing away whatever read/write bits existed.",
+        "Correct. Symbolic notation operates on specific bits without disturbing the rest. `u+x` adds owner-execute; `g-w` removes group-write; `o=r` sets other to read-only (replacing whatever was there). Use symbolic when you mean to *modify* specific bits; use numeric when you mean to *set* the entire permission set to a known target.",
+        "Wrong — `chmod +x` (with no class prefix) does add execute, but it's affected by `umask`. The original GNU behavior was 'all classes'; some shells / umasks restrict it. The portable form for 'owner only' is `u+x`.",
+        "Wrong — `chmod x` isn't valid syntax."
+      ]
+    },
+
+    {
+      "id": "m4-s1-c14",
+      "type": "code_trap",
+      "topic": "chmod 777 anti-pattern",
+      "topic_ru": "Анти-паттерн chmod 777",
+      "difficulty": 4,
+      "tags": ["linux", "chmod", "777", "anti-pattern", "security", "interview-classic"],
+      "code_snippet": "# Application can't read a config file. Junior engineer's fix:\n\n$ chmod 777 /etc/myapp/config.yml\n$ # Now the app works! Ship it.",
+      "question": "Why is `chmod 777` almost always the wrong fix, and what should you do instead?",
+      "options": [
+        "Nothing wrong — 777 means everyone can read it, which is what we want.",
+        "**777 grants read, write, AND execute to EVERY user on the system** — including any unprivileged service, any user account, any process that exploits a local-privilege bug. The actual problem is almost always a specific user (the app's service account) needing read access. The right fix is to grant *only what's needed*: `chown app_user:app_group /etc/myapp/config.yml && chmod 640 /etc/myapp/config.yml` (owner read+write, group read, other none — so the app's user reads it, others can't). **`chmod 777` in production is a 'I gave up debugging the real permission issue' smell.** It also opens the file to *write* by everyone, which is far worse than read.",
+        "777 means 7+7+7 bits, but Linux ignores values above 666.",
+        "777 only affects the file itself, not its containing directory, so it's safe."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The conversation around `chmod 777` is one of the standard junior-vs-senior splits. Two things make it dangerous:\n\n1. **Over-grants write.** 777 = `rwxrwxrwx`. Any user can edit the file. For a config file containing credentials or a control parameter, that's a backdoor.\n2. **Over-grants execute on data files.** A YAML config doesn't need execute; granting it is meaningless at best, a smell of 'we don't understand the permission model' at worst.\n\nThe right reflex: figure out *which user* needs *which subset* of permissions, then grant exactly that. Common safe patterns:\n\n- App config the service reads: `chown app_user:app_group config.yml; chmod 640 config.yml`. Owner read+write, group read, other none.\n- Shared data file the team writes: dedicated group (`chgrp data_team file; chmod 660 file`).\n- Private secrets: `chmod 600 secret` (owner-only). SSH refuses keys with broader perms.\n\nThe interview probe: 'we ran `chmod 777` to fix a permission issue. Why is that a problem?' — Answer: over-grants in two dimensions (write to everyone, execute on non-executable data); the right fix is targeted ownership + minimum perms, not blanket permissiveness."
+    }
+  ]
+}

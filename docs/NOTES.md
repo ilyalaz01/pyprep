@@ -1201,3 +1201,60 @@ file harness constraint). The three together form the emerging
 appendix in `PRD_code_sandbox.md` is on the post-Module-4 polish
 todo list per owner brief.
 
+---
+
+## N045 — Schema explanation-field naming: code_trap vs multiple_choice [AUTHORING]
+
+**Phase:** 9 (m3-s5 + m4-s1) · **Date:** 2026-05-13 · **Status:** active
+
+The card schema (`content/schema/card.schema.json`) splits the
+explanation surface by card type:
+
+- **`code_trap`** requires `explanation_md` — *one* prose block
+  attached to the card as a whole.
+- **`multiple_choice`** requires `option_explanations` — an *array
+  of per-option strings*, one explanation per option.
+
+The shapes serve different pedagogies: code_trap teaches a single
+mechanism around a snippet (the explanation explains the trap and
+the fix); multiple_choice teaches discrimination between four
+options (each option gets its own explanation of why right or
+wrong).
+
+**Authoring footgun:** when a card has both (a) a code snippet
+*and* (b) per-option explanations, you can't legally type it as
+either of:
+
+- `code_trap` with `option_explanations` → schema rejects: missing
+  `explanation_md`.
+- `multiple_choice` with `explanation_md` → schema rejects: missing
+  `option_explanations`.
+
+**Two fix paths:**
+
+1. **Type = multiple_choice + code in the question.** Embed the
+   snippet in the `question` field as a fenced markdown block;
+   provide `option_explanations`. Cards like `m3-s5-c6` and
+   `m4-s1-c10` use this shape — the code is part of the question
+   prose, the per-option explanations live where the schema wants.
+2. **Type = code_trap + single explanation_md.** Drop the per-option
+   shape entirely; one prose block at the bottom explains the trap
+   + correct answer. Use when the four options are mostly
+   throwaway and the explanation is one logical narrative.
+
+**Heuristic:** if the four options each deserve a distinct rebuttal
+naming their specific wrongness, you have a multiple_choice. If
+the four options exist mainly to make the trap recognizable and
+the explanation is one story about the trap, you have a code_trap.
+
+**Discovery:** flagged at `m3-s5-c6` (caught during validation,
+fixed by converting code_trap → multiple_choice + code-in-question).
+Recurred at `m4-s1-c10` (same shape, same fix). Two instances in
+two modules is enough to codify.
+
+**Quality note:** when converting code_trap → multiple_choice, the
+code that was in `code_snippet` must move into the `question`
+string as a fenced block. Don't leave `code_snippet` as an extra
+key on a multiple_choice card; the schema allows unknown keys but
+the renderer may double-show.
+
