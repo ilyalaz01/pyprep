@@ -1,0 +1,243 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s6",
+  "cards": [
+    {
+      "id": "m4-s6-c1",
+      "type": "flip",
+      "topic": "venv mechanism: what activation actually does to your shell",
+      "topic_ru": "Механика venv: что активация делает с шеллом",
+      "difficulty": 2,
+      "tags": ["python", "venv", "path", "isolation"],
+      "question": "Walk through what `python -m venv .venv && source .venv/bin/activate` actually does. What's in `.venv/`, and what does activation change about your shell?",
+      "answer": "`python -m venv .venv` creates a directory `.venv/` containing:\n\n- `bin/python` (Linux/Mac) or `Scripts/python.exe` (Windows) — a Python interpreter for this environment (a symlink or small wrapper around the system Python).\n- `bin/pip` — a pip configured to install into this environment.\n- `lib/python3.13/site-packages/` — initially nearly empty; this is where packages get installed.\n- `pyvenv.cfg` — metadata declaring which base Python this env was created from.\n\n`source .venv/bin/activate` modifies your current shell session by:\n\n1. **Prepending `.venv/bin` to `PATH`** — so `python` and `pip` now resolve to the venv's binaries before the system Python.\n2. Setting `VIRTUAL_ENV` env var to the venv path (consumers like `pip` and IDEs use it).\n3. Modifying the shell prompt to show `(.venv)` as a visual cue.\n\n`deactivate` reverses all three — it's a shell function defined by `activate` that restores the original `PATH`, unsets `VIRTUAL_ENV`, and undoes the prompt change.\n\n**Key point:** activation is a *shell* operation, not a global one. It only affects the current shell session. Opening a new terminal starts fresh; you have to activate again. There's no system-wide 'this project is now active' state.",
+      "answer_explanation_md": "Why venvs exist: Python's import system reads packages from a single `site-packages/` per interpreter. Without venvs, every project shares one `site-packages` and version conflicts are inevitable — `project A needs requests==2.20`, `project B needs requests==2.31`, system pip can hold one at a time and the other project breaks. Each venv has its own `site-packages`, so projects are isolated.\n\n**Two practical reflexes:**\n\n- **`.gitignore` should always include `.venv/`** — committing a venv ships binary blobs that aren't portable across machines and bloats history. Dependencies are reconstructed from `pyproject.toml` / lockfiles (see `m4-s6-c5`); the venv is a build artifact.\n- **You don't actually need to `activate`** — you can also run `.venv/bin/python script.py` or `.venv/bin/pip install foo` directly. Activation is just the convenience layer that makes `python` resolve to the right interpreter without specifying the path. Many CI scripts skip activation and call the venv binaries by absolute path."
+    },
+
+    {
+      "id": "m4-s6-c2",
+      "type": "multiple_choice",
+      "topic": "uv venv vs python -m venv — speed and the tooling-evolution story",
+      "topic_ru": "uv venv vs python -m venv — скорость и эволюция тулинга",
+      "difficulty": 3,
+      "tags": ["python", "venv", "uv", "modern-stack"],
+      "question": "What's the practical difference between these two ways to create a virtual environment?\n\n```bash\n(A)  python -m venv .venv\n(B)  uv venv\n```",
+      "options": [
+        "(B) is just an alias for (A) — same speed, same behavior.",
+        "**They produce a functionally equivalent venv, but `uv venv` is ~30x faster** (~0.1s vs ~3s on a typical machine) because `uv` is a Rust-based reimplementation that avoids the overhead of bootstrapping pip into the venv. Both produce the same directory shape (`.venv/bin/python`, `.venv/bin/pip`, `site-packages/`); activation works identically (`source .venv/bin/activate` regardless of which creator made it). **The interview-relevant point:** `uv` is the Astral team's modern replacement for the entire pip/venv/poetry toolchain, with `uv venv` being the most visible entry point. Naming `uv` as the modern stack (alongside `ruff` from the same team) is a 2026-current-on-the-ecosystem signal.",
+        "(A) is correct for production; (B) is only for local development.",
+        "(B) uses a different Python interpreter, so the resulting venvs are incompatible."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `uv venv` is a distinct implementation (Rust), not a wrapper around `python -m venv`. The speed difference is real and substantial.",
+        "Correct. The speed alone is not the interview point; the *direction of the ecosystem* is. Knowing `uv` exists and what it replaces is part of the 2026 'modern Python tooling' competence signal. Cross-link to `m4-s6-c4` (uv as the broader pip/poetry replacement) and `m4-s6-c8` (ruff as the parallel modernization in the linter space). Both `uv` and `ruff` come from Astral and represent the same Rust-rewrite-of-Python-tooling shape.",
+        "Wrong — both work identically for production and development; they produce equivalent venvs.",
+        "Wrong — both create venvs that wrap the same base Python interpreter; the resulting venvs are interchangeable. You can `uv venv` then use system `pip` inside it, or `python -m venv` then use `uv pip` inside it."
+      ]
+    },
+
+    {
+      "id": "m4-s6-c3",
+      "type": "code_trap",
+      "topic": "Forgot to activate venv → installs to system Python (or wrong env)",
+      "topic_ru": "Забыл активировать venv → установка в системный Python",
+      "difficulty": 3,
+      "tags": ["python", "venv", "activation", "common-mistake"],
+      "code_snippet": "# Monday morning. New terminal. Cold from sleep.\n# You navigate to your project and run:\n\n$ cd ~/projects/myapp\n$ pip install requests        # ← forgot to activate the venv first\n\n$ python -c \"import requests\"\nModuleNotFoundError: No module named 'requests'\n\n# Yet pip just said it installed successfully. Where did it go?",
+      "question": "What happened, and what's the discipline that prevents this on Monday mornings?",
+      "options": [
+        "The install failed silently — re-run with `--verbose` to see the error.",
+        "**Without `source .venv/bin/activate`, your shell's `PATH` still points at the system Python's `pip`. The install succeeded — into the SYSTEM Python's `site-packages`** (or into whatever venv was active in another terminal, or into the user-site for `pip install --user`-style configurations). When you then run `python` (also resolving to system Python in this shell), it imports from the system `site-packages`, which doesn't have `requests` unless you'd installed it there before. **Disciplines that prevent it:** (1) **Visual cue — never run `pip` without `(.venv)` in your shell prompt.** Most activate scripts add that prefix; if it's missing, you're not activated. (2) **Use `uv` — `uv add requests` is venv-aware by default** and refuses to install outside an env. (3) **Verify before install:** `which pip` (Linux/Mac) or `where pip` (Windows) should show a path inside `.venv/`; if it shows `/usr/bin/pip` or similar, you're about to pollute system Python. (4) **Direnv / `pyenv-virtualenv`**: tools that auto-activate when you `cd` into a project directory.",
+        "Pip installed the package into a project-specific directory by detecting the `pyproject.toml`.",
+        "Modern pip refuses to install when no venv is active — the install above would have errored."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The reason this footgun is so common: there's no error, no warning, no visible failure. `pip install requests` happily succeeds — into the wrong place. The mismatch only surfaces when you try to import from a shell where the *other* `python` is active, at which point you get `ModuleNotFoundError` and the bug is decoupled from the cause.\n\n**The newer-Python guard:** since Python 3.12+, system Python distributions on Debian/Ubuntu (and some other distros) ship with `EXTERNALLY-MANAGED` markers that cause `pip install` outside a venv to error with `error: externally-managed-environment`. This is OS-level, not pip-level, and is becoming standard. It catches the trap on those systems — but not on macOS (Homebrew Python), not on Windows, not in custom Python installs, and not when you have an *unrelated* venv active. So the discipline is still the answer.\n\n**Recovery if it happened:**\n\n```bash\n# Find where the package actually went:\npython -c \"import requests; print(requests.__file__)\"\n# /usr/lib/python3.13/site-packages/requests/__init__.py  ← oops\n\n# Remove from system Python:\n/usr/bin/pip uninstall requests   # use absolute path to be explicit\n\n# Then activate the right env and reinstall:\nsource .venv/bin/activate\npip install requests   # NOW into the venv's site-packages\n```\n\nThe `uv` ecosystem sidesteps this entirely by being venv-aware by default — `uv add` / `uv sync` operates on `.venv/` next to `pyproject.toml`, with no activation step needed. This is one of several reasons modern teams default to `uv`."
+    },
+
+    {
+      "id": "m4-s6-c4",
+      "type": "flip",
+      "topic": "pip vs uv vs poetry — the tooling-evolution timeline",
+      "topic_ru": "pip vs uv vs poetry — таймлайн эволюции тулинга",
+      "difficulty": 3,
+      "tags": ["python", "pip", "uv", "poetry", "tooling-evolution"],
+      "question": "What does each of `pip`, `uv`, and `poetry` do, and where does each fit in the 2026 ecosystem?",
+      "answer": "**`pip`** — the stdlib installer. Ubiquitous (every Python ships with it), reliable, slow, no native lockfile. Used with `requirements.txt` (a flat list of pinned versions). Still the lowest-common-denominator install path; almost all projects support it.\n\n**`poetry`** — comprehensive project manager that *introduced* `pyproject.toml`-based dependency declarations and lockfiles to Python. Roughly 2018–2024 was its golden era. Strengths: complete (deps + venv + build + publish in one tool); standards-driven (one of the drivers of PEP 621 / PEP 518). Weaknesses: historically slow resolver; opinionated CLI; lockfile format that pre-dated standards. Still common in established projects.\n\n**`uv`** — 2024+ Rust-based replacement for the entire pip/venv/poetry workflow. From the Astral team (same group that ships `ruff`). 10–100x faster than pip/poetry for installs and resolution; uses `pyproject.toml` + `uv.lock` (standards-aligned); manages venvs automatically. The dominant direction migration tickets point in for 2026.\n\n**Ecosystem position in 2026:**\n- **New projects** → reach for `uv`.\n- **Existing poetry projects** → migrate to `uv` when convenient; both interoperate via `pyproject.toml`.\n- **Plain `pip + requirements.txt`** → still works fine; appropriate for simple one-file scripts and lowest-friction deployment targets that can't install other tooling.",
+      "answer_explanation_md": "The mental model: pip is the *minimal* tool (install a package, done); poetry was the first *comprehensive* tool (deps + lockfile + venv + build); uv is the *comprehensive but fast* tool (same scope as poetry, ~50x faster, standards-aligned). Each was the right answer for its era; in 2026, uv is the answer for new work.\n\n**Compatibility note:** `uv` ships a `pip`-compatible CLI as `uv pip` — `uv pip install foo` does what `pip install foo` does, faster, and respects the same `requirements.txt` files. This compatibility layer is the migration ramp: a project can adopt `uv` for speed without restructuring its workflow until it's ready.\n\nThe AI / data-science world has parallel tooling (`conda`, `mamba`) that lives in a slightly different ecosystem optimized for binary scientific packages. Outside of that niche, `uv` is the trajectory."
+    },
+
+    {
+      "id": "m4-s6-c5",
+      "type": "multiple_choice",
+      "topic": "requirements.txt vs lockfile — the reproducibility difference",
+      "topic_ru": "requirements.txt vs lockfile — разница в воспроизводимости",
+      "difficulty": 3,
+      "tags": ["python", "pip", "uv", "lockfile", "reproducibility", "interview-classic"],
+      "question": "Two projects pin their dependencies differently. Which produces a deterministic install that gives every developer (and every CI run) an identical environment, even six months later?\n\n```\n(A)  Project Alpha:  pyproject.toml lists `fastapi>=0.110`\n                     and a `requirements.txt` with `fastapi==0.110.3`.\n\n(B)  Project Beta:   pyproject.toml lists `fastapi>=0.110`\n                     and a `uv.lock` (or `poetry.lock`) committed to the repo.\n```",
+      "options": [
+        "(A) — `requirements.txt` is more explicit because it lists exact versions.",
+        "**(B) — the lockfile is the deterministic shape.** `requirements.txt` (in Project Alpha) pins `fastapi` to `0.110.3`, but says nothing about its TRANSITIVE dependencies (the packages fastapi itself depends on — Pydantic, Starlette, etc.). When fastapi's transitive dep `pydantic` releases a new version, `pip install -r requirements.txt` may pick up a different `pydantic` than yesterday's install — same `fastapi`, different transitive graph, possibly different behavior. **The lockfile (in Project Beta) captures the entire resolved transitive graph** — every package, every version, hashes for verification, the relationship between them. `uv sync` from the lockfile produces an identical environment regardless of when it's run, until the lockfile is regenerated (`uv lock` or `uv add new-pkg`). **The interview answer in one sentence:** `requirements.txt` pins the packages you depend on directly; a lockfile pins those AND every package they transitively depend on, in a verifiable graph.",
+        "Both produce identical results — `requirements.txt` and lockfiles are functionally equivalent.",
+        "(A) — Project Beta's `uv.lock` is a binary file and won't work across operating systems."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on scope. `requirements.txt` pins only what's listed in it; transitive deps drift unless every transitive dep is also pinned explicitly (which `pip freeze` produces, but the relationships are still lost — see explanation).",
+        "Correct. **`pip freeze > requirements.txt`** produces a 'lockfile-like' flat list of every installed package with exact versions — better than a hand-written requirements.txt, but still missing the *relationships* (which package is a top-level dep vs a transitive dep, which extras were resolved, hash verification). A real lockfile (`uv.lock`, `poetry.lock`, `Pipfile.lock`) preserves all of that. The interview-relevant probe is whether you can articulate the distinction; once you can, you'll always reach for a lockfile-producing tool for any project that ships beyond a single developer's machine.",
+        "Wrong. The two have meaningfully different reproducibility properties; they're not equivalent.",
+        "Wrong. `uv.lock` is a text file (TOML format) committed to the repo; it works cross-platform and is human-readable for diffing. The format is designed for diffability in PRs — when a dependency bumps, you see exactly which packages and versions changed."
+      ]
+    },
+
+    {
+      "id": "m4-s6-c6",
+      "type": "code_trap",
+      "topic": "pyproject.toml vs lockfile — where deps are DECLARED vs where they're PINNED",
+      "topic_ru": "pyproject.toml vs lockfile — где зависимости ОБЪЯВЛЕНЫ vs где ПРИНУДИТЕЛЬНО ЗАКРЕПЛЕНЫ",
+      "difficulty": 3,
+      "tags": ["python", "pyproject", "lockfile", "uv", "subtle"],
+      "code_snippet": "# Your pyproject.toml:\n#   [project]\n#   dependencies = [\"fastapi>=0.110\"]\n\n# Your uv.lock pins fastapi to 0.110.3, pydantic to 2.7.0 (transitive).\n\n# fastapi releases 0.115. Pydantic releases 2.8.\n# A teammate runs:\n\n$ uv sync\n# Their environment: fastapi 0.110.3, pydantic 2.7.0.   ← matches lockfile\n\n# Then they run:\n$ uv lock --upgrade fastapi\n$ uv sync\n# Their environment: fastapi 0.115.x, pydantic 2.8.x.   ← lockfile regenerated",
+      "question": "What's the difference between editing `pyproject.toml` vs running `uv lock`, and which step actually changes what version teammates install?",
+      "options": [
+        "They're the same — editing `pyproject.toml` automatically updates `uv.lock`.",
+        "**`pyproject.toml` DECLARES dependencies with intent (`fastapi>=0.110` means 'I want any version 0.110 or above'); `uv.lock` PINS a specific resolved graph (`fastapi 0.110.3 + pydantic 2.7.0 + ...`).** Editing `pyproject.toml` does NOT change the lockfile — `uv sync` reads from the lockfile and gives you the pinned versions regardless of what `pyproject.toml`'s constraints would now allow. To actually update versions, you have to regenerate the lockfile: `uv lock` (re-resolve respecting current `pyproject.toml` constraints), or `uv lock --upgrade fastapi` (force an upgrade of a specific package), or `uv add fastapi@latest` (declare + upgrade in one step). **The discipline:** pyproject.toml constraints define the *allowed range*; the lockfile is the *current chosen point* within that range. Commit BOTH files; reviewers can see both 'what's allowed' (pyproject diff) and 'what changed' (uv.lock diff) in a PR.",
+        "`uv sync` automatically reads the latest versions matching `pyproject.toml` and ignores the lockfile.",
+        "The lockfile is regenerated on every `uv sync`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Three operations and their effects:\n\n```bash\nuv sync                   # install from uv.lock exactly. No re-resolution. Reproducible.\nuv lock                   # re-resolve respecting pyproject.toml; rewrites uv.lock.\nuv lock --upgrade pkg     # re-resolve with --upgrade for one package; rewrites uv.lock.\nuv add pkg                # add to pyproject.toml [project].dependencies + run uv lock.\nuv add pkg==1.2.3         # add with exact version; run uv lock.\n```\n\nThe mental model is two layers:\n\n- **`pyproject.toml`** — human-edited intent. 'I want fastapi >= 0.110' is a *policy*.\n- **`uv.lock`** — machine-generated state. 'I currently have fastapi 0.110.3 + pydantic 2.7.0 + ...' is the *resolution* of that policy at a particular moment.\n\nThis is the same separation `poetry` introduced with `pyproject.toml` + `poetry.lock`, and the same one npm uses (`package.json` + `package-lock.json`), and Cargo uses (`Cargo.toml` + `Cargo.lock`). Once you see the pattern, it transfers across ecosystems.\n\n**Cross-link to `m4-s6-c5`:** that card establishes *why* lockfiles exist (transitive determinism); this card names *how* you actually use them in a `uv` workflow. Same concept, two facets — the lockfile semantics thread per N046."
+    },
+
+    {
+      "id": "m4-s6-c7",
+      "type": "flip",
+      "topic": "ruff / black / mypy — what each tool does",
+      "topic_ru": "ruff / black / mypy — что делает каждый",
+      "difficulty": 2,
+      "tags": ["python", "ruff", "black", "mypy", "linters", "formatters"],
+      "question": "In 30 seconds, what does each of `ruff`, `black`, and `mypy` do? Why are they typically all three in a CI pipeline?",
+      "answer": "**`black`** — opinionated formatter. Rewrites your code to a consistent style. Zero config: line length, quote style, trailing commas, all decided. The original 'stop bikeshedding about formatting' tool.\n\n**`ruff`** — fast Rust-based linter + formatter from the Astral team. As a linter (`ruff check`), it catches style violations, common bugs, unused imports, anti-patterns. As a formatter (`ruff format`), it does what `black` does — many teams drop `black` once they adopt `ruff`. Replaces `flake8`, `isort`, parts of `pylint`, parts of `pyupgrade`. Runs in milliseconds where the older tools took seconds.\n\n**`mypy`** — static type checker. Reads your type hints (`def f(x: int) -> str:`) and verifies that code uses functions and values according to their declared types. Catches `AttributeError: 'NoneType' object has no attribute 'x'`-class bugs before the code runs.\n\n**Why all three (or `ruff` + `mypy`) in CI:** they catch different classes of error, and each runs in seconds. **`ruff check`** catches style violations and common code smells. **`ruff format --check`** (or `black --check`) catches formatting drift. **`mypy`** catches type errors. **`pytest`** catches behavioral regressions. The whole pre-commit + CI gate runs in under a minute on most projects and prevents distinct classes of bug each.",
+      "answer_explanation_md": "**The modern minimal CI gate** is `ruff check + ruff format --check + mypy + pytest`. Older stacks were `flake8 + isort + black --check + mypy + pytest`; `ruff` consolidates the first three into one tool (faster, fewer config files).\n\n**Configuration lives in `pyproject.toml`** for all of them — keeps tool config alongside dependency config, one file to read for any reviewer:\n\n```toml\n[tool.ruff]\nline-length = 100\n\n[tool.ruff.lint]\nselect = [\"E\", \"F\", \"I\", \"B\", \"UP\", \"S\"]\n\n[tool.mypy]\nstrict = true\npython_version = \"3.13\"\n```\n\nThe consolidation theme: tool configs that used to live in `setup.cfg`, `.flake8`, `mypy.ini`, etc., now collapse into `pyproject.toml`. This is part of the broader 'pyproject.toml as the single source of project truth' direction the ecosystem has been moving in since PEP 518 (2017)."
+    },
+
+    {
+      "id": "m4-s6-c8",
+      "type": "multiple_choice",
+      "topic": "ruff replaces flake8 + isort + parts of pylint — the modernization",
+      "topic_ru": "ruff заменяет flake8 + isort + части pylint — модернизация",
+      "difficulty": 3,
+      "tags": ["python", "ruff", "flake8", "isort", "pylint", "tooling-evolution"],
+      "question": "A 2022-era Python project has these tools in CI: `flake8`, `isort`, `pyupgrade`, `pylint`, `black`. A 2026-modern project replaces most of them with a single tool. Which one, and what does it consolidate?",
+      "options": [
+        "`mypy` — it's a superset of all the linters listed.",
+        "**`ruff` consolidates `flake8` + `isort` + `pyupgrade` + a substantial chunk of `pylint`** (the fast, AST-level rules; pylint's deeper symbolic analysis is the part `ruff` doesn't replicate). It can also replace `black` via `ruff format`, which is black-compatible. So the 2026-modern minimum stack is typically just `ruff` (lint + format) + `mypy` (types) + `pytest` (tests), down from five tools to three. **Performance is the practical driver:** `ruff` runs in milliseconds where the older tools took seconds — it's not unusual to see a 100x speedup on a real codebase. The teams that resist switching are usually those with custom `pylint` plugins that haven't been ported yet, since `pylint`'s deep symbolic analysis is the part `ruff` deliberately doesn't try to replicate.",
+        "`black` — it absorbed isort and pylint's functionality in version 24.",
+        "`uv` — it ships its own linter as `uv lint`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on scope. `mypy` is a type checker, not a linter — it catches type errors, not style violations or unused imports.",
+        "Correct. The consolidation story: pre-2024, a 'modern' Python project had ~5 linting/formatting tools in its CI; post-2024, `ruff` collapsed most of them into one. This is the same Astral-team Rust-rewrite-of-Python-tooling shape as `uv` (covered in `m4-s6-c2` and `m4-s6-c4`). **The 2026 stack signal is naming both `uv` and `ruff`** as the modern replacements — not as cutting-edge experiments, but as the current standard. Cross-link to the tooling-evolution thread: `m4-s6-c2`/`m4-s6-c4` for `uv`, this card for `ruff` — same shape, different tooling segment.",
+        "Wrong — `black` stayed focused on formatting; it didn't absorb other tools. `ruff` is what absorbed `black`'s functionality (and remained compatible).",
+        "Wrong — `uv` is a package manager, not a linter. There's no `uv lint` command."
+      ]
+    },
+
+    {
+      "id": "m4-s6-c9",
+      "type": "multiple_choice",
+      "topic": "Why mypy in a dynamically-typed language",
+      "topic_ru": "Зачем mypy в динамически-типизированном языке",
+      "difficulty": 3,
+      "tags": ["python", "mypy", "static-typing", "interview-classic"],
+      "question": "An interviewer asks: 'Python is dynamically typed — why bother with `mypy`?' Which answer most clearly captures the value?",
+      "options": [
+        "Because `mypy` makes Python run faster at runtime.",
+        "**Three concrete reasons.** (1) **Type errors caught at write-time, not runtime.** Most `AttributeError: 'NoneType' object has no attribute 'x'`-class bugs are predictable from type signatures — `mypy` flags them when you save the file, not when a request hits prod at 3 AM. (2) **IDE refactoring and autocomplete rely on types.** Renaming a function with no type hints requires grep across the codebase; renaming a typed function lets the IDE mechanically find every call site. Same for jump-to-definition, parameter completion, and 'show me callers'. (3) **Types document intent in the signature.** `def get_user(user_id: int) -> User | None` tells the reader the contract; a typeless `def get_user(user_id)` does not. The signature becomes part of the API documentation. **mypy doesn't change runtime behavior** — type hints are stripped (or treated as comments) by the interpreter; mypy reads them statically and produces error output. The runtime is exactly as fast as untyped Python.",
+        "Because mypy converts Python to C++ for performance.",
+        "Because mypy is a syntax checker — it's redundant with the interpreter."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — mypy has zero effect on runtime performance. Type hints are stripped/ignored at runtime; mypy reads them statically only.",
+        "Correct. The three-reasons framing is the canonical interview answer because it's *specific* — 'static error detection + tooling support + intent documentation', three distinct values rather than a vague 'types are good'. Senior engineers reach for these reasons because they've felt the pain of refactoring untyped Python at scale. **Strict mode** (`mypy --strict` or `strict = true`) is the modern default for new code: enables every available check (no implicit Any, no missing returns, no unreachable code, etc.). Legacy codebases adopt strictness gradually — module by module with `# mypy: disable-error-code=...` markers for parts not yet cleaned up.",
+        "Wrong — mypy doesn't compile Python; it's a separate static analyzer. (Tools that DO compile Python for speed — Cython, Mypyc, Nuitka — exist but are unrelated to mypy's core purpose.)",
+        "Wrong — mypy is much more than a syntax checker. It performs full type inference and checks against declared types; the interpreter only catches *syntactic* errors, not type mismatches."
+      ]
+    },
+
+    {
+      "id": "m4-s6-c10",
+      "type": "flip",
+      "topic": "Big-O lite + Python collection complexities table",
+      "topic_ru": "Big-O lite + таблица сложностей Python-коллекций",
+      "difficulty": 3,
+      "tags": ["python", "big-o", "complexity", "collections", "interview-warmup"],
+      "question": "Write the Big-O complexity table for the most common operations on Python's `list`, `dict`, `set`, and `collections.deque`. What's the canonical interview probe this maps to?",
+      "answer": "```\n             list      dict      set       deque\n[i]          O(1)      O(1)*     n/a       O(1) for ends, O(n) middle\nx in d       O(n)      O(1)      O(1)      O(n)\nappend(x)    O(1)¹     n/a       n/a       O(1)\nappendleft   n/a       n/a       n/a       O(1)\ninsert(0, x) O(n)      n/a       n/a       — (use appendleft)\nadd(x)       n/a       d[k]=v O(1)  O(1)   n/a\npop()        O(1)      n/a       n/a       O(1)\npop(0)       O(n)      n/a       n/a       — (use popleft)\nsort()       O(n log n) (Timsort)\n```\n\n¹ amortized — occasional reallocations are O(n) but average O(1).\n\n**`dict[key]` is starred** because the asymptotic is O(1), but pathologically-constructed key sequences (or low-quality hash functions) can degrade to O(n). For all realistic inputs, treat dict ops as O(1).\n\n**The canonical interview probe:** 'why is `key in dict` faster than `key in list`?' — dict is a hash table with O(1) average lookup; list scans linearly until it finds the value, O(n). The follow-up probe: 'optimize this loop that does `x in big_list` for many `x`'. Answer: 'precompute `big_set = set(big_list)`; now `x in big_set` is O(1), turning O(n*m) into O(n+m)'.",
+      "answer_explanation_md": "**The space-vs-time tradeoff** is the conceptual core of most Big-O optimization questions. The 'precompute a set' optimization above spends O(n) extra memory to build the hash structure, in exchange for turning each lookup from O(n) to O(1). For one or two lookups against a list, the conversion cost isn't worth it; for many lookups against the same data, the set conversion pays for itself within a few operations.\n\nVariants of this question appear in roughly every junior technical screen:\n\n- 'Find common elements between two lists.' → `set(a) & set(b)` (O(n+m) instead of nested loops O(n*m)).\n- 'Deduplicate a list while preserving order.' → `dict.fromkeys(items)` (Python 3.7+ preserves insertion order).\n- 'Find the first non-repeating character.' → `collections.Counter` then scan; O(n) total.\n- 'Check if a list has duplicates.' → `len(items) != len(set(items))`; O(n).\n\nThe shape recurs: when you find yourself writing a nested loop or a repeated `in list` check, ask 'can I trade O(n) memory for O(1) lookup?'."
+    },
+
+    {
+      "id": "m4-s6-c11",
+      "type": "code_trap",
+      "topic": "x in list O(n) vs x in set O(1) — the canonical optimization",
+      "topic_ru": "x in list O(n) vs x in set O(1) — каноническая оптимизация",
+      "difficulty": 3,
+      "tags": ["python", "big-o", "list", "set", "optimization", "interview-classic"],
+      "code_snippet": "# blocked_users: list of 50,000 user IDs to deny.\n# incoming: list of 10,000 incoming user IDs to check.\n\nblocked_users = [...]   # 50,000 entries\nincoming = [...]        # 10,000 entries\n\nflagged = [uid for uid in incoming if uid in blocked_users]\n# Slow. On real-world data, runs for several seconds.",
+      "question": "Why is this slow, and what's the one-line fix that makes it fast?",
+      "options": [
+        "Nothing is slow — Python optimizes `in list` to O(log n) automatically.",
+        "**Each `uid in blocked_users` is an O(n) linear scan** through the 50,000-entry list. With 10,000 incoming IDs, total work is O(n * m) = 500,000,000 comparisons — hence the multi-second runtime. **The fix:** convert `blocked_users` to a `set` once, before the loop. `set` membership is O(1) (hash-based), so each check is constant-time and total work drops to O(n + m) = 60,000 operations — ~10,000x speedup. The one-line fix:\n\n```python\nblocked_set = set(blocked_users)\nflagged = [uid for uid in incoming if uid in blocked_set]\n```\n\n**The space-vs-time tradeoff:** you spend O(n) memory to build the hash structure, in exchange for turning each lookup from O(n) to O(1). For one or two lookups, not worth it; for any meaningful number of lookups against the same data, the conversion pays for itself within a handful of operations. This is the marquee 'pick a better data structure' optimization that shows up across roughly every junior technical screen.",
+        "Use `bisect_left` on the sorted list — that's O(log n) per lookup and faster than set conversion.",
+        "Wrap it in a NumPy array — NumPy's C loop is faster regardless of algorithm."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**Mental model for spotting this pattern in code review:**\n\n- 'For each X in A, check if X is in B' where B is a list → flag for set conversion.\n- 'For each X in A, look up X's value in B' where B is a list-of-tuples → flag for dict conversion.\n- 'For each X in A, count how many times X appears in B' → flag for `Counter(B)`.\n\nAll three are variants of the same tradeoff: precompute O(n) hash structure once, get O(1) per-lookup afterward.\n\n**When the set conversion is NOT the right call:**\n\n- One or two lookups against `blocked_users`. Conversion cost is O(n); for just a couple of lookups, the set construction itself takes longer than scanning the list directly.\n- The 'list' is actually small (under ~100 elements). Linear scan over a small list is competitive with hash lookup; the set conversion is overhead.\n- You need ordering. `set` is unordered (since Python 3.7+ dict preserves insertion order, but `set` does not).\n- You're scanning once. If the lookup happens once, the conversion was wasted.\n\nThe set-conversion optimization is most valuable when (a) the haystack is large, (b) the number of lookups is large, and (c) you don't need ordering. For interview purposes: recognize the pattern, propose the optimization, name the tradeoff. Three sentences."
+    },
+
+    {
+      "id": "m4-s6-c12",
+      "type": "multiple_choice",
+      "topic": "list.insert(0, x) is O(n) — collections.deque for O(1) prepend",
+      "topic_ru": "list.insert(0, x) — O(n); collections.deque для O(1) prepend",
+      "difficulty": 4,
+      "tags": ["python", "list", "deque", "big-o", "collections", "subtle"],
+      "question": "You're implementing a 'recent items' buffer that adds new items to the FRONT of a sequence. With 100,000 items added, which approach scales and which doesn't?\n\n```python\n(A)  recent = []\n     for item in items:\n         recent.insert(0, item)        # always prepend\n\n(B)  from collections import deque\n     recent = deque()\n     for item in items:\n         recent.appendleft(item)       # always prepend\n```",
+      "options": [
+        "Both are O(n) total — same speed.",
+        "**(A) is O(n²) in total work; (B) is O(n).** `list.insert(0, item)` shifts every existing element one position to the right to make room at the front — O(len(list)) per call. Across 100,000 insertions, that's 100,000 × (average list length / 2) = ~5 billion shift operations. Multi-second runtime. **`collections.deque` is a doubly-linked list of fixed-size blocks** specifically engineered for O(1) `appendleft` AND O(1) `append`. Each prepend is constant time; total work for 100,000 prepends is 100,000 operations. **General rule:** if you need O(1) on BOTH ends of a sequence, use `deque`. If you only ever append/pop from the end, `list` is fine. If you need random-access by index, `list` is the right choice (deque is O(n) for arbitrary indexing). **Cross-link:** this is the same space-vs-time-tradeoff family as `m4-s6-c11` (precompute a set) — picking the right data structure changes the complexity class.",
+        "(A) is faster because lists are simpler than deques.",
+        "(B) errors out — `deque` doesn't support `appendleft`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on complexity. (A) is O(n²); (B) is O(n). The asymptotic difference dominates on any meaningful input size.",
+        "Correct. **Other deque use cases worth knowing:**\n\n```python\nfrom collections import deque\n\nrecent = deque(maxlen=10)        # bounded — newest 10 items, old ones auto-evicted\nfor item in stream:\n    recent.append(item)          # appending past maxlen evicts the oldest in O(1)\n\nqueue = deque()                  # FIFO queue: append + popleft, both O(1)\nstack = list()                   # LIFO stack: append + pop, both O(1) — list is fine\n```\n\nThe `maxlen` form is the canonical 'sliding-window' / 'recent N items' pattern — O(1) per insert and automatic eviction. The `queue.Queue` class is a thread-safe deque for multi-threaded producer/consumer code (overhead worth it only when you actually need thread safety; otherwise deque is faster).",
+        "Wrong — both data structures exist; the question is which has the right complexity for the workload. List has O(n) prepend; deque has O(1) prepend.",
+        "Wrong — `deque.appendleft(x)` is the canonical method. `deque` is designed for exactly this workload."
+      ]
+    },
+
+    {
+      "id": "m4-s6-c13",
+      "type": "fill_in",
+      "topic": "Big-O quick recall — fill in complexities for common ops",
+      "topic_ru": "Big-O быстрая память — заполнить сложности для типичных операций",
+      "difficulty": 3,
+      "tags": ["python", "big-o", "complexity", "discrimination"],
+      "code_snippet_with_blanks": "# Fill in the Big-O complexity for each operation.\n# Use the form O(1), O(log n), O(n), O(n log n), O(n^2).\n\n# Look up a value by index in a list:    big_list[i]\n___\n\n# Check membership in a 1M-element list:  x in big_list\n___\n\n# Check membership in a 1M-element set:   x in big_set\n___\n\n# Sort a list of 1M elements:             sorted(big_list)\n___",
+      "accepted_answers": [
+        ["O(1)"],
+        ["O(n)"],
+        ["O(1)"],
+        ["O(n log n)"]
+      ],
+      "explanation_md": "Four operations, four complexities — recall test for the table in `m4-s6-c10`:\n\n- **`big_list[i]` — O(1)**. Python lists are backed by C arrays of pointers; indexing is a single memory access regardless of list size.\n- **`x in big_list` — O(n)**. Linear scan from index 0 until found or end-of-list. Average case n/2; worst case n; asymptotically O(n).\n- **`x in big_set` — O(1)**. Hash-based lookup: compute hash of x, jump to bucket, compare. Average case is genuinely constant time; pathological inputs (terrible hash function or constructed collisions) can degrade to O(n) but no realistic workload hits that.\n- **`sorted(big_list)` — O(n log n)**. Python uses Timsort (a hybrid of merge sort + insertion sort); worst case and average case both O(n log n). For nearly-sorted input, Timsort is closer to O(n) due to its run-detection optimization.\n\n**Quick interview probe shape:** 'walk me through how you'd find the most common element in a list of 1M items'. Answers in increasing sophistication:\n\n1. Nested loop counting — O(n²), takes forever.\n2. Sort then scan for longest run — O(n log n), good.\n3. `collections.Counter(items).most_common(1)` — O(n), correct.\n\nReach for option 3 reflexively in code review."
+    }
+  ]
+}
