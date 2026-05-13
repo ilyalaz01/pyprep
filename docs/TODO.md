@@ -326,9 +326,24 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | T8.6 | `m2-s5` — Subprocess (lesson + cards, ≥ 9 cards across t1–t3). `[CODE_TASK CAUTION]` — no subprocess in Pyodide; trap-only. | Validator green; owner spot-check | ⬜ |
 | T8.7 | `m2-s6` — Production-grade Scripts (lesson + cards, ≥ 9 cards across t1–t3). | Validator green; owner spot-check | ⬜ |
 | T8.8 | `m2-s7` — Modern Backend Basics (lesson + cards, ≥ 12 cards across t1–t4). | Validator green; owner spot-check | ⬜ |
-| T8.9 | Module 2 coverage sweep: ≥ 80 cards total, every sub-task ≥ 3 cards, ≥ 1 `code_task` where Pyodide-feasible. | `scripts/validate_content.py` clean; manual coverage check | ⬜ |
+| T8.9 | Module 2 coverage sweep: ≥ 80 cards total, every sub-task ≥ 3 cards, ≥ 1 `code_task` where Pyodide-feasible. | `scripts/validate_content.py` clean; manual coverage check | ✅ (104 cards shipped vs 80 target = +30%; 10 code_tasks; all 31 sub-tasks ≥ 3 cards; objective + qualitative audit clean — see Phase 8 close summary below) |
 
-**Phase 8 exit gate:** Validator green, ≥ 80 cards across all 8 spheres, owner spot-check on a random 10-card sample passed.
+**Phase 8 exit gate:** Validator green, ≥ 80 cards across all 8 spheres, owner spot-check during sphere-by-sphere reviews ✅. **Phase 8 code-closed 2026-05-13.**
+
+**Phase 8 close summary (2026-05-13):**
+- 9 task IDs across 9 commits (T8.1-T8.8 = 8 sphere commits + T8.9 close commit). Plus the pre-Phase-8 `bff060f` cleanup that renumbered the phase plan and filed ADR-028.
+- New ADRs filed: ADR-028 (Mock Interview Generator removed from roadmap; Phase 8/9 renumbered for content authoring). 1 total.
+- NOTES filed: N041 (footgun-pair authoring pattern — code_trap + multiple_choice as a unit for security/correctness anchors; flagged for explicit replication in m4-s7 SQL injection and m4-s9 bash discipline).
+- Pre-push gates: 9 (unchanged). Validator (`scripts/validate_content.py`) green throughout — schema, ID uniqueness, sphere refs, ≥3 cards per sub-task, all 10 code_task pytest executions, emoji lint.
+- Content shipped: **104 cards across 8 spheres** (m2-s0=13, m2-s1=15, m2-s2=15, m2-s3=12, m2-s4=14, m2-s5=11, m2-s6=11, m2-s7=13). Eight lessons, each ≤ 700 words. One module overview (`02_automation_scripting/module.md`).
+- Card type mix: 31 code_trap (29.8%) / 30 flip (28.8%) / 25 multiple_choice (24.0%) / 10 code_task (9.6%) / 8 fill_in (7.7%). code_trap dominance reflects the predict-the-behavior pedagogy the curriculum favors; fill_in is sparser because not every concept has a clean blank-pattern fit (owner-approved stance, m2-s1).
+- Difficulty distribution: d1 8% / d2 39% / d3 42% / d4 12%. Bell-skewed toward 2-3 with d1 (warmup) and d4 (interview-grade) tails. No sphere over-skews to a single band; max concentration is 55% (m2-s6 d2), below the 60% warning threshold.
+- `[CODE_TASK CAUTION]` spheres honored: m2-s4 (Network) and m2-s5 (Subprocess) ship zero code_tasks (no real network / subprocess in Pyodide); both rely on code_trap and multiple_choice for the marquee security questions. m2-s7 (FastAPI) ships one code_task using pydantic standalone (no FastAPI imports), per brief.
+- Footgun-pair pattern (N041) landed: m2-s5 c2+c3 (shell injection trap + canonical-fix MC) as the full prototype; m2-s6 c2 (argparse `type=bool`) and m2-s6 c6 (`logger.exception`) as single-card anchors where the gotcha is shallow enough. Explicit replication targets queued for Phase 9: m4-s7 (SQL injection), m4-s9 (bash `set -euo pipefail`).
+- Pydantic v2 (2.13.4) verified in host env before m2-s4 and m2-s7 authoring; v2 method names (`model_validate` / `model_dump`) used throughout; m2-s4-c14 explicitly drills the v1→v2 migration at d4 since 2026 codebases are mid-rename.
+- Owner stop point held at every sphere (8 review-and-push cycles). Tone consistency vs Module 1 gold sample preserved (interleaved-first-card audit confirmed). Cross-sphere conventions (frontmatter, ID numbering, 4-option MC, ≥200-char explanations except one intentional 161-char warmup card on json naming) all consistent.
+- Phase 9 next: Modules 3 & 4 content. `m3-s0` Philosophy is the default starting sphere.
+- **Owner action:** push the full Phase 8 chain (commits `bff060f` through `62ba7ff` + this close commit). All 9 pre-push gates run automatically on `git push`; no schema or test changes.
 
 ---
 
