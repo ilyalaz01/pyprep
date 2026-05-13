@@ -1,14 +1,14 @@
 ---
 module_id: 2
 sphere_id: "m2-s0"
-title: "Time, Dates & Math"
-title_ru: "Время, даты и арифметика времени"
+title: "Time & Date"
+title_ru: "Время и даты"
 estimated_minutes: 12
 prerequisites: []
 tags: ["datetime", "timedelta", "timezone", "perf-counter", "interview-classic"]
 ---
 
-# Time, Dates & Math
+# Time & Date
 
 Time is where automation scripts most often break in production. Cron triggers misfire, log timestamps go non-comparable, retry windows leak across daylight-saving boundaries, durations come out negative because somebody used wall-clock time instead of a monotonic timer. None of these bugs are exotic — they ship into junior code constantly, and interviewers know it.
 

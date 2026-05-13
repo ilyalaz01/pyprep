@@ -1,5 +1,7 @@
 # PRD — Mock Interview Prompt Generator
 
+> **DEPRECATED — Historical artifact only.** Mock Interview Generator was removed from the roadmap on 2026-05-13 (see `PLAN.md` ADR-028). The feature had no product traction during Phase 5–7 and the Phase 8/9 slots originally reserved for it were reclaimed for Module 2–4 content authoring, which directly ships product value. `MockPromptService` (built in T2.6) remains in the SDK as dormant code. ADR-005 (prompt generator vs in-app LLM call) is retained as the original design rationale; it is not withdrawn, because the architecture would still be correct if this feature is ever revived. **Do not implement against this PRD without first amending or superseding ADR-028.**
+
 **Component:** `src/pyprep/sdk/prompts/`
 **Decision:** This feature does **not** call any LLM API. It generates a text prompt the user pastes into their own LLM (Claude.ai / ChatGPT). See `PLAN.md` ADR-005.
 

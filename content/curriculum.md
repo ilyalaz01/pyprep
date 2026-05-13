@@ -116,7 +116,7 @@ When authoring Modules 2–4, periodically open Module 1's `.cards.json` files f
 
 Module 2 is the automation-engineer track: handling time, files, text, serialization, networks, subprocesses, and the production-grade glue (argparse / logging / FastAPI) that turns a one-off script into something a team can run on a schedule. Sphere index in bullet form below; per-sphere knowledge points and interview angles follow as `### Sphere` sections.
 
-- `m2-s0` — Time, Dates & Math
+- `m2-s0` — Time & Date
   - `m2-s0-t1` — `datetime.now()` vs `datetime.utcnow()`; tz-aware datetimes
   - `m2-s0-t2` — `strftime` and `strptime`
   - `m2-s0-t3` — `timedelta` for time arithmetic
@@ -165,7 +165,7 @@ Module 2 is the automation-engineer track: handling time, files, text, serializa
 
 ---
 
-### Sphere `m2-s0` — Time, Dates & Math
+### Sphere `m2-s0` — Time & Date
 
 **Why this sphere matters in interviews:** Automation scripts live and die by time handling — cron triggers, log timestamps, retry windows, scheduled jobs. The mistakes here are subtle (naive vs aware, timezone surprises, NTP clock adjustments) and interviewers love them because they distinguish engineers who've been bitten by timezone bugs from those who haven't.
 

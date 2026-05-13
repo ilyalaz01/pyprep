@@ -933,7 +933,54 @@ The hand-rolled implementation lives in one component (`frontend/src/components/
 
 **Revisit when:**
 - Multi-user deployment makes abandoned-session leakage a real reporting concern. At that point a periodic heartbeat persisting partial-session duration becomes justified — same shape as the abandoned-row cleanup work ADR-024 also points at.
-- A future PRD requires per-card-type time breakdown (Phase 8+). Either Σ response_ms returns as a secondary signal for that surface specifically, or per-card timing gets its own first-class column.
+- A future PRD requires per-card-type time breakdown. Either Σ response_ms returns as a secondary signal for that surface specifically, or per-card timing gets its own first-class column.
+
+---
+
+### ADR-028: Mock Interview Generator removed from roadmap; Phase 8/9 renumbered for content authoring
+
+**Status:** Accepted (Phase 8 kickoff — 2026-05-13).
+
+**Context:** The original roadmap placed Mock Interview Generator at Phase 8 (T8.1–T8.7) and Modules 2–4 content at Phase 9 (T9.1–T9.5). Mock Interview Generator was originally scoped in `PRD_mock_interview_prompts.md` and ADR-005: composable prompts that the user pastes into their own Claude/ChatGPT subscription, with five pre-curated packs and a `/mock` route in the SPA. The feature never had product traction during the Phase 5–7 build cycles. No owner request, no real-world prompt iteration, no demand surfaced from the m1-s0 study runs.
+
+The Phase 5–7 work, in contrast, repeatedly surfaced content as the binding constraint on the product's perceived value: a learner who hits the end of Module 1 has no Module 2 to advance into, and the stats / weakness surfaces are calibration-dead without breadth of material. Every hour spent on Mock Interview is an hour not spent unblocking Module 2.
+
+**Decision:**
+
+1. Remove Mock Interview Generator from the roadmap entirely. Tasks T8.1–T8.7 (old) are deleted from `docs/TODO.md`, not deferred. If interview-prompt demand surfaces post-MVP, file a fresh entry then with current product context.
+2. Renumber phases:
+   - **Phase 8 (new)** — Module 2 — Automation Content Authoring. Eight spheres `m2-s0`–`m2-s7`, one task row per sphere, validator-green per sphere, owner-spot-check between spheres. Authoring begins with `m2-s0` (committed `38a0949`, 2026-05-13). Auto-roll between spheres forbidden — owner pace.
+   - **Phase 9 (new)** — Modules 3 & 4 — Testing / Infrastructure Content Authoring. Module 3 (Testing & QA, `m3-s0`–`m3-s5`) and Module 4 (Linux/Docker/SQL/Git/Tooling/Operations, `m4-s0`–`m4-s9` after the `78278a5` extension adding Web Security, CI/CD, Bash).
+   - **Phase 10** — unchanged (MVP-1 Polish & Deploy).
+3. `PRD_mock_interview_prompts.md` is retained as a historical artifact with a deprecation banner pointing at this ADR. `ADR-005` (Mock interview as prompt generator, not as in-app LLM call) remains as documentation of the original design decision; it is *not* withdrawn because the architectural reasoning is still correct if the feature is ever revived.
+4. `src/pyprep/sdk/prompts/MockPromptService` (built in T2.6) remains in the SDK as dormant code — no UI consumer, no API router. Removal of the SDK module is a separate cleanup decision; leaving it in place costs nothing while the question of revival is open.
+5. `T1.13` (pack JSON schema) is updated from "deferred to Phase 8" to "deferred — revive only if interview-pack feature is re-prioritized".
+
+**Rationale:**
+
+- Mock Interview was a *nice-to-have* that competed for slots with content, which is *necessary*. Removing it makes the trade-off explicit instead of letting it hide in the phase plan.
+- Renumbering rather than inserting (e.g. "Phase 7.5") preserves the simple monotonic-phase narrative the rest of the docs (PLAN.md, NOTES.md, commit messages) leans on. The cost is a one-time grep across `Phase 8` / `Phase 9` references; the benefit is a roadmap that reads forward without footnotes.
+- Deleting the old tasks rather than parking them in a "Post-MVP Backlog" section avoids the slow drift where dead ideas accumulate and a future reader can't tell which deferred items are still aspirational. The PRD remains in tree as the historical artifact; that's the right level of preservation for an idea that may never come back.
+
+**Trade-offs (accepted):**
+
+- If Mock Interview demand surfaces later, the feature has to be re-scoped from current product state, not from the 2026-04 roadmap snapshot. Acceptable: a re-scope at that point will produce a better plan anyway.
+- `MockPromptService` SDK code (10 tests, 100 % coverage) becomes dead weight until either revived or removed. Acceptable cost; aggressive removal carries risk of having to re-author from `git log` if revival happens within a year.
+- Cross-document references that conflated "Phase 8" with Mock Interview (e.g. T1.13's parenthetical, N039's "before Phase 8 Module 2 authoring") had to be tightened. The fix surface is small; the work is in this same cleanup commit.
+
+**Implementation contract:**
+
+- `docs/TODO.md` — Phase 8 section rewritten as Module 2 authoring (T8.1=m2-s0 ✅ from `38a0949`, T8.2–T8.8 ⬜ one per sphere, T8.9 = coverage sweep). Phase 9 rewritten as Modules 3 & 4 authoring. Phase 10 unchanged. T1.13 parenthetical updated.
+- `docs/PRD_mock_interview_prompts.md` — top-of-file deprecation banner referencing this ADR. PRD body left intact.
+- `docs/PLAN.md` ADR-027's parenthetical "Phase 8+" reference updated to no longer pin to Phase 8 specifically (the surface that would consume it is now unscheduled).
+
+**Test contract:**
+
+- None — process / roadmap change only. The validator's behavior is unchanged.
+
+**Revisit when:**
+
+- Owner runs ≥ 5 real study sessions across multiple modules and reports the Mock Interview prompt-export pattern as a felt gap. At that point this ADR is amended or superseded; reactivation pulls back tasks from the historical PRD as a starting point but re-validates them against the then-current product.
 
 ---
 

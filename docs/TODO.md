@@ -58,7 +58,7 @@
 | T1.10 | Build content validator: `scripts/validate_content.py` — schema, ID uniqueness, sphere refs, min-cards-per-task ≥ 3. | Run via `uv run validate-content` | ✅ (per-sphere counts; strict per-sub-task deferred — NOTES N006) |
 | T1.11 | Write ≥ 5 `code_task` cards for Module 1 with hidden pytest harness. | Each runs and passes when correct | ✅ (7 code_tasks, one per sphere s0–s6, every solution verified against its tests) |
 | T1.12 | (NEW) Author Sphere 6 lesson + ~12 cards (Concurrency & GIL — m1-s6, curriculum (ADDED) item). | Validation green | ✅ (factual fix on s6-c5 logged: `Thread.join()` on unstarted thread raises `RuntimeError`, not no-op; `correct_index` 1→3, explanation rewritten) |
-| T1.13 | (NEW) Lock pack JSON schema in `content/schema/pack.schema.json` (referenced by PRD §2 but not yet present). | `jsonschema` validates `content/interview_packs/packs.json` | ⬜ (deferred to Phase 8 — pack schema is for `MockPromptService`/interview-pack feature) |
+| T1.13 | (NEW) Lock pack JSON schema in `content/schema/pack.schema.json` (referenced by PRD §2 but not yet present). | `jsonschema` validates `content/interview_packs/packs.json` | ⬜ (deferred — pack schema tied to Mock Interview Generator, removed from roadmap per ADR-028; revive only if interview-pack feature is re-prioritized) |
 
 **Phase 1 exit gate:** Validator green, ≥ 75 cards, ≥ 5 `code_task` cards, all 7 spheres covered (m1-s0…m1-s6).
 
@@ -312,35 +312,36 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 ---
 
-## Phase 8 — Mock Interview Generator
+## Phase 8 — Module 2 — Automation Content Authoring
 
-**Goal:** Composable prompts that generate a high-quality external-LLM interview.
+**Goal:** Full Module 2 (Automation, Scripting, Infrastructure) content. All 8 spheres authored, validator green, tone calibrated against Module 1 gold sample. Mock Interview Generator removed from roadmap — see ADR-028.
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T8.1 | `/mock` route: filters (modules, spheres, difficulty, count, language EN/RU). | UI works | ⬜ |
-| T8.2 | Prompt template v1 in `content/interview_packs/template_v1.md`. | Reviewed by owner | ⬜ |
-| T8.3 | Prompt service samples cards per filter, fills template. | Same input → same output | ⬜ |
-| T8.4 | Copy-to-clipboard with success toast. | Works in Chrome/Firefox/Safari | ⬜ |
-| T8.5 | "How to use" panel: paste into Claude/ChatGPT, instruction tips. | Reviewed | ⬜ |
-| T8.6 | 5 pre-curated prompt packs (e.g., "Junior Backend — Python Core", "QA Automation — Testing Heavy"). | Available on `/mock` page | ⬜ |
-| T8.7 | Owner runs ≥ 3 real mock interviews, iterates on template based on output. | Notes added to ADR-005 | ⬜ |
+| T8.1 | `m2-s0` — Time & Date (lesson + cards, ≥ 12 cards across t1–t4). | Validator green; owner spot-check | ✅ (13 cards: 4 flip / 4 code_trap / 3 multiple_choice / 1 fill_in / 1 code_task; difficulty bands 1–4; `feat(p8.m2-s0)`) |
+| T8.2 | `m2-s1` — Filesystem & OS (lesson + cards, ≥ 15 cards across t1–t5). `[CODE_TASK CAUTION]` — Pyodide filesystem is in-memory only. | Validator green; owner spot-check | ⬜ |
+| T8.3 | `m2-s2` — Text & Regex (lesson + cards, ≥ 15 cards across t1–t5). | Validator green; owner spot-check | ⬜ |
+| T8.4 | `m2-s3` — Serialization Formats (lesson + cards, ≥ 9 cards across t1–t3). | Validator green; owner spot-check | ⬜ |
+| T8.5 | `m2-s4` — Network & APIs (lesson + cards, ≥ 12 cards across t1–t4). `[CODE_TASK CAUTION]` — no real network in Pyodide; mock or trap-only. | Validator green; owner spot-check | ⬜ |
+| T8.6 | `m2-s5` — Subprocess (lesson + cards, ≥ 9 cards across t1–t3). `[CODE_TASK CAUTION]` — no subprocess in Pyodide; trap-only. | Validator green; owner spot-check | ⬜ |
+| T8.7 | `m2-s6` — Production-grade Scripts (lesson + cards, ≥ 9 cards across t1–t3). | Validator green; owner spot-check | ⬜ |
+| T8.8 | `m2-s7` — Modern Backend Basics (lesson + cards, ≥ 12 cards across t1–t4). | Validator green; owner spot-check | ⬜ |
+| T8.9 | Module 2 coverage sweep: ≥ 80 cards total, every sub-task ≥ 3 cards, ≥ 1 `code_task` where Pyodide-feasible. | `scripts/validate_content.py` clean; manual coverage check | ⬜ |
 
-**Phase 8 exit gate:** Owner runs a satisfying mock interview with a generated prompt and reports it caught real weaknesses.
+**Phase 8 exit gate:** Validator green, ≥ 80 cards across all 8 spheres, owner spot-check on a random 10-card sample passed.
 
 ---
 
-## Phase 9 — Modules 2–4 Content
+## Phase 9 — Modules 3 & 4 — Testing / Infrastructure Content Authoring
 
-**Goal:** Full curriculum coverage.
+**Goal:** Full curriculum coverage for Module 3 (Testing & QA) and Module 4 (Linux, Docker, SQL, Git, Tooling & Operations).
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T9.1 | Module 2 (Automation, Scripting, Infrastructure) — all spheres. | Validator green, ≥ 80 cards | ⬜ |
-| T9.2 | Module 3 (Testing & QA) — all spheres. | Validator green, ≥ 60 cards | ⬜ |
-| T9.3 | Module 4 (Linux, Docker, SQL, Git) — all spheres. | Validator green, ≥ 70 cards | ⬜ |
-| T9.4 | Coverage check ≥ 95% sub-tasks × 3 cards. | Script confirms | ⬜ |
-| T9.5 | Spot-check by owner: 20 random cards across modules for accuracy. | Owner sign-off | ⬜ |
+| T9.1 | Module 3 (Testing & QA) — all spheres `m3-s0`–`m3-s5`. | Validator green, ≥ 60 cards | ⬜ |
+| T9.2 | Module 4 (Linux, Docker, SQL, Git, Tooling & Operations) — all spheres `m4-s0`–`m4-s9` (incl. m4-s7 Web Security, m4-s8 CI/CD, m4-s9 Bash, added in `78278a5`). | Validator green, ≥ 100 cards | ⬜ |
+| T9.3 | Coverage check ≥ 95% sub-tasks × 3 cards across Modules 3 + 4. | Script confirms | ⬜ |
+| T9.4 | Spot-check by owner: 20 random cards across both modules for accuracy. | Owner sign-off | ⬜ |
 
 **Phase 9 exit gate:** Coverage check green, owner-spot-check passed.
 
