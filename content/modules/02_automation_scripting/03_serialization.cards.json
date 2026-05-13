@@ -1,0 +1,210 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s3",
+  "cards": [
+    {
+      "id": "m2-s3-c1",
+      "type": "flip",
+      "topic": "json loads/load/dumps/dump — four entry points",
+      "topic_ru": "json loads/load/dumps/dump — четыре точки входа",
+      "difficulty": 1,
+      "tags": ["json", "interview-warmup"],
+      "question": "What's the difference between `json.loads`, `json.load`, `json.dumps`, and `json.dump`?",
+      "answer": "The `s` suffix means 'string'. `json.loads(s)` parses a JSON *string* into a Python object. `json.dumps(obj)` serializes a Python object into a JSON *string*. The `s`-less forms work on file-like objects: `json.load(f)` reads from an open file, `json.dump(obj, f)` writes to one. Same four operations, two pairs distinguished by whether the medium is a string or a stream.",
+      "answer_explanation_md": "The mnemonic: `load(s)` / `dump(s)` — drop the `s` when you're working with a file (because you wrote `with open(...) as f:` and you can already see the stream)."
+    },
+
+    {
+      "id": "m2-s3-c2",
+      "type": "code_trap",
+      "topic": "json.dumps ensure_ascii default escapes Unicode",
+      "topic_ru": "json.dumps по умолчанию экранирует Unicode",
+      "difficulty": 3,
+      "tags": ["json", "unicode", "ensure-ascii", "hebrew", "interview-classic"],
+      "code_snippet": "import json\n\nprint(json.dumps({'name': 'אלון', 'city': 'חיפה'}))",
+      "question": "What does this print?",
+      "options": [
+        "{\"name\": \"אלון\", \"city\": \"חיפה\"}",
+        "{\"name\": \"\\u05d0\\u05dc\\u05d5\\u05df\", \"city\": \"\\u05d7\\u05d9\\u05e4\\u05d4\"}",
+        "Raises `UnicodeEncodeError`",
+        "{\"name\": \"????\", \"city\": \"????\"}"
+      ],
+      "correct_index": 1,
+      "explanation_md": "`json.dumps` defaults to `ensure_ascii=True`, which escapes every non-ASCII codepoint to `\\uXXXX`. The output is valid JSON — `json.loads` on it round-trips back to the Hebrew strings — but it's unreadable in logs, error reports, DB columns, and curl output.\n\nThe fix is one keyword argument:\n\n```python\njson.dumps({'name': 'אלון'}, ensure_ascii=False)\n# → '{\"name\": \"אלון\"}'\n```\n\nFor any service that handles Hebrew, Cyrillic, Arabic, CJK, or emoji, `ensure_ascii=False` should be the default at every `dumps` call site."
+    },
+
+    {
+      "id": "m2-s3-c3",
+      "type": "code_task",
+      "topic": "Round-trip JSON with indent and ensure_ascii=False via StringIO",
+      "topic_ru": "Round-trip JSON через StringIO с indent и ensure_ascii=False",
+      "difficulty": 3,
+      "tags": ["json", "stringio", "indent", "ensure-ascii"],
+      "prompt_md": "Implement `to_pretty_json(obj) -> str` and `from_pretty_json(s) -> object` such that:\n\n- `to_pretty_json(obj)` returns a JSON string with `indent=2`, `ensure_ascii=False`, and `sort_keys=True`.\n- `from_pretty_json(s)` parses such a string back into a Python object.\n- The round trip preserves Hebrew / Cyrillic / emoji strings as native Unicode (not `\\uXXXX` escapes).\n\nUse `json.dumps` / `json.loads` directly — no file I/O.",
+      "starter_code": "import json\n\ndef to_pretty_json(obj):\n    # your code here\n    pass\n\ndef from_pretty_json(s):\n    # your code here\n    pass\n",
+      "solution_code": "import json\n\ndef to_pretty_json(obj):\n    return json.dumps(obj, indent=2, ensure_ascii=False, sort_keys=True)\n\ndef from_pretty_json(s):\n    return json.loads(s)\n",
+      "tests": "import json\nimport pytest\nfrom solution import to_pretty_json, from_pretty_json\n\ndef test_preserves_native_unicode():\n    s = to_pretty_json({'name': 'אלון'})\n    assert 'אלון' in s\n    assert '\\\\u05d0' not in s\n\ndef test_indent_is_two():\n    s = to_pretty_json({'a': 1, 'b': 2})\n    assert '\\n  \"a\"' in s\n\ndef test_keys_are_sorted():\n    s = to_pretty_json({'b': 2, 'a': 1})\n    assert s.index('\"a\"') < s.index('\"b\"')\n\ndef test_round_trip_preserves_data():\n    obj = {'name': 'аня', 'count': 7, 'tags': ['x', 'y']}\n    assert from_pretty_json(to_pretty_json(obj)) == obj\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s3-c4",
+      "type": "multiple_choice",
+      "topic": "Which Python types json.dumps cannot serialize",
+      "topic_ru": "Какие типы json.dumps не может сериализовать",
+      "difficulty": 2,
+      "tags": ["json", "types", "typeerror"],
+      "question": "Which of these will `json.dumps` raise `TypeError` on?",
+      "options": [
+        "`set`, `datetime`, and `bytes` — none of them have a JSON representation; pass `default=str` or a custom encoder.",
+        "`tuple` and `list` — JSON has no distinction so both raise.",
+        "`None` — JSON has no null literal in Python.",
+        "Nothing — `json.dumps` serializes any Python object via `__dict__`."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `set` has no JSON equivalent (no native set type); `datetime` and `bytes` are not basic JSON types either. The escape hatch is `json.dumps(obj, default=str)`, which calls `str(...)` on anything it doesn't know how to handle; for full control, subclass `json.JSONEncoder`.",
+        "Wrong — `tuple` serializes silently as a JSON array (becomes a Python `list` on the way back, losing the tuple-ness, which is its own footgun). `list` is the native target type.",
+        "Wrong — `None` serializes to JSON `null`, no error.",
+        "Wrong — JSON has no native object-via-`__dict__` mechanism; custom classes raise unless you provide an encoder."
+      ]
+    },
+
+    {
+      "id": "m2-s3-c5",
+      "type": "flip",
+      "topic": "csv.reader vs csv.DictReader",
+      "topic_ru": "csv.reader vs csv.DictReader",
+      "difficulty": 2,
+      "tags": ["csv", "dictreader"],
+      "question": "What's the difference between `csv.reader` and `csv.DictReader`, and when should you prefer each?",
+      "answer": "`csv.reader(f)` yields each row as a list — access columns by integer index (`row[0]`, `row[1]`). `csv.DictReader(f)` reads the first row as headers and yields each subsequent row as a dict keyed by header (`row['amount']`). Prefer `DictReader` whenever the CSV has a header row: the code reads cleaner, doesn't break if a column moves, and `row['column_name']` is self-documenting in code review.",
+      "answer_explanation_md": "Use plain `csv.reader` only when the file is headerless (raw data dumps, fixed-schema feeds) or when you need raw row access for some structural reason. The corresponding writers (`csv.writer` vs `csv.DictWriter`) follow the same logic; `DictWriter` requires `fieldnames=[...]` and an explicit `writeheader()` call."
+    },
+
+    {
+      "id": "m2-s3-c6",
+      "type": "code_task",
+      "topic": "Sum a numeric column from a CSV string via DictReader",
+      "topic_ru": "Сумма числовой колонки из CSV-строки через DictReader",
+      "difficulty": 3,
+      "tags": ["csv", "dictreader", "stringio", "interview-classic"],
+      "prompt_md": "Implement `sum_column(csv_text: str, column: str) -> int` that:\n\n- Parses `csv_text` as CSV with a header row.\n- Sums the integer values of the column named `column`.\n- Returns the sum as an `int`.\n- Raises `KeyError` if the column isn't in the header.\n\nUse `csv.DictReader` and `io.StringIO` — no file I/O. This is the read-a-CSV-and-aggregate interview classic.",
+      "starter_code": "import csv\nimport io\n\ndef sum_column(csv_text, column):\n    # your code here\n    pass\n",
+      "solution_code": "import csv\nimport io\n\ndef sum_column(csv_text, column):\n    reader = csv.DictReader(io.StringIO(csv_text))\n    if column not in (reader.fieldnames or []):\n        raise KeyError(column)\n    return sum(int(row[column]) for row in reader)\n",
+      "tests": "import pytest\nfrom solution import sum_column\n\nCSV = 'name,amount\\nalice,100\\nbob,200\\ncarol,50\\n'\n\ndef test_sums_the_amount_column():\n    assert sum_column(CSV, 'amount') == 350\n\ndef test_unknown_column_raises_keyerror():\n    with pytest.raises(KeyError):\n        sum_column(CSV, 'nope')\n\ndef test_empty_data_returns_zero():\n    assert sum_column('amount\\n', 'amount') == 0\n\ndef test_single_row():\n    assert sum_column('amount\\n42\\n', 'amount') == 42\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m2-s3-c7",
+      "type": "code_trap",
+      "topic": "csv writer + missing newline='' produces blank rows on Windows",
+      "topic_ru": "csv writer без newline='' порождает пустые строки на Windows",
+      "difficulty": 4,
+      "tags": ["csv", "newline", "windows", "subtle", "interview-classic"],
+      "code_snippet": "import csv\n\nwith open('out.csv', 'w') as f:          # <-- note: no newline=''\n    writer = csv.writer(f)\n    writer.writerow(['name', 'amount'])\n    writer.writerow(['alice', 100])\n    writer.writerow(['bob', 200])",
+      "question": "On Windows, what does the resulting file look like when opened in Excel?",
+      "options": [
+        "Three correct rows: header, alice, bob.",
+        "Three rows of data with a phantom blank row between every real row.",
+        "An empty file — `csv.writer` requires binary mode on Windows.",
+        "Raises `UnicodeEncodeError` because Excel demands UTF-8 BOM."
+      ],
+      "correct_index": 1,
+      "explanation_md": "On Windows, `open()` in text mode translates `\\n` to `\\r\\n`. `csv.writer` *also* writes `\\r\\n` as its row terminator. The two layers compound, and each `writerow` ends with `\\r\\r\\n` — which Excel interprets as 'row ending, then a blank row'. Result: phantom blank rows everywhere.\n\nThe fix is `newline=''` (empty string) on the `open` call:\n\n```python\nwith open('out.csv', 'w', newline='') as f:\n    writer = csv.writer(f)\n    ...\n```\n\nThis tells the file layer to leave newlines alone, and `csv.writer` writes the correct `\\r\\n` itself. The same applies to reading — open with `newline=''` so the csv module sees raw line endings.\n\nLinux/macOS don't translate, so the bug is invisible in dev and ships to the Windows-user QA team. Memorize: `open(..., newline='')` for every CSV file."
+    },
+
+    {
+      "id": "m2-s3-c8",
+      "type": "multiple_choice",
+      "topic": "csv.DictWriter required fields and writeheader()",
+      "topic_ru": "csv.DictWriter: обязательные поля и writeheader()",
+      "difficulty": 3,
+      "tags": ["csv", "dictwriter"],
+      "question": "Which statement about `csv.DictWriter` is correct?",
+      "options": [
+        "`DictWriter(f, fieldnames=[...])` writes the header row automatically on the first `writerow` call.",
+        "`DictWriter` requires `fieldnames` at construction and an explicit `writeheader()` call before any data rows; omitting `writeheader()` produces a headerless file.",
+        "`fieldnames` is optional — `DictWriter` infers it from the first dict you pass to `writerow`.",
+        "`DictWriter` and `csv.writer` are interchangeable; the `Dict` form is just a naming convenience."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `DictWriter` never writes the header automatically. You must call `writeheader()`. The omission is the classic 'why is my CSV headerless?' bug.",
+        "Correct. The contract is: `fieldnames=[...]` at construction (used to order the dict-to-row mapping), then `writeheader()`, then `writerow(...)` calls. Each row's dict keys must be a subset of `fieldnames`; extras raise `ValueError` unless `extrasaction='ignore'`.",
+        "Wrong — `fieldnames` is required at construction. The constructor can't see future rows.",
+        "Wrong — they have different shapes. `csv.writer.writerow` takes a sequence; `csv.DictWriter.writerow` takes a dict."
+      ]
+    },
+
+    {
+      "id": "m2-s3-c9",
+      "type": "flip",
+      "topic": "Why yaml.safe_load over yaml.load",
+      "topic_ru": "Почему yaml.safe_load, а не yaml.load",
+      "difficulty": 2,
+      "tags": ["yaml", "security", "rce", "deserialization", "interview-classic"],
+      "question": "Why should you always use `yaml.safe_load` instead of `yaml.load` when parsing YAML in Python?",
+      "answer": "`yaml.load` (the default loader, until PyYAML 6.0 made `Loader=` mandatory) honors YAML tags like `!!python/object:os.system`, which instantiate arbitrary Python objects from the document. A malicious YAML file fed to `yaml.load` executes shell commands or imports modules during parsing — remote code execution from a config file. `yaml.safe_load` uses a restricted loader that only constructs basic types (dict, list, str, int, float, bool, None) and rejects all tags. Use it unconditionally; there is essentially no production case where the extra power of `yaml.load` is worth the attack surface.",
+      "answer_explanation_md": "This is one of the canonical Python security questions, on the OWASP top-10 deserialization vulnerabilities list. PyYAML 6.0 changed the default to issue a warning, and `Loader=` is now required — but `yaml.safe_load` remains the cleanest answer because it leaves no room to forget."
+    },
+
+    {
+      "id": "m2-s3-c10",
+      "type": "code_trap",
+      "topic": "yaml.load executes arbitrary code via !!python/object tag",
+      "topic_ru": "yaml.load исполняет произвольный код через тег !!python/object",
+      "difficulty": 4,
+      "tags": ["yaml", "security", "rce", "deserialization", "interview-classic"],
+      "code_snippet": "import yaml\n\nhostile = '!!python/object/apply:os.system [\"rm -rf ~/important\"]'\nyaml.load(hostile, Loader=yaml.UnsafeLoader)\n# vs:\nyaml.safe_load(hostile)",
+      "question": "What is the difference in outcome between the `yaml.load(..., Loader=yaml.UnsafeLoader)` call and the `yaml.safe_load(...)` call?",
+      "options": [
+        "Both raise `yaml.YAMLError` — the `!!python/object` tag is invalid YAML.",
+        "Both succeed and return a dict — the tag is metadata only.",
+        "The `yaml.load` call executes `os.system('rm -rf ~/important')` during parsing — arbitrary code execution. The `yaml.safe_load` call raises `yaml.constructor.ConstructorError` because the tag is rejected by the safe loader.",
+        "The `yaml.load` call returns the string literal; the `yaml.safe_load` call returns `None`."
+      ],
+      "correct_index": 2,
+      "explanation_md": "`!!python/object/apply:os.system` is a YAML tag instructing the loader to call `os.system(...)` with the listed arguments. `yaml.UnsafeLoader` (and the historical default loader) honor it — `os.system('rm -rf ~/important')` runs, recursively deletes the directory, and *then* parsing 'completes'.\n\n`yaml.safe_load` uses `yaml.SafeLoader`, which only constructs basic types and rejects every tag outside that allowlist. The same input raises `yaml.constructor.ConstructorError: could not determine a constructor for the tag 'tag:yaml.org,2002:python/object/apply:os.system'`.\n\n**Rule:** parse untrusted YAML with `yaml.safe_load` exclusively. The interview is checking whether you've internalized this; the existence of `UnsafeLoader` in the API is a footgun PyYAML chose to keep for legacy reasons, not a feature you should ever reach for."
+    },
+
+    {
+      "id": "m2-s3-c11",
+      "type": "multiple_choice",
+      "topic": "What yaml.safe_load accepts and rejects",
+      "topic_ru": "Что yaml.safe_load принимает и отвергает",
+      "difficulty": 3,
+      "tags": ["yaml", "safe-load", "types"],
+      "question": "Which of these YAML inputs does `yaml.safe_load` accept without raising?",
+      "options": [
+        "All YAML inputs — `safe_load` is just a stricter parser; the type system is identical to `yaml.load`.",
+        "Only inputs that use no tags at all — any explicit `!` tag is rejected.",
+        "Inputs producing basic types (dict, list, str, int, float, bool, None) and standard YAML aliases / anchors. Tags like `!!python/object`, `!!python/tuple`, and `!Custom` are rejected with `ConstructorError`.",
+        "Inputs producing dicts only — lists at the top level raise."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — `safe_load` deliberately rejects the Python-specific and arbitrary tags. That's the point of the safer surface.",
+        "Wrong — built-in YAML 1.1/1.2 tags like `!!str`, `!!int`, `!!seq`, `!!map` are fine because they map to basic types. Only the dangerous tags (especially `!!python/object`) are rejected.",
+        "Correct. `safe_load` is exactly the subset of YAML that produces a tree of basic Python types — perfect for config files. Aliases (`&anchor` / `*ref`) are still supported because they don't instantiate new types.",
+        "Wrong — top-level lists are fine; `safe_load(\"- a\\n- b\")` returns `['a', 'b']`."
+      ]
+    },
+
+    {
+      "id": "m2-s3-c12",
+      "type": "fill_in",
+      "topic": "Canonical safe YAML config-load pattern",
+      "topic_ru": "Канонический безопасный паттерн загрузки YAML-конфига",
+      "difficulty": 1,
+      "tags": ["yaml", "safe-load", "patterns"],
+      "code_snippet_with_blanks": "import yaml\n\nwith open('config.yml') as f:\n    config = yaml.___(f)\n\nassert config['name'] == 'pyprep'",
+      "accepted_answers": [
+        ["safe_load"]
+      ],
+      "explanation_md": "The one-liner you use everywhere: `yaml.safe_load(stream)`. It takes a string or a file-like object and returns a tree of basic Python types. Pair with `yaml.safe_dump(data, stream)` for the write side. \n\n**Never** type `yaml.load(...)` from muscle memory — even when the input is a file you wrote, today's safe file is tomorrow's untrusted-uploaded-from-an-API file, and the loader is the wrong place to enforce that distinction."
+    }
+  ]
+}
