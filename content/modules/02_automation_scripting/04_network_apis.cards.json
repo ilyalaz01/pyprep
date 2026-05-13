@@ -1,0 +1,257 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s4",
+  "cards": [
+    {
+      "id": "m2-s4-c1",
+      "type": "flip",
+      "topic": "requests.get/post + params + json body",
+      "topic_ru": "requests.get/post + params + json body",
+      "difficulty": 1,
+      "tags": ["requests", "http", "interview-warmup"],
+      "question": "How do you send a GET with query parameters, and a POST with a JSON body, using `requests`?",
+      "answer": "GET: `requests.get(url, params={'q': 'hello', 'limit': 50})` — `params` becomes the URL-encoded query string `?q=hello&limit=50`. POST: `requests.post(url, json={'name': 'alice'})` — `json=` serializes the dict to JSON *and* sets `Content-Type: application/json` for you.",
+      "answer_explanation_md": "Never build query strings or JSON bodies by hand: `requests` does the URL encoding and JSON serialization correctly, including edge cases like spaces and Unicode. The same `params=` / `json=` parameters work on every method (`get`, `post`, `put`, `delete`, `patch`)."
+    },
+
+    {
+      "id": "m2-s4-c2",
+      "type": "code_trap",
+      "topic": "data= vs json= — Content-Type and body format",
+      "topic_ru": "data= vs json= — Content-Type и формат тела",
+      "difficulty": 3,
+      "tags": ["requests", "post", "content-type", "interview-classic"],
+      "code_snippet": "import requests\n\n# Server expects: Content-Type: application/json, body = {\"name\": \"alice\"}\nrequests.post('https://api.example.com/items', data={'name': 'alice'})",
+      "question": "What does the server actually receive, and why is the request likely to fail with 400 Bad Request?",
+      "options": [
+        "Body `{\"name\": \"alice\"}` with `Content-Type: application/json` — works fine, `data=` and `json=` are aliases.",
+        "Body `name=alice` with `Content-Type: application/x-www-form-urlencoded`. The server's JSON parser rejects it as malformed JSON.",
+        "Empty body — `data=` ignores dicts unless they're stringified first.",
+        "Body `{'name': 'alice'}` (Python repr) — server can't parse Python literals."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`data={...}` URL-encodes the dict and sends it as `application/x-www-form-urlencoded` — the body becomes `name=alice`, not JSON. The server expecting JSON tries to parse it and returns 400.\n\nThe fix is one character: change `data=` to `json=`.\n\n```python\nrequests.post(url, json={'name': 'alice'})\n# body: '{\"name\": \"alice\"}'\n# Content-Type: application/json\n```\n\nRule of thumb: `json=` for JSON APIs (almost everything modern); `data=` only when the server explicitly wants form encoding (HTML form submissions, OAuth token endpoints in some flavors)."
+    },
+
+    {
+      "id": "m2-s4-c3",
+      "type": "multiple_choice",
+      "topic": "Building a query string: params= vs manual concatenation",
+      "topic_ru": "Построение query string: params= vs ручная конкатенация",
+      "difficulty": 2,
+      "tags": ["requests", "params", "url-encoding"],
+      "question": "You need to GET `/search` with parameters `q='hello world'` and `tag='c++'`. Which approach is correct?",
+      "options": [
+        "`requests.get(f'{base}/search?q=hello world&tag=c++')` — string interpolation is simplest.",
+        "`requests.get(f'{base}/search', params={'q': 'hello world', 'tag': 'c++'})` — `requests` URL-encodes spaces and special characters for you.",
+        "`requests.get(f'{base}/search', data={'q': 'hello world', 'tag': 'c++'})` — `data` is the GET equivalent.",
+        "Manually call `urllib.parse.quote` on each value, then concatenate."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. Unescaped spaces break the URL; `+` in `c++` is special (decodes to space on the server). Hand-built URLs always have a bug.",
+        "Correct. `params=` URL-encodes every key and value safely. `hello world` becomes `hello%20world`; `c++` becomes `c%2B%2B`. The server decodes back to the original strings.",
+        "Wrong — `data=` is for POST bodies; on GET it does nothing useful.",
+        "Works but reinvents what `params=` already does cleanly. The library exists for this reason."
+      ]
+    },
+
+    {
+      "id": "m2-s4-c4",
+      "type": "fill_in",
+      "topic": "Canonical POST-with-JSON-body pattern",
+      "topic_ru": "Канонический POST с JSON-телом",
+      "difficulty": 2,
+      "tags": ["requests", "post", "json", "patterns"],
+      "code_snippet_with_blanks": "import requests\n\nr = requests.___(\n    'https://api.example.com/users',\n    ___={'name': 'alice', 'role': 'admin'},\n    timeout=5,\n)\ndata = r.___()",
+      "accepted_answers": [
+        ["post"],
+        ["json"],
+        ["json"]
+      ],
+      "explanation_md": "Three pieces of the production shape: `requests.post` for the verb, `json=` for the body (which both serializes and sets the Content-Type header), and `r.json()` to parse the response body as JSON. The `timeout=5` is the survival kit; it's already in the snippet because you should never forget it. The third blank is the same word as the second by coincidence — `json` is overloaded across the request and the response."
+    },
+
+    {
+      "id": "m2-s4-c5",
+      "type": "code_trap",
+      "topic": "Bearer token in Authorization header, not query string",
+      "topic_ru": "Bearer токен в Authorization, а не в query",
+      "difficulty": 3,
+      "tags": ["requests", "auth", "bearer", "security", "interview-classic"],
+      "code_snippet": "import requests\n\ntoken = 'eyJhbGciOiJI...'   # JWT\n\n# Option A\nrequests.get(f'https://api.example.com/me?token={token}')\n\n# Option B\nrequests.get('https://api.example.com/me',\n             headers={'Authorization': f'Bearer {token}'})",
+      "question": "Both calls authenticate (assume the server accepts either). Which is correct for production code, and why?",
+      "options": [
+        "Option A — query strings are simpler and easier to debug.",
+        "Option B — tokens belong in the `Authorization` header. Query-string tokens leak through server access logs, browser history, `Referer` headers on any outbound link, and most CDN/proxy logs by default. Header values are not logged by these surfaces.",
+        "Both are equivalent — pick whichever reads better.",
+        "Option A — it's the JWT spec; `Authorization: Bearer` is OAuth-only."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Server access logs (nginx, Apache, ALB, GCP LB) record the full URL by default, including the query string. Tokens that hit the URL hit those logs — log rotation eventually pushes them to a long-term archive read by SREs / contractors / leaked backups. Browser history captures the URL. The `Referer` header carries the URL to every linked-to domain. CDN logs and proxy logs do the same.\n\nHeader values are not captured by any of those surfaces by default. `Authorization: Bearer <token>` is the canonical pattern; `X-API-Key: <key>` is the equivalent for API keys. This question is essentially a security baseline screen — every junior backend interview asks it once, in some form."
+    },
+
+    {
+      "id": "m2-s4-c6",
+      "type": "multiple_choice",
+      "topic": "requests auth= shortcuts: HTTPBasicAuth vs tuple",
+      "topic_ru": "requests auth= shortcuts: HTTPBasicAuth vs tuple",
+      "difficulty": 2,
+      "tags": ["requests", "auth", "http-basic"],
+      "question": "Which is the simplest correct way to send HTTP Basic Auth credentials with `requests`?",
+      "options": [
+        "`requests.get(url, auth=('user', 'pass'))` — the tuple form is short-hand for `HTTPBasicAuth('user', 'pass')`.",
+        "`requests.get(url, headers={'auth': 'user:pass'})` — `auth` is a header.",
+        "`requests.get(url, basic=('user', 'pass'))` — there's a dedicated `basic=` parameter.",
+        "`requests.get(url, params={'user': 'user', 'pass': 'pass'})` — Basic Auth uses query parameters."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `auth=(user, pass)` is the shorthand `requests` accepts; internally it constructs `HTTPBasicAuth(user, pass)`. Both produce the same `Authorization: Basic <base64(user:pass)>` header.",
+        "Wrong — `auth` isn't an HTTP header name; the actual header is `Authorization`. And `requests` wouldn't base64-encode it for you.",
+        "Wrong — no such parameter exists. `auth=` is the canonical name.",
+        "Wrong — Basic Auth uses the `Authorization` header, not query parameters."
+      ]
+    },
+
+    {
+      "id": "m2-s4-c7",
+      "type": "flip",
+      "topic": "Why credentials belong in headers, not URLs",
+      "topic_ru": "Почему креды живут в заголовках, а не в URL",
+      "difficulty": 2,
+      "tags": ["requests", "auth", "security", "headers"],
+      "question": "Name three places a token will leak into if you put it in the query string instead of the `Authorization` header.",
+      "answer": "(1) Server access logs (nginx / Apache / ALB / GCP LB record full URLs by default). (2) Browser history and bookmarks (any in-browser navigation). (3) The `Referer` header on every outbound link the page contains. Bonus: CDN logs, proxy logs, error monitoring tools that capture URLs, screenshots in support tickets, link previews in chat tools that fetch the page.",
+      "answer_explanation_md": "The threat model isn't 'someone with current access reads the URL' — it's all the surfaces that capture URLs over time, none of which a delete-the-line commit removes from the past. Headers are not captured by any of those surfaces by default. This is the same shape as the 'never hardcode secrets in source' question from `m2-s1`: the issue is exfiltration through artifacts, not in-the-moment readers."
+    },
+
+    {
+      "id": "m2-s4-c8",
+      "type": "code_trap",
+      "topic": "No timeout means hang forever on a hung server",
+      "topic_ru": "Без timeout — зависание навсегда на упавшем сервере",
+      "difficulty": 4,
+      "tags": ["requests", "timeout", "production", "interview-classic"],
+      "code_snippet": "import requests\n\nfor url in service_urls:\n    r = requests.get(url)         # note: no timeout=\n    process(r.json())",
+      "question": "One of the services is hung (accepts the connection but never sends data). What is the actual outcome of this script in production?",
+      "options": [
+        "`requests` has a sensible default timeout of 30 seconds; the script raises `Timeout` and moves on.",
+        "The script blocks indefinitely on the hung URL. The CI job runs forever (or until the pipeline-level timeout, hours later). No exception, no log line, no recovery.",
+        "Python's GIL eventually preempts the blocking call after ~5 seconds.",
+        "`requests` would raise `ConnectionError` since the server isn't responding."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**`requests` has no default timeout.** Without `timeout=`, the call blocks on the socket-read forever — until the OS kills the process, the pipeline-level timeout fires, or someone restarts the box. The hung-server case is the worst kind because the connection succeeded (so `ConnectionError` doesn't fire) and no data arrives (so the read just waits).\n\nThe fix is one keyword argument: `requests.get(url, timeout=5)`. Use `timeout=(connect, read)` for finer control. **Every** `requests` call in production code should have a timeout; treat its absence as a code review blocker."
+    },
+
+    {
+      "id": "m2-s4-c9",
+      "type": "multiple_choice",
+      "topic": "raise_for_status semantics — which status codes raise",
+      "topic_ru": "Семантика raise_for_status — какие коды бросают исключение",
+      "difficulty": 3,
+      "tags": ["requests", "raise-for-status", "http-error"],
+      "question": "Which statement about `response.raise_for_status()` is correct?",
+      "options": [
+        "Raises on every non-200 status code (so 201, 204, 301 all raise).",
+        "Raises `requests.exceptions.HTTPError` on 4xx and 5xx; does nothing on 1xx / 2xx / 3xx. Redirects (3xx) are usually followed automatically by the library before you see the response.",
+        "Always raises — call it only inside a try/except, like an assertion.",
+        "Returns a bool — you check the result manually."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — 201 Created, 204 No Content, and 3xx redirects are not errors. `raise_for_status` is intentionally lenient about success codes.",
+        "Correct. The split is exactly at the 4xx boundary: 4xx is client error, 5xx is server error, both raise `HTTPError`. Everything below 400 is treated as success. `requests` also auto-follows redirects by default (configurable with `allow_redirects=False`).",
+        "Wrong — it's a no-op on success codes; you can call it unconditionally.",
+        "Wrong — it returns `None` on success and raises on failure, like an assertion."
+      ]
+    },
+
+    {
+      "id": "m2-s4-c10",
+      "type": "code_trap",
+      "topic": "Manual status check misses the timeout case",
+      "topic_ru": "Ручная проверка status пропускает таймауты",
+      "difficulty": 3,
+      "tags": ["requests", "error-handling", "exceptions"],
+      "code_snippet": "import requests\n\nr = requests.get(url, timeout=5)\nif r.status_code == 200:\n    return r.json()\nreturn None",
+      "question": "What error case is this code blind to?",
+      "options": [
+        "None — checking status_code == 200 is sufficient.",
+        "5xx errors — the script returns `None` and the caller can't tell apart 'no data' from 'server crashed'.",
+        "Timeouts and connection errors. `requests.get` raises `Timeout` / `ConnectionError` *before* assigning to `r`, so the `if` line is never reached and the caller sees an uncaught exception. The pattern is `try/except RequestException` *around* both the call and the status check.",
+        "Redirects — 3xx codes are silently followed, masking the original URL."
+      ],
+      "correct_index": 2,
+      "explanation_md": "The status-code check pattern misses the entire family of pre-response failures: `Timeout`, `ConnectionError`, `TooManyRedirects`, SSL errors. These all raise `RequestException` (or a subclass) *before* a response object exists. \n\nThe robust shape catches the base class:\n\n```python\nfrom requests.exceptions import RequestException\n\ntry:\n    r = requests.get(url, timeout=5)\n    r.raise_for_status()\n    return r.json()\nexcept RequestException as e:\n    log.error('request failed: %s', e)\n    return None\n```\n\n`raise_for_status` folds the 4xx/5xx case into the same exception family, so one `except RequestException` covers timeout, connection error, *and* HTTP error."
+    },
+
+    {
+      "id": "m2-s4-c11",
+      "type": "flip",
+      "topic": "requests.exceptions hierarchy",
+      "topic_ru": "Иерархия requests.exceptions",
+      "difficulty": 3,
+      "tags": ["requests", "exceptions", "hierarchy"],
+      "question": "What's the top of the `requests` exception hierarchy, and what are the three most common subclasses you'd actually catch?",
+      "answer": "`requests.exceptions.RequestException` is the base class for every `requests`-raised error. The three subclasses worth knowing by name: `Timeout` (the `timeout=` window expired), `ConnectionError` (host unreachable, DNS failure, refused connection), and `HTTPError` (raised by `raise_for_status` on 4xx/5xx). Catch `RequestException` to cover the whole surface in one line.",
+      "answer_explanation_md": "Other subclasses you'll see occasionally: `TooManyRedirects` (3xx loop), `ChunkedEncodingError` (malformed response framing), `SSLError` (cert verification failure). All of them inherit from `RequestException`, so `except RequestException` catches them too. The library is deliberately designed so that a single `except` clause is the right move; finer-grained handling is only worth writing when the retry policy differs per error type."
+    },
+
+    {
+      "id": "m2-s4-c12",
+      "type": "flip",
+      "topic": "What pydantic BaseModel does at the API boundary",
+      "topic_ru": "Что pydantic BaseModel делает на границе API",
+      "difficulty": 2,
+      "tags": ["pydantic", "validation", "boundary"],
+      "question": "What does `pydantic.BaseModel` give you when validating an HTTP response, and why is it preferred over manual dict access?",
+      "answer": "You declare the expected shape with type-hinted attributes; `Model.model_validate(payload)` parses *and* validates in one call, raising `ValidationError` with a structured error report if anything is wrong (missing field, wrong type, out-of-range value). The result is a typed object — IDE autocomplete, mypy-friendly, attribute access (`item.price`) instead of dict access (`item['price']`). Unknown fields are ignored by default (permissive), which matches the API-boundary use case.",
+      "answer_explanation_md": "The win at boundaries: validation lives at the *boundary*, not scattered through 50 lines of `if 'x' in payload and isinstance(payload['x'], int)`. A pydantic ValidationError gives you the field name, expected type, actual value, and a JSON-serializable error report — exactly what you'd want to log or surface to a user. In FastAPI, request-body parsing uses pydantic under the hood; the framework converts ValidationError to HTTP 422 automatically."
+    },
+
+    {
+      "id": "m2-s4-c13",
+      "type": "code_trap",
+      "topic": "pydantic ValidationError shape and FastAPI 422 mapping",
+      "topic_ru": "Форма pydantic ValidationError и mapping на FastAPI 422",
+      "difficulty": 3,
+      "tags": ["pydantic", "fastapi", "validation-error", "http-422"],
+      "code_snippet": "from pydantic import BaseModel, Field\n\nclass Item(BaseModel):\n    id: int\n    name: str\n    price: float = Field(gt=0)\n\nItem.model_validate({'id': 'not-a-number', 'name': 'a', 'price': -5})",
+      "question": "What does this raise, and (if used inside a FastAPI request body) what HTTP response does FastAPI return for the same data?",
+      "options": [
+        "Raises `TypeError`; FastAPI returns HTTP 500.",
+        "Raises `pydantic.ValidationError` listing two errors (`id` not int-coercible, `price` not > 0); FastAPI returns HTTP 422 with a structured JSON error body listing each failing field.",
+        "Raises `AssertionError`; FastAPI returns HTTP 400 with `error: bad request` as the only detail.",
+        "Returns an `Item` with default values substituted; no error."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`ValidationError.errors()` returns a list of dicts like `[{'loc': ('id',), 'msg': 'Input should be a valid integer, ...', 'type': 'int_parsing'}, {'loc': ('price',), 'msg': 'Input should be greater than 0', 'type': 'greater_than'}]`. The structure is JSON-serializable.\n\nIn FastAPI, request-body parsing happens before your handler runs; if the body fails validation, FastAPI returns **HTTP 422 Unprocessable Entity** with `{'detail': [<errors list>]}`. You never write that mapping yourself — declaring a `BaseModel` parameter is the whole contract.\n\nThe interview question is: 'what does a 422 from your API mean?' — Answer: the body parsed as JSON but failed shape/type validation. 400 is a generic 'bad request', 422 is specifically 'syntax OK, semantics wrong'."
+    },
+
+    {
+      "id": "m2-s4-c14",
+      "type": "multiple_choice",
+      "topic": "Pydantic v2 method names vs v1",
+      "topic_ru": "Имена методов pydantic v2 vs v1",
+      "difficulty": 4,
+      "tags": ["pydantic", "v2", "migration", "subtle"],
+      "question": "You're reading a 2026 Python codebase using `pydantic >= 2`. Which row lists the correct v2 method names for parsing a dict, parsing a JSON string, serializing to a dict, and serializing to a JSON string?",
+      "options": [
+        "`parse_obj` / `parse_raw` / `dict` / `json` — same as v1; nothing changed.",
+        "`model_validate` / `model_validate_json` / `model_dump` / `model_dump_json` — every method gained a `model_` prefix in v2 to avoid clashing with user field names.",
+        "`from_dict` / `from_json` / `to_dict` / `to_json` — pydantic v2 renamed everything to match Python convention.",
+        "`load` / `loads` / `dump` / `dumps` — pydantic v2 matches the `json` module names."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — those are v1 names. They still *work* in v2 as deprecation shims (emit a `DeprecationWarning`) but new code uses the v2 names.",
+        "Correct. The v2 rename is deliberate: pydantic v1's `dict()` clashed with a field literally named `dict` (and similar with `json`, `copy`, etc.). The `model_` prefix is unambiguous. All four are class methods or instance methods on `BaseModel`.",
+        "Wrong — pydantic v2 did not adopt these names. The `model_` prefix is the actual convention.",
+        "Wrong — these are `json` stdlib names, not pydantic's."
+      ]
+    }
+  ]
+}
