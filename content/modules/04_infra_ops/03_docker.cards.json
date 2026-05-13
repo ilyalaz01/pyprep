@@ -1,0 +1,293 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s3",
+  "cards": [
+    {
+      "id": "m4-s3-c1",
+      "type": "flip",
+      "topic": "Image vs container — the class/instance analogy",
+      "topic_ru": "Образ vs контейнер — аналогия класс/экземпляр",
+      "difficulty": 1,
+      "tags": ["docker", "image", "container", "interview-warmup"],
+      "question": "What's the difference between a Docker **image** and a Docker **container**? Use one concrete shell command on each side of the distinction.",
+      "answer": "An **image** is an immutable, read-only template — a frozen filesystem plus metadata describing how to run it. A **container** is a running (or stopped) instance of an image, with its own writable layer on top.\n\nOne image, many containers — same template, independent runtime state.\n\nCommands:\n- `docker build -t myapp:v1 .` — produces an **image** from a `Dockerfile`. The image now exists in your local image store; it doesn't run anything yet.\n- `docker run myapp:v1` — creates a **container** from that image and starts the configured process.",
+      "answer_explanation_md": "The class/instance analogy is the canonical mental model. The class (image) is defined once; instances (containers) are created from it and have independent runtime state. Modifying a container does not modify the image — writes go to the container's own writable layer. Starting a second container from the same image yields a fresh filesystem identical to the original image.\n\nThis is why the Docker interview opens with this question: a candidate who confuses the two will misunderstand every subsequent operation. 'Why didn't my change persist?' (you `docker rm`'d the container — image is unchanged, your writes were in the container's writable layer). 'Why does the new container not see my files?' (a fresh container starts from the image, which doesn't have those files). Get the image-vs-container distinction right and the rest of Docker falls into place."
+    },
+
+    {
+      "id": "m4-s3-c2",
+      "type": "multiple_choice",
+      "topic": "Image immutability + the writable container layer",
+      "topic_ru": "Иммутабельность образа + writable-слой контейнера",
+      "difficulty": 3,
+      "tags": ["docker", "image", "layers", "immutability"],
+      "question": "You run two containers from the same image: `docker run --name a myapp:v1` and `docker run --name b myapp:v1`. Inside container `a`, you write a file `/data/log.txt`. Which of the following is true?",
+      "options": [
+        "The file appears in container `b` too — they share the same image filesystem.",
+        "**Container `a` has the file; container `b` does NOT.** The image's filesystem is read-only and shared across containers, but each container also has its own writable layer stacked on top. Writes in `a` go to `a`'s writable layer; `b` has a separate writable layer and sees only the original image filesystem. **The file also disappears when container `a` is removed** (`docker rm a`) — the writable layer is part of the container, not the image, so it's deleted along with the container. **Implications:** (1) Data that must persist needs a volume (see m4-s3-c14). (2) Modifying a container does NOT modify the image; `docker run myapp:v1` from anywhere else still gets the original.",
+        "Container `b` also gets the file but only after restart.",
+        "The image itself is modified — the file is now part of `myapp:v1`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. The image's filesystem is shared as the *base* layer (read-only), but each container has its own writable layer; writes are isolated per container.",
+        "Correct. Docker uses union/overlay filesystems: the image contributes one or more read-only layers; each container adds a writable layer on top. Reads see the merged view (writable layer first, then image layers below). Writes go only to the writable layer. Removing the container removes its writable layer — and only the writable layer. This is the foundation of (a) why containers are disposable, (b) why volumes exist for persistence, (c) why image builds are reproducible.",
+        "Wrong — there's no asynchronous propagation between containers. Each container is independent from the moment it starts.",
+        "Wrong, and this is a common misconception. To produce a modified image you must explicitly `docker commit` the container (rarely recommended) or rebuild from a `Dockerfile`. Plain writes inside a container never alter the image."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c3",
+      "type": "code_trap",
+      "topic": "docker rm deletes the container's writable layer — data is gone without a volume",
+      "topic_ru": "docker rm удаляет writable-слой контейнера — данные пропадают без volume",
+      "difficulty": 3,
+      "tags": ["docker", "container", "data-loss", "volumes", "interview-classic"],
+      "code_snippet": "$ docker run -d --name pg postgres:16            # start postgres\n$ # ... a week of development, data accumulates in /var/lib/postgresql/data ...\n$ docker stop pg && docker rm pg                   # cleanup\n$ docker run -d --name pg postgres:16            # start it again",
+      "question": "What state survives between the two `docker run` calls, and what's gone?",
+      "options": [
+        "Everything survives — Docker keeps container state across restarts of the same image.",
+        "**Nothing survives. The new `pg` container has a completely empty Postgres data directory** — `docker rm` deleted the previous container, which deleted its writable layer, which is where Postgres was storing data. The new `docker run` creates a fresh container from `postgres:16` with the image's default empty data directory. A week of development data is gone. **The fix is to attach a volume:** `docker run -d --name pg -v pgdata:/var/lib/postgresql/data postgres:16`. The named volume `pgdata` lives outside the container's writable layer; `docker rm pg` removes the container but NOT the volume. The next `docker run` with the same `-v pgdata:...` re-mounts the existing data.",
+        "The data survives because Postgres writes to `/var/lib/postgresql/data`, which Docker treats as a volume by default.",
+        "The data survives until `docker system prune` is run."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The reason this is a classic interview question (and a classic real-world incident): a developer treats containers as 'machines I can stop and start', forgetting that the writable layer is part of the container, not separate state. `docker stop pg` is benign — it just stops the process; the writable layer is still on disk. `docker rm pg` is destructive — it deletes the container AND its writable layer.\n\nThree levels of persistence in Docker:\n\n1. **Container writable layer (default).** Survives `docker stop`. Deleted by `docker rm`. NOT durable.\n2. **Bind mount (`-v /host/path:/container/path`).** Maps a host directory into the container. Survives anything that happens to the container; you can `docker rm` and the host files stay. Useful for development (live-edit code on the host).\n3. **Named volume (`-v myvol:/container/path`).** Docker manages the host location; survives `docker rm`. Removed only by explicit `docker volume rm myvol`. The production-grade choice for stateful services (databases, queues, file uploads).\n\nThe `postgres:16` image is actually a good example: its Dockerfile declares `VOLUME /var/lib/postgresql/data` as a hint that this directory is stateful. But `VOLUME` in a Dockerfile *only* declares intent — at `docker run` time, you still need `-v` to bind a real volume. Without it, Docker creates an *anonymous volume*, which lives until the container is removed AND `docker rm -v` is used (or `docker volume prune` later sweeps it). Anonymous volumes are NOT durable in practice; always use a named volume or bind mount for state you care about."
+    },
+
+    {
+      "id": "m4-s3-c4",
+      "type": "flip",
+      "topic": "Dockerfile instructions: FROM/WORKDIR/COPY/RUN/EXPOSE/ENV",
+      "topic_ru": "Инструкции Dockerfile: FROM/WORKDIR/COPY/RUN/EXPOSE/ENV",
+      "difficulty": 2,
+      "tags": ["docker", "dockerfile", "instructions"],
+      "question": "Explain what each of these Dockerfile instructions does: `FROM`, `WORKDIR`, `COPY`, `RUN`, `EXPOSE`, `ENV`.",
+      "answer": "`FROM image:tag` — declares the **base image** to start from (must be the first non-comment instruction). Example: `FROM python:3.13-slim`.\n\n`WORKDIR /app` — sets the **working directory** inside the image; subsequent `RUN`/`COPY`/`CMD` use this as their CWD. Creates the directory if missing.\n\n`COPY src dest` — copies files from the **host build context** (the directory passed to `docker build`) into the image. `.dockerignore` excludes paths from the build context.\n\n`RUN command` — executes a command **at build time** (during `docker build`); the resulting filesystem state becomes a layer. Used for `pip install`, `apt-get install`, etc.\n\n`EXPOSE 8000` — **documentation only**. Does NOT publish the port. Publishing requires `-p` at `docker run` time.\n\n`ENV KEY=value` — sets an **environment variable** in the final image; visible to the process at runtime.",
+      "answer_explanation_md": "Two of these are subtle and worth flagging:\n\n- **`EXPOSE` is purely informational.** A common misconception is that `EXPOSE 8000` makes port 8000 reachable from the host — it doesn't. Without `docker run -p 8000:8000`, nothing is published. The instruction exists so tools like `docker port` can show 'this image intends to listen on these ports' and so `docker run -P` (capital P) can auto-map every EXPOSE'd port to random host ports. The actual publish step is always `-p` at run time.\n- **`COPY` reads from the build context, not your filesystem.** The 'build context' is the directory you pass to `docker build .` (here `.`). Files outside that directory cannot be `COPY`-ed in. `.dockerignore` lets you exclude paths (like `.git/`, `node_modules/`, `.env`) from the context — both shrinking the upload to the Docker daemon and avoiding shipping secrets into the image.\n\n`ADD` is similar to `COPY` but can also fetch URLs and auto-extract tarballs. Best practice: **use `COPY` unless you specifically need ADD's extras**; explicit is better, and `COPY` is what reviewers expect."
+    },
+
+    {
+      "id": "m4-s3-c5",
+      "type": "multiple_choice",
+      "topic": "Dockerfile layer caching — order matters",
+      "topic_ru": "Кэш слоёв Dockerfile — порядок важен",
+      "difficulty": 4,
+      "tags": ["docker", "dockerfile", "cache", "layers", "optimization", "interview-classic"],
+      "question": "Two Dockerfiles do the same thing but rebuild at very different speeds when you change one line of `app.py`. Which order is correct, and why?\n\n```dockerfile\n# Version A:\nFROM python:3.13-slim\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\nCMD [\"python\", \"app.py\"]\n\n# Version B:\nFROM python:3.13-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nCMD [\"python\", \"app.py\"]\n```",
+      "options": [
+        "Version A is correct — fewer COPY statements means simpler.",
+        "**Version B is correct.** Each Dockerfile instruction becomes a cached layer; a layer's cache is reused when both (a) the instruction text and (b) its inputs are unchanged. **The first instruction whose cache is invalidated forces every layer below it to rebuild.** In Version A, `COPY . .` includes your app code; changing one line of `app.py` invalidates `COPY . .`'s cache, which forces the `RUN pip install` below it to re-execute — re-downloading and reinstalling every dependency on every code change. In Version B, `requirements.txt` is copied as a separate layer before `pip install`; as long as `requirements.txt` is unchanged, the expensive pip-install layer stays cached, and only the cheap `COPY . .` (app code) rebuilds. **Rule:** put less-frequently-changed files (lockfiles, manifests) BEFORE more-frequently-changed files (app code) in the Dockerfile.",
+        "Both versions cache identically — Docker is smart enough to figure out what changed.",
+        "Version A is faster because it has fewer layers."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. Layer count is not the metric; cache invalidation behavior is. Fewer layers can be worse if they bundle frequently-changing files with expensive operations.",
+        "Correct. This is the marquee Docker build-optimization question — every senior engineer has had a slow Docker rebuild and learned this lesson. The mental model: think of the Dockerfile as a chain of layers, each cached on the bytes of its instruction + the bytes of any inputs (`COPY` is sensitive to the files it copies; `RUN` is sensitive to nothing but the command string). The first cache miss cascades — every layer below must rebuild because it might have depended on the changed earlier layer. **Cheap-and-changes-often layers go LAST.**",
+        "Wrong. Docker's layer cache is content-addressable but conservative: any change to a layer's inputs invalidates it. There's no semantic 'figured out what changed' — `COPY . .` either matches the cached version byte-for-byte or it doesn't.",
+        "Wrong on metric. The layer count is roughly the same; the bottleneck is whether the expensive `pip install` layer can be cached across code edits. Version B caches it; Version A does not."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c6",
+      "type": "multiple_choice",
+      "topic": "Multi-stage builds for slim production images",
+      "topic_ru": "Многоэтапные сборки для слим-образов",
+      "difficulty": 4,
+      "tags": ["docker", "multi-stage", "image-size", "optimization"],
+      "question": "What's the purpose of this multi-stage Dockerfile, and what does the final image actually contain?\n\n```dockerfile\nFROM python:3.13 AS builder\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --prefix=/install -r requirements.txt\n\nFROM python:3.13-slim\nCOPY --from=builder /install /usr/local\nCOPY . /app\nWORKDIR /app\nCMD [\"python\", \"app.py\"]\n```",
+      "options": [
+        "It builds the image twice for safety — both stages end up in the final image.",
+        "**The first stage (`builder`) installs dependencies; the second stage produces the final image, copying ONLY the installed packages from the builder.** The final image contains: the slim Python runtime, the installed Python packages (copied from `/install` in the builder), and the app code. It does NOT contain: build tools (gcc, headers), build caches, package manager metadata from `pip install`, or anything else that lived in the full `python:3.13` builder image. **Why bother:** dependencies often need build tools (compiling C extensions, native libs) to install, but those tools aren't needed at runtime. A single-stage build ships everything — final image often 1+ GB. The multi-stage build ships only what's needed to RUN — final image often 100–300 MB. Smaller images deploy faster, reduce attack surface, and cost less in registry storage and pull bandwidth.",
+        "Multi-stage builds run the app twice — once in `builder`, once in the final stage.",
+        "The `AS builder` tag means Docker keeps both stages as separate images in the registry."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — only the final stage produces the published image. Intermediate stages exist only during the build and are discarded.",
+        "Correct. Multi-stage builds let you separate **build environment** (heavy, has compilers and toolchains) from **runtime environment** (light, has only what your app needs to execute). The `COPY --from=builder` syntax pulls artifacts from a named earlier stage. The final image's size is determined only by what its base image contains plus what gets copied into it; everything else (the entire `builder` filesystem) is discarded. Common pattern in: Go (build a static binary, copy to `scratch`), Node (npm install + build, copy `dist/` to a tiny final image), Python with native deps, Rust, anything with a heavy build step.",
+        "Wrong. The app runs only at runtime — in the second stage's container. The `builder` stage only installs dependencies; it doesn't execute the app.",
+        "Wrong. `AS builder` is a *local* stage name used only within this Dockerfile by `COPY --from=builder`. Intermediate stages are not pushed to registries."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c7",
+      "type": "flip",
+      "topic": "CMD vs ENTRYPOINT — overridable default vs fixed executable",
+      "topic_ru": "CMD vs ENTRYPOINT — переопределяемый дефолт vs фиксированный исполняемый",
+      "difficulty": 3,
+      "tags": ["docker", "cmd", "entrypoint", "interview-classic"],
+      "question": "What's the difference between `CMD` and `ENTRYPOINT` in a Dockerfile? When would you combine them?",
+      "answer": "`CMD` sets the **default command** — what runs if `docker run image` is called with no extra arguments. `docker run image somethingelse` **replaces** CMD entirely, so the default is overridable from the command line.\n\n`ENTRYPOINT` sets the **fixed executable** — it always runs, and any arguments passed to `docker run` are **appended** to it.\n\n**Combining them** is the recommended pattern when the container *is* a tool/CLI: `ENTRYPOINT` holds the executable, `CMD` provides default arguments.\n\n```dockerfile\nENTRYPOINT [\"python\"]\nCMD [\"app.py\"]\n```\n\n- `docker run image`            → runs `python app.py` (uses default CMD)\n- `docker run image other.py`   → runs `python other.py` (CMD replaced)\n- `docker run image --version`  → runs `python --version`\n\nUse **CMD alone** for typical service containers ('default behavior is to run my app, but allow override for debugging'). Use **ENTRYPOINT + CMD** when the container's identity *is* a specific executable with sensible defaults.",
+      "answer_explanation_md": "The bypass for ENTRYPOINT exists but is rarely needed: `docker run --entrypoint /bin/sh image` overrides ENTRYPOINT for that single run, useful for debugging an image whose normal ENTRYPOINT is failing. The fact that you have to pass `--entrypoint` explicitly is the point — accidental overrides are prevented.\n\nA common shape in CLI utility images:\n\n```dockerfile\nENTRYPOINT [\"git\"]\nCMD [\"--help\"]\n```\n\nNow `docker run git-image` shows help; `docker run git-image status` runs `git status` inside the container; the user feels like they're calling `git` directly. This is exactly the use case ENTRYPOINT was designed for.\n\nFor a long-running service:\n\n```dockerfile\nCMD [\"python\", \"app.py\"]\n```\n\nNo ENTRYPOINT — `docker run image` starts the service; `docker run image bash` opens a shell for debugging. The simplicity is the feature."
+    },
+
+    {
+      "id": "m4-s3-c8",
+      "type": "multiple_choice",
+      "topic": "Exec form vs shell form — PID 1 and SIGTERM handling",
+      "topic_ru": "Exec-форма vs shell-форма — PID 1 и обработка SIGTERM",
+      "difficulty": 4,
+      "tags": ["docker", "cmd", "exec-form", "shell-form", "signals", "pid1", "subtle"],
+      "question": "Two Dockerfiles ship the same Python app. After `docker stop`, one shuts down cleanly in 0.2 seconds; the other always takes the full 10-second timeout before being killed. Which line causes the slow shutdown?\n\n```dockerfile\n# Version A (exec form):\nCMD [\"python\", \"app.py\"]\n\n# Version B (shell form):\nCMD python app.py\n```",
+      "options": [
+        "Version A is slow — the exec form lacks signal handling.",
+        "**Version B is slow.** Shell form (`CMD python app.py` — no JSON array) is rewritten by Docker as `CMD [\"/bin/sh\", \"-c\", \"python app.py\"]`. That means `/bin/sh` runs as **PID 1** inside the container, with `python` as its child. `docker stop` sends SIGTERM to PID 1, which is `sh`. `sh` doesn't forward signals to its children by default — it just sits there. Python never receives SIGTERM, never runs its graceful shutdown handlers; after the 10-second timeout (default), Docker sends SIGKILL and the kernel reaps everything. **Version A (exec form `[\"python\", \"app.py\"]`) runs `python` directly as PID 1.** SIGTERM goes straight to Python, your `atexit` / signal handlers fire, the app shuts down in milliseconds. **Rule: always use exec form unless you specifically need shell features** (variable expansion, pipes, etc.). When you do need shell, prefix the real command with `exec`: `CMD [\"sh\", \"-c\", \"exec python app.py\"]` — `exec` replaces sh with python at PID 1, restoring direct signal delivery.",
+        "Both versions handle signals identically; the timeout difference is unrelated.",
+        "Version A is slow because Python without a shell wrapper can't catch SIGTERM."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on direction and mechanism. Exec form gives BETTER signal handling because the application runs directly as PID 1 and receives signals straight from the kernel.",
+        "Correct. This is one of the highest-signal Docker interview questions because it requires understanding three things at once: (1) `CMD` exec vs shell form rewriting, (2) the PID-1-is-special property of Linux containers, (3) how signals are (not) forwarded by `sh`. Cross-links to m4-s2-c14 (SIGTERM/SIGKILL graceful shutdown) and m4-s2-c15 (signal table). **Diagnostic:** `docker exec container ps` — if you see `sh -c ...` as PID 1 and your app as PID 2+, you've hit the shell-form trap.",
+        "Wrong. The 10-second-then-SIGKILL pattern is exactly the behavior of `docker stop` when SIGTERM isn't being handled — the difference between versions is real and significant.",
+        "Wrong on mechanism. Python natively handles SIGTERM (it raises `SystemExit`); the shell wrapper is what prevents the signal from reaching it."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c9",
+      "type": "multiple_choice",
+      "topic": "CMD/ENTRYPOINT combination semantics under docker run args",
+      "topic_ru": "Семантика комбинаций CMD/ENTRYPOINT при docker run аргументах",
+      "difficulty": 4,
+      "tags": ["docker", "cmd", "entrypoint", "override", "subtle"],
+      "question": "Given this Dockerfile:\n\n```dockerfile\nENTRYPOINT [\"python\"]\nCMD [\"app.py\"]\n```\n\nWhich `docker run` invocation runs `python script.py --verbose`?",
+      "options": [
+        "`docker run myimg`",
+        "`docker run myimg script.py --verbose` — ENTRYPOINT (`python`) is fixed; CMD's default (`app.py`) is replaced by everything after the image name. So the runtime command becomes `python script.py --verbose`. **General rule:** with both ENTRYPOINT and CMD set in exec form, `docker run image ARGS` executes `ENTRYPOINT + ARGS` (CMD is dropped entirely when ARGS are present); `docker run image` (no args) executes `ENTRYPOINT + CMD`.",
+        "`docker run myimg --entrypoint script.py --verbose`",
+        "`docker run myimg python script.py --verbose`"
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — this runs the default `python app.py` (ENTRYPOINT + CMD). To run a different script, you need to pass it as an argument.",
+        "Correct. The exec-form ENTRYPOINT (`[\"python\"]`) is always prepended; any positional args after the image name in `docker run` are appended to it AND replace CMD. So `docker run myimg script.py --verbose` → ENTRYPOINT `python` + args `script.py --verbose` = `python script.py --verbose`. This composability is exactly why ENTRYPOINT+CMD is the recommended shape for tool/CLI containers — users don't have to retype `python`; they just pass the script and args.",
+        "Wrong. `--entrypoint` is a `docker run` flag (placed BEFORE the image name) used to *replace* the image's ENTRYPOINT for one run. The shape would be `docker run --entrypoint X myimg ARGS`. As placed here, `--entrypoint` becomes a positional arg to `python`, which would error.",
+        "Wrong. With ENTRYPOINT=`python` already fixed, prepending another `python` produces `python python script.py --verbose` — runs `python` with `python` as the script name, errors out."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c10",
+      "type": "fill_in",
+      "topic": "docker build / run / ps / logs / exec — daily command basics",
+      "topic_ru": "docker build / run / ps / logs / exec — ежедневные базовые команды",
+      "difficulty": 2,
+      "tags": ["docker", "cli", "commands", "operational"],
+      "code_snippet_with_blanks": "# Build an image from the Dockerfile in the current directory, tagged myapp:v1:\n$ docker ___ -t myapp:v1 .\n\n# Run that image in the background (detached), with the container named \"api\":\n$ docker run -___ --name api myapp:v1\n\n# Follow the container's stdout/stderr live (like tail -F):\n$ docker logs -___ api\n\n# Get an interactive bash shell inside the running container:\n$ docker ___ -it api bash",
+      "accepted_answers": [
+        ["build"],
+        ["d"],
+        ["f"],
+        ["exec"]
+      ],
+      "explanation_md": "These four commands plus `docker ps` and `docker stop`/`docker rm` cover ~90% of daily Docker use:\n\n```bash\ndocker build -t name:tag .        # build from Dockerfile in CWD\ndocker run -d --name N img        # run detached, with a stable name\ndocker run --rm img               # run, auto-remove on exit (don't pile up dead containers)\ndocker ps                         # list RUNNING\ndocker ps -a                      # list ALL (including stopped)\ndocker logs -f N                  # follow live logs\ndocker exec -it N bash            # interactive shell in running container\ndocker stop N                     # graceful (SIGTERM, then SIGKILL after timeout)\ndocker rm N                       # remove a stopped container\n```\n\nThe two operational shapes worth memorizing as muscle memory:\n\n- **Production-style:** `docker run -d --name api --restart unless-stopped -p 8000:80 -v apidata:/data myapp:v1` — detached, named, restart-on-failure, port published, volume attached.\n- **Disposable / dev:** `docker run --rm -it myapp:v1 bash` — auto-clean, interactive shell, no port/volume — for poking around inside an image."
+    },
+
+    {
+      "id": "m4-s3-c11",
+      "type": "multiple_choice",
+      "topic": "Debugging a running container: logs vs exec",
+      "topic_ru": "Дебаг работающего контейнера: logs vs exec",
+      "difficulty": 2,
+      "tags": ["docker", "debugging", "logs", "exec", "operational"],
+      "question": "Your web app container has been running for an hour but suddenly stopped responding to HTTP requests. `docker ps` shows it's still 'Up'. What's the standard debugging workflow?",
+      "options": [
+        "Restart the container — there's no way to inspect a running one.",
+        "**Step 1: `docker logs -f api` (or `docker logs --tail=200 api`)** — read what the application has been writing to stdout/stderr. Most issues surface here: stack traces, slow query warnings, OOM messages from the runtime, deadlock detections. **Step 2: if logs don't tell the story, `docker exec -it api bash`** (or `sh` for slim images that lack bash) — get a shell inside the running container. From inside you can check filesystem state, hit health endpoints with `curl localhost`, inspect environment variables, run language-specific diagnostics (`py-spy` for Python, `jstack` for JVM). **Step 3: `docker stats api`** to see CPU/memory usage live — useful when the symptom is 'slow' rather than 'broken'. **Avoid restarting first:** restart loses the in-memory state that caused the bug; you'll get the same incident again with no extra information.",
+        "Run `docker logs` once, then immediately restart — the logs are only readable when the container is stopped.",
+        "`docker exec -it api bash` is the only debugging tool — logs are unreliable inside Docker."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. `docker logs` and `docker exec` both work on running containers and are the entire point of having a debuggable runtime. Restarting first throws away diagnostic state.",
+        "Correct. The interview-relevant version of this question is the screening probe: 'How do you debug a misbehaving container in production?' The expected answer is the layered workflow above. A candidate who reaches for 'restart and hope' has never debugged a live system; one who reaches for `logs` then `exec` has.",
+        "Wrong. `docker logs` works on running containers continuously — `-f` follows them live, like `tail -F`. It also works on stopped containers; either way, restarting first destroys exactly the state you want to investigate.",
+        "Wrong on both counts. Logs are usually the *first* thing to check (cheaper, faster, often sufficient); `exec` is the next step when logs don't show the cause."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c12",
+      "type": "code_trap",
+      "topic": "docker run without --rm and --name collisions",
+      "topic_ru": "docker run без --rm и коллизии --name",
+      "difficulty": 3,
+      "tags": ["docker", "run", "rm", "name", "operational"],
+      "code_snippet": "# Day 1:\n$ docker run --name api myapp:v1   # Ctrl-C to stop\n\n# Day 2: try the same command again.\n$ docker run --name api myapp:v1\ndocker: Error response from daemon: Conflict. The container name \"/api\"\nis already in use by container \"abc123...\".\n\n# Also after a week of iteration:\n$ docker ps -a | wc -l\n47   # 47 stopped containers cluttering the listing",
+      "question": "What two flags fix these two annoyances together, and why?",
+      "options": [
+        "Just use `docker restart` instead of `docker run` to re-run the container.",
+        "**Add `--rm` to auto-clean and (when iterating with the same name) `docker rm api` between runs, OR drop `--name` and let Docker auto-generate names.** The two issues are: (1) **Without `--rm`, every `docker run` leaves a stopped container behind** — `docker ps -a` accumulates them indefinitely until you `docker container prune`. (2) **`--name` is unique across all containers, running OR stopped** — even a stopped `api` container reserves the name, so the next `--name api` collides. Production-style services (long-lived, restartable) typically use `--name` + `--restart unless-stopped` and stop/start the same container. Iterative dev work typically uses `--rm` (auto-clean) and either skips `--name` or removes the old container before re-creating: `docker rm -f api 2>/dev/null; docker run --name api ...`.",
+        "Use `docker run -d` — detached mode auto-cleans on exit.",
+        "Use `docker run --replace` — Docker has a built-in flag for this."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The two common patterns in practice:\n\n**Iterative development** — short-lived containers, rapid re-runs:\n\n```bash\ndocker run --rm -it --name dev -p 8000:8000 myapp:v1\n# Ctrl-C exits the container, --rm cleans it up automatically.\n# Next run reuses the name with no collision because nothing was left behind.\n```\n\n**Long-running services** — persistent restart loop:\n\n```bash\ndocker run -d --name api --restart unless-stopped -p 8000:80 \\\n  -v apidata:/data myapp:v1\n# Detached, named, auto-restart on failure or host reboot, volume attached.\n# To upgrade: docker stop api && docker rm api && docker run ... new image.\n```\n\nA cleanup one-liner worth knowing:\n\n```bash\ndocker container prune        # remove ALL stopped containers\ndocker image prune            # remove dangling (untagged) images\ndocker system prune           # both, plus unused networks (be careful)\ndocker system prune -a        # ALSO removes ALL unused images (very aggressive)\n```\n\n`docker system prune -a --volumes` is the 'reclaim everything' nuke — useful at end of week, dangerous in production (it removes volumes that no running container is using, which can include data you wanted to keep)."
+    },
+
+    {
+      "id": "m4-s3-c13",
+      "type": "flip",
+      "topic": "Port mapping with -p: host:container, localhost binding",
+      "topic_ru": "Маппинг портов через -p: host:container, привязка к localhost",
+      "difficulty": 2,
+      "tags": ["docker", "ports", "networking"],
+      "question": "What do `-p 8000:80`, `-p 127.0.0.1:8000:80`, and `-P` (capital P) do? Why is `EXPOSE 80` in a Dockerfile not enough to make port 80 reachable?",
+      "answer": "`-p 8000:80` — publish: **host port 8000 → container port 80**. From the host, you reach the container service via `localhost:8000`; the container sees its own service bound on port 80 internally. Reads as `host:container`.\n\n`-p 127.0.0.1:8000:80` — same mapping, but **bind the host side only to the loopback interface**. External machines cannot reach it; only the host itself can. Useful for services that should be local-only (databases in development, admin consoles).\n\n`-P` (capital P) — **publish all `EXPOSE`'d ports** to random high host ports. `docker port <container>` shows the actual mapping. Convenient for quick tests; ambiguous for production.\n\n**Why `EXPOSE 80` alone isn't enough:** `EXPOSE` in a Dockerfile is **documentation only**. It tells tools and humans 'this image listens on port 80'; it does NOT publish the port. Without `-p` (or `-P`) at `docker run` time, the container's port 80 stays internal — no host port maps to it, no external traffic reaches it.",
+      "answer_explanation_md": "The default host binding (without an IP prefix) is `0.0.0.0:8000` — every interface on the host. On a developer laptop that's usually fine; on a multi-tenant box it accidentally exposes the service to the public internet. The `127.0.0.1:8000:80` form is the firewall-by-default reflex.\n\nUDP works with `/udp` suffix: `-p 53:53/udp`. Most apps are TCP and the suffix is omitted.\n\n**Common misread:** the order `host:container` (not `container:host`). Memorize it as 'left side is what I type in my browser; right side is what the image was built to listen on'. A test: `docker run -p 3000:8080 nginx` — nginx listens on 80 inside by default, so this maps host 3000 → container 8080 (where nothing is listening) → connection refused. The mapping is mechanical; you have to match the container side to what the process actually binds to."
+    },
+
+    {
+      "id": "m4-s3-c14",
+      "type": "multiple_choice",
+      "topic": "Bind mount vs named volume — when to use which",
+      "topic_ru": "Bind mount vs named volume — когда что",
+      "difficulty": 3,
+      "tags": ["docker", "volumes", "bind-mount", "persistence"],
+      "question": "Two `docker run` commands attach storage. What's the difference, and which is the right default for a production Postgres deployment?\n\n```bash\n(A)  docker run -v /opt/pgdata:/var/lib/postgresql/data postgres:16\n(B)  docker run -v pgdata:/var/lib/postgresql/data postgres:16\n```",
+      "options": [
+        "They're identical; the syntax is just a stylistic choice.",
+        "**(A) is a bind mount** — the host directory `/opt/pgdata` is mapped directly into the container at `/var/lib/postgresql/data`. The path is explicit; you can see the files on the host with `ls /opt/pgdata`. Useful for development (live-edit source code on the host; container sees it instantly) and for cases where ops needs filesystem-level access to the data. **(B) is a named volume** — `pgdata` is a Docker-managed volume; Docker decides the actual host location (typically `/var/lib/docker/volumes/pgdata/_data`). **Named volumes are the production default for stateful services** because: (1) they survive container removal until you explicitly `docker volume rm pgdata`; (2) they're portable across Docker hosts via `docker volume create` / inspect; (3) volume drivers (NFS, EFS, cloud block storage) plug in transparently; (4) they're labeled by Docker, so `docker volume ls` shows them with metadata. Bind mounts couple your container to a specific host filesystem path — fine for dev, awkward for production fleets.",
+        "(A) is faster than (B) because bind mounts skip Docker's volume layer.",
+        "(B) loses data on `docker rm` — only bind mounts persist."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. Different syntax → different behavior. The presence of a `/` in the source distinguishes a bind mount (`-v /host/path:...`) from a named volume (`-v name:...`).",
+        "Correct. The mental model: bind mount = 'I know exactly where on the host the data should live'; named volume = 'I want Docker to manage the storage'. For local dev, bind mounts are great (you edit source on the host and see the changes inside the container). For production state (databases, queues, file uploads), named volumes are the default. **Cross-link:** the data-loss scenario in `m4-s3-c3` is exactly what a named volume prevents — the volume survives `docker rm`.",
+        "Wrong on performance: bind mounts and named volumes both use the host filesystem; the I/O paths are nearly identical. The real performance asymmetry is on Docker Desktop for Mac/Windows, where bind mounts cross a VM boundary and are slower than named volumes — opposite of the option's claim.",
+        "Wrong on persistence: named volumes EXPLICITLY survive `docker rm` (that's their point). Removing them requires `docker volume rm`. Bind mounts also survive `docker rm` (they're on the host filesystem, which Docker doesn't touch). Both forms persist past container removal; the difference is who manages the host location."
+      ]
+    },
+
+    {
+      "id": "m4-s3-c15",
+      "type": "multiple_choice",
+      "topic": "EXPOSE vs -p — Dockerfile declaration vs runtime publish",
+      "topic_ru": "EXPOSE vs -p — декларация в Dockerfile vs публикация при запуске",
+      "difficulty": 3,
+      "tags": ["docker", "expose", "ports", "publishing", "subtle"],
+      "question": "Your Dockerfile contains `EXPOSE 8000`. You run `docker run myapp` and then try to hit `localhost:8000` from your laptop. It refuses to connect. What's going on?",
+      "options": [
+        "Your app probably crashed on startup.",
+        "**`EXPOSE` does NOT publish the port — it's pure documentation.** It declares the image's intent ('this service listens on 8000') so tools like `docker port` and `docker run -P` (capital P) can discover it, but it does NOT create any host-side mapping. To actually reach the container from the host, you need `-p` at `docker run` time: `docker run -p 8000:8000 myapp` (host 8000 → container 8000). The misconception that `EXPOSE` publishes the port is one of the most common Docker beginner mistakes — the documentation reads 'expose' as in 'make visible', but in Docker's terminology it means 'declare that this port exists', not 'publish it'.",
+        "EXPOSE only works for TCP — your app must be UDP.",
+        "EXPOSE publishes the port, but Docker firewalls it by default; run `docker firewall allow 8000` to open it."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong, or at least premature — check `docker logs myapp` to confirm the app is running. But even with a healthy app, no `-p` flag means no host-side mapping; the most likely cause is the missing publish, not a crash.",
+        "Correct. Memorize: **EXPOSE = declaration in image; -p = publish at runtime**. The two together is the canonical pattern — Dockerfile documents the port; `docker run -p` actually maps it. With `docker run -P` (capital P), Docker reads every EXPOSE'd port and auto-maps them to random high host ports. This is convenient for one-off tests but not for stable services (the host port changes every run).",
+        "Wrong — TCP vs UDP doesn't affect EXPOSE's documentation-only nature. You'd notate `EXPOSE 53/udp` for UDP and need `-p 53:53/udp` to publish it, but EXPOSE still doesn't publish either form.",
+        "Wrong — there's no `docker firewall` command, and Docker doesn't add its own firewall layer between the host and container ports. Either the port is published (`-p`) or it isn't."
+      ]
+    }
+  ]
+}
