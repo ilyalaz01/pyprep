@@ -623,6 +623,41 @@ Module 2 is the automation-engineer track: handling time, files, text, serializa
 
 ## Module 3 — Testing & QA
 
+Module 3 is the testing track: philosophy first, then `pytest` mechanics, then fixtures, mocking, and coverage. Sphere index in bullet form below; per-sphere knowledge points and interview angles follow as `### Sphere` sections.
+
+- `m3-s0` — Philosophy
+  - `m3-s0-t1` — Test pyramid: unit / integration / E2E
+  - `m3-s0-t2` — AAA pattern: Arrange / Act / Assert (one Act per test)
+
+- `m3-s1` — pytest Basics
+  - `m3-s1-t1` — File naming `test_*.py`, function naming `test_*`
+  - `m3-s1-t2` — `assert` patterns (equality, truthiness, `in`)
+  - `m3-s1-t3` — CLI flags: `-v`, `-s`, `-k keyword`, `::test_id`
+
+- `m3-s2` — Errors & Parametrization
+  - `m3-s2-t1` — `pytest.raises(ExceptionType, match=...)`
+  - `m3-s2-t2` — `@pytest.mark.parametrize`
+  - `m3-s2-t3` — `@pytest.mark.skip`, `xfail`
+
+- `m3-s3` — Fixtures
+  - `m3-s3-t1` — `@pytest.fixture` and dependency injection
+  - `m3-s3-t2` — `yield` for setup/teardown
+  - `m3-s3-t3` — Scope: `function`, `class`, `module`, `session`
+  - `m3-s3-t4` — `conftest.py` for shared fixtures
+
+- `m3-s4` — Mocking & Patching
+  - `m3-s4-t1` — `Mock` vs `MagicMock`; `return_value`
+  - `m3-s4-t2` — `assert_called`, `assert_called_once_with`
+  - `m3-s4-t3` — `@patch("module.where_used.func")` (mock where used, not defined)
+  - `m3-s4-t4` — `with patch(...) as mock:` context-manager form
+  - `m3-s4-t5` — `side_effect` for exceptions and sequences
+
+- `m3-s5` — Coverage
+  - `m3-s5-t1` — `pytest --cov=pkg tests/`
+  - `m3-s5-t2` — HTML report; identifying uncovered branches
+
+---
+
 ### Sphere `m3-s0` — Philosophy
 
 **Why this sphere matters in interviews:** Before any test code is discussed, interviewers screen for vocabulary — does the candidate know what a unit test is vs an integration test? This is the conversation that filters out candidates who've never thought about testing strategy.

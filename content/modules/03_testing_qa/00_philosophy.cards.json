@@ -1,0 +1,149 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 3,
+  "sphere_id": "m3-s0",
+  "cards": [
+    {
+      "id": "m3-s0-c1",
+      "type": "flip",
+      "topic": "Test pyramid: three levels and what each catches",
+      "topic_ru": "Пирамида тестов: три уровня и что каждый ловит",
+      "difficulty": 1,
+      "tags": ["test-pyramid", "vocabulary", "interview-warmup"],
+      "question": "Define unit, integration, and E2E tests in one sentence each. Which catches which kinds of bugs?",
+      "answer": "**Unit:** exercises a single function or class with mocked dependencies (no real I/O / DB / network); fast (ms); catches **logic bugs** inside the unit. **Integration:** exercises two or more real components together (function + real DB, two services); slower (hundreds of ms to seconds); catches **contract bugs** between components (schema mismatches, wrong assumptions about a dependency). **E2E:** drives the whole system as a real user would (browser, real backend, real DB); slowest (seconds to minutes); catches **whole-system bugs** (auth flows, deploy-config issues).",
+      "answer_explanation_md": "The three levels are not redundant — each catches a class of bug the others can't. Unit tests can't catch contract bugs because mocks always agree with their mocked side. Integration tests can't catch logic bugs efficiently because they're too slow to run on every function change. E2E tests are the only thing that catches whole-system / deploy issues, but they're too expensive to drill behavior with."
+    },
+
+    {
+      "id": "m3-s0-c2",
+      "type": "multiple_choice",
+      "topic": "Pyramid shape vs inverted pyramid",
+      "topic_ru": "Форма пирамиды vs перевёрнутая пирамида",
+      "difficulty": 2,
+      "tags": ["test-pyramid", "shape", "anti-pattern"],
+      "question": "Which test count distribution best matches the healthy 'test pyramid' shape?",
+      "options": [
+        "Roughly equal counts at all three levels — 100 unit / 100 integration / 100 E2E.",
+        "Many unit, fewer integration, very few E2E — e.g. 500 unit / 100 integration / 10 E2E. Each level above is roughly 5–10× smaller than the level below.",
+        "Mostly E2E (real user flows are the truth), with a small unit-test base for utility functions. E.g. 10 unit / 50 integration / 500 E2E.",
+        "Only unit tests — anything that needs a real DB belongs in QA's manual test plan, not in the CI suite."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — equal counts means CI runs at the speed of the slowest tier and E2E flakiness dominates failure noise.",
+        "Correct. The shape is structural: many unit (fast feedback on logic), some integration (catches contract bugs), few E2E (catches deploy / whole-system bugs). The 5–10× ratio is rule-of-thumb, not exact; the binding constraint is 'unit >> integration >> E2E'.",
+        "Wrong — that's the *inverted* pyramid, the canonical anti-pattern. 40-minute CI runs, fragile tests, failures point at 'something in the flow' without localization.",
+        "Wrong — skipping integration and E2E entirely ships contract bugs and deploy issues into production. CI's job is to run them; QA's manual plan layers on top."
+      ]
+    },
+
+    {
+      "id": "m3-s0-c3",
+      "type": "multiple_choice",
+      "topic": "Why not just E2E for everything",
+      "topic_ru": "Почему не писать только E2E",
+      "difficulty": 3,
+      "tags": ["test-pyramid", "e2e", "trade-offs", "interview-classic"],
+      "question": "Junior engineer argues: 'E2E tests cover the real user flow, so why bother with unit tests?' What's the most accurate counter?",
+      "options": [
+        "E2E tests can't catch logic bugs — only unit tests run the function in isolation.",
+        "Three properties E2E lacks at scale: **speed** (you can't run 5000 in CI; they take minutes each), **isolation** (a failure could be anywhere in the stack, so debugging is a guessing game), and **stability** (every dependency is real, so flakiness compounds). Unit tests give fast, localized, deterministic feedback on logic; integration tests catch contract bugs E2E *would* catch but more cheaply. E2E is the top of the pyramid, not the whole pyramid.",
+        "E2E tests are too expensive to run on every commit; they belong in nightly QA only.",
+        "E2E tests need real browsers; in a CI environment that's impractical."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Partial — E2E *can* catch logic bugs (they exercise the same code), they're just slow and indirect about it.",
+        "Correct. The three-property answer is what interviewers want to hear: speed, isolation, stability. Each is a concrete reason E2E alone is operationally broken at scale. The composite is the senior answer; naming any one property is junior.",
+        "True but a side effect of (1) speed. The deeper reason is the three-property argument; 'too expensive' on its own doesn't capture isolation or stability.",
+        "True historically; modern Playwright / headless Chromium make CI E2E feasible. The objection to all-E2E isn't infrastructure; it's the three properties above."
+      ]
+    },
+
+    {
+      "id": "m3-s0-c4",
+      "type": "code_trap",
+      "topic": "Mocks always agree with their mocked side — contract bug survives unit tests",
+      "topic_ru": "Mock всегда согласен со своим mock-двойником — контрактный баг переживает unit-тесты",
+      "difficulty": 4,
+      "tags": ["test-pyramid", "mocks", "contract-bug", "subtle", "interview-classic"],
+      "code_snippet": "# unit test\ndef test_handler_returns_user_name():\n    mock_db = Mock()\n    mock_db.get_user.return_value = {'name': 'alice', 'email': 'a@x.io'}\n    h = Handler(mock_db)\n    assert h.user_name(42) == 'alice'\n\n# Production:\n# - The real DB driver returns SQLAlchemy rows, not dicts.\n# - h.user_name does row['name'], which dict allows and row also allows.\n# - One year later, DB driver is swapped; the new driver returns objects\n#   with .name attribute, no [] access. Production breaks; unit tests still green.",
+      "question": "What kind of bug is hiding here, and what level of the pyramid would catch it?",
+      "options": [
+        "A logic bug; another unit test would catch it.",
+        "A **contract bug**: the unit test asserts that `Handler` behaves correctly *against the mock's contract* — but the mock's contract drifted from the real dependency's contract, and nothing in the unit tier compares them. An **integration test** running `Handler` against the actual DB driver (or a representative test fixture) catches it on the first run.",
+        "A flake; rerunning the unit test would surface it.",
+        "An E2E bug only — no test tier shorter than full-system would catch this."
+      ],
+      "correct_index": 1,
+      "explanation_md": "This is the canonical 'mocks always agree with their mocked side' failure. Unit tests with mocked dependencies verify that *your code* uses *the mock* correctly. They cannot verify that *the mock* matches *the real thing*. When the real dependency's behavior drifts (driver swap, library upgrade, schema change), the mock stays frozen and the unit tests stay green — but production breaks.\n\nIntegration tests close the gap by running your code against the real dependency (or a high-fidelity stand-in: a test DB, a recorded HTTP fixture, a containerized service). The interview-grade insight: **the integration tier exists specifically to catch the bugs that survive the unit tier because mocks lie**. This is *why* the pyramid has a middle layer at all; without it you ship contract bugs every time you upgrade a dependency.\n\nThe practice rule: any code path that crosses a process / library / service boundary needs at least one integration test, even when the unit-tier coverage looks complete."
+    },
+
+    {
+      "id": "m3-s0-c5",
+      "type": "flip",
+      "topic": "AAA pattern and the one-Act rule",
+      "topic_ru": "Паттерн AAA и правило одного Act",
+      "difficulty": 1,
+      "tags": ["aaa", "pattern", "interview-warmup"],
+      "question": "What does AAA stand for, and what's the one binding rule about it?",
+      "answer": "**A**rrange / **A**ct / **A**ssert. Arrange sets up inputs, fixtures, mocks (usually the longest section). Act is the single operation under test — one call, one line. Assert verifies the outcome. The binding rule: **one Act per test**. If you'd test two function calls, split into two tests so the failure message points at exactly one behavior.",
+      "answer_explanation_md": "AAA is a shape, not a syntax — pytest doesn't enforce it. The whole point is that future-you (or a reviewer at 2am) can read the test and immediately answer 'what's being tested?' by looking at the single Act line. A test with five `assert`s spread across three function calls fails on line N and you have to read upward to figure out which behavior broke."
+    },
+
+    {
+      "id": "m3-s0-c6",
+      "type": "code_trap",
+      "topic": "Multiple Acts hidden in one test",
+      "topic_ru": "Несколько Act в одном тесте",
+      "difficulty": 3,
+      "tags": ["aaa", "one-act-rule", "test-shape"],
+      "code_snippet": "def test_cart_workflow():\n    cart = Cart()\n    cart.add(Item('apple', 10))\n    assert cart.total() == 10\n\n    cart.apply_coupon('SAVE20')\n    assert cart.total() == 8\n\n    cart.remove(Item('apple', 10))\n    assert cart.total() == 0",
+      "question": "What's wrong with this test's shape, and how do you fix it?",
+      "options": [
+        "Nothing — covering a workflow in one test is efficient.",
+        "The assertions should be combined into one `assert all(...)` call.",
+        "Three Acts (`add`, `apply_coupon`, `remove`), each with its own assertion. When the second assert fails, pytest reports 'line 7 failed', the first assert masks any later failure (pytest stops at the first failure in a test), and you can't tell from the test name which behavior regressed. Split into three tests: `test_total_with_single_item`, `test_coupon_reduces_total`, `test_remove_returns_to_zero`. Each fails independently and names its own behavior.",
+        "Missing fixtures — `Cart` and `Item` should be created via `@pytest.fixture`."
+      ],
+      "correct_index": 2,
+      "explanation_md": "The 'workflow test' anti-pattern is tempting because it reads like a story. The cost is that failures lose their localization: pytest stops at the first failed assert in a test, so if `total()` breaks on coupon application *and* on removal, you only see the coupon failure until you fix it and re-run. The test name `test_cart_workflow` tells the reviewer nothing about *which step* broke.\n\nThe fix:\n\n```python\ndef test_total_with_single_item():\n    cart = Cart()\n    cart.add(Item('apple', 10))\n    assert cart.total() == 10\n\ndef test_coupon_reduces_total():\n    cart = Cart(); cart.add(Item('apple', 10))\n    cart.apply_coupon('SAVE20')\n    assert cart.total() == 8\n\ndef test_remove_returns_to_zero():\n    cart = Cart(); cart.add(Item('apple', 10))\n    cart.remove(Item('apple', 10))\n    assert cart.total() == 0\n```\n\nEach test names one behavior. CI runs them in parallel. Failures fan out instead of cascading. Use `@pytest.fixture` to extract the shared setup if the duplication starts to grate."
+    },
+
+    {
+      "id": "m3-s0-c7",
+      "type": "fill_in",
+      "topic": "Annotate AAA on a test",
+      "topic_ru": "Расставить аннотации AAA на тесте",
+      "difficulty": 2,
+      "tags": ["aaa", "pattern", "annotation"],
+      "code_snippet_with_blanks": "def test_discount_application():\n    # ___\n    cart = Cart()\n    cart.add(Item('apple', price=10))\n\n    # ___\n    cart.apply_coupon('SAVE20')\n\n    # ___\n    assert cart.total() == 8",
+      "accepted_answers": [
+        ["Arrange"],
+        ["Act"],
+        ["Assert"]
+      ],
+      "explanation_md": "Three blanks, three sections, in order. The Arrange section builds the input state (Cart with an Item). The Act is the single behavior under test — `apply_coupon`. The Assert verifies the outcome. The comments aren't mandatory in shipping code (the structure should be obvious from the shape), but explicit `# Arrange` / `# Act` / `# Assert` markers in early code reviews are a good calibration tool to force junior engineers to confront whether they have one Act or several."
+    },
+
+    {
+      "id": "m3-s0-c8",
+      "type": "code_trap",
+      "topic": "Try/except: pass around Act — vacuous green test",
+      "topic_ru": "try/except: pass вокруг Act — тест зелёный, но ничего не проверяет",
+      "difficulty": 4,
+      "tags": ["aaa", "assertion", "vacuous-test", "subtle", "interview-classic"],
+      "code_snippet": "def test_user_signup_persists():\n    db = Database()\n\n    try:\n        signup(db, 'alice@x.io', 'pw123')\n    except Exception:\n        pass\n\n    assert db.user_count() >= 0",
+      "question": "Why is this test dangerous in production, even though it's currently green?",
+      "options": [
+        "It's fine — the test passes, that's what matters.",
+        "The Act is wrapped in `try/except: pass`, so any exception (broken DB connection, signup logic regression, database driver failure) is silently swallowed. The assertion `db.user_count() >= 0` is **vacuously true** — even an empty database satisfies it. The test passes whether the code works, fails, or doesn't exist at all. It looks like coverage but provides zero behavioral verification. The fix: drop the try/except (let real failures fail the test) and assert something specific like `db.user_count() == 1` (the signup actually persisted a user).",
+        "The assertion uses `>=` instead of `==`, which is bad style.",
+        "It needs a fixture instead of constructing `Database()` inline."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Two failure modes compound here: a swallowed Act (any exception becomes a silent no-op) plus a vacuous assertion (`>= 0` is true for any non-negative count, including zero). The test passes when:\n\n- `signup` works correctly (one user added; `user_count() == 1 >= 0`; passes).\n- `signup` raises (caught; `user_count() == 0 >= 0`; passes).\n- `signup` is deleted entirely (no call, no exception; `user_count() == 0 >= 0`; passes).\n\nAll three scenarios produce a green CI signal. The test is worse than no test — its presence implies coverage that doesn't exist.\n\nThe fix:\n\n```python\ndef test_user_signup_persists():\n    db = Database()\n    signup(db, 'alice@x.io', 'pw123')   # let exceptions propagate\n    assert db.user_count() == 1          # specific outcome\n```\n\n**Rules:** never wrap the Act in `try/except: pass` (that's `pytest.raises` for expected exceptions, not bare suppression). Never write a vacuous assertion (`>= 0` on a count, `is not None` on a string when you mean a specific value, `True` on its own). The assertion must be the thing that fails when the behavior breaks."
+    }
+  ]
+}
