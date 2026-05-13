@@ -1,0 +1,202 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 2,
+  "sphere_id": "m2-s5",
+  "cards": [
+    {
+      "id": "m2-s5-c1",
+      "type": "flip",
+      "topic": "subprocess.run signature: arg list, capture, text, check",
+      "topic_ru": "Сигнатура subprocess.run: список аргументов, capture, text, check",
+      "difficulty": 2,
+      "tags": ["subprocess", "run", "interview-warmup"],
+      "question": "What's the modern idiomatic shape of `subprocess.run` for 'run a command, capture its output as a string, raise if it fails'?",
+      "answer": "`subprocess.run(args, capture_output=True, text=True, check=True, timeout=N)` where `args` is a list (`['git', 'status']`), not a string. `capture_output=True` captures both stdout and stderr; `text=True` decodes them to `str` instead of `bytes`; `check=True` raises `CalledProcessError` on non-zero exit; `timeout=N` prevents hangs on hung children. Read the result via `result.stdout`, `result.stderr`, `result.returncode`.",
+      "answer_explanation_md": "This one form covers the 95% case — running a command, reading its output, failing fast on errors. The older `subprocess.check_output(args)` does roughly the same minus the stderr capture; `subprocess.run` is the unified replacement."
+    },
+
+    {
+      "id": "m2-s5-c2",
+      "type": "code_trap",
+      "topic": "shell=True with user input is a shell-injection vector",
+      "topic_ru": "shell=True с пользовательским вводом — это shell-injection",
+      "difficulty": 4,
+      "tags": ["subprocess", "shell", "injection", "security", "interview-classic"],
+      "code_snippet": "import subprocess\n\ndef checkout_branch(branch):\n    subprocess.run(f'git checkout {branch}', shell=True)\n\n# called as part of a CI webhook, branch comes from the request payload:\ncheckout_branch('main; rm -rf ~')",
+      "question": "What does the script actually execute, given that `branch` is `'main; rm -rf ~'`?",
+      "options": [
+        "`git checkout 'main; rm -rf ~'` — the string is quoted as one arg; git complains, nothing else runs.",
+        "Two commands in sequence: `git checkout main`, then `rm -rf ~`. The shell sees the semicolon as a command separator. Recursive delete of the user's home directory runs to completion. This is a textbook shell-injection vulnerability.",
+        "`git checkout` exits with an error; the script catches the error and returns.",
+        "Python rejects the call with `subprocess.SubprocessError` because the input contains a semicolon."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`shell=True` passes the whole string to `/bin/sh -c`. The shell parses it like any other shell input: `;` is a command separator, `|` is a pipe, `$(...)` is substitution, `&&` chains, backticks substitute. Whatever `branch` contains becomes shell syntax.\n\nIf `branch` came from anywhere an attacker can influence — a CI webhook payload, a CLI flag, a form field — they own the shell. `rm -rf ~` is the demo; in practice the payload exfiltrates secrets, installs a backdoor, or starts a crypto miner.\n\n**The fix is one line.** Drop `shell=True` and pass the args as a list:\n\n```python\nsubprocess.run(['git', 'checkout', branch])\n```\n\nWithout the shell in between, `branch` is a single arg to `git checkout` — the OS exec call doesn't interpret it. If `branch` is `'main; rm -rf ~'`, git sees one literal branch name (with a space and a semicolon in it), fails to find that branch, and exits cleanly. No shell, no injection."
+    },
+
+    {
+      "id": "m2-s5-c3",
+      "type": "multiple_choice",
+      "topic": "Correct fix for shell-injection in subprocess",
+      "topic_ru": "Правильное исправление shell-injection в subprocess",
+      "difficulty": 3,
+      "tags": ["subprocess", "shell", "shlex", "security"],
+      "question": "Given the vulnerable `subprocess.run(f'git checkout {branch}', shell=True)`, which is the best fix?",
+      "options": [
+        "Wrap the user input in `shlex.quote(branch)` and keep `shell=True`.",
+        "Drop `shell=True` and pass args as a list: `subprocess.run(['git', 'checkout', branch])`. The OS exec call receives `branch` as a single literal argument; no shell parsing happens.",
+        "Manually escape shell metacharacters with `branch.replace(';', '\\\\;').replace('|', '\\\\|')`.",
+        "Validate `branch` against a regex like `^[a-zA-Z0-9_-]+$` and keep `shell=True`."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Works but is the second-best answer. It still uses the shell, which keeps the attack surface available for any future code that doesn't remember to quote. Use this only when you genuinely need shell features (pipes, globs, redirection); for a plain command, list form is cleaner.",
+        "Correct. The list-form bypass of the shell is the canonical fix. It's secure by construction — there's no shell to misinterpret anything. `shell=True` should only be used when you genuinely need shell features, and even then every input should be wrapped in `shlex.quote`.",
+        "Wrong — you'll miss a metacharacter. Shell quoting is a notoriously hard problem to solve by hand; that's exactly why `shlex.quote` exists. And manual escapes are easy to drift wrong in maintenance.",
+        "Defense in depth, not a fix. Input validation is good practice on top of structural safety, but on its own it puts the security guarantee on you remembering every regex edge case (Unicode lookalikes, null bytes, control characters). Structural safety (no shell) is the actual fix."
+      ]
+    },
+
+    {
+      "id": "m2-s5-c4",
+      "type": "fill_in",
+      "topic": "Canonical safe subprocess.run form",
+      "topic_ru": "Канонический безопасный вызов subprocess.run",
+      "difficulty": 2,
+      "tags": ["subprocess", "patterns", "security"],
+      "code_snippet_with_blanks": "import subprocess\n\nresult = subprocess.run(\n    [___, '-l', user_path],   # args as a LIST, no shell parsing\n    capture_output=True,\n    text=True,\n    check=___,\n    timeout=30,\n)",
+      "accepted_answers": [
+        ["'ls'", "\"ls\""],
+        ["True"]
+      ],
+      "explanation_md": "The safe shape: args as a list (no shell), `capture_output=True` and `text=True` to read stdout/stderr as strings, `check=True` to raise on failure, `timeout=30` to bound the wait. With this shape, `user_path` is passed verbatim to `ls` — it can contain spaces, semicolons, anything — without being interpreted as shell syntax."
+    },
+
+    {
+      "id": "m2-s5-c5",
+      "type": "flip",
+      "topic": "capture_output + text=True idiomatic form",
+      "topic_ru": "Идиоматическая форма capture_output + text=True",
+      "difficulty": 2,
+      "tags": ["subprocess", "capture-output", "text"],
+      "question": "What do `capture_output=True` and `text=True` each do for `subprocess.run`?",
+      "answer": "`capture_output=True` captures both stdout and stderr into `result.stdout` and `result.stderr` instead of letting them go to the parent process's terminals. `text=True` decodes them as `str` (using `locale.getpreferredencoding(False)`) instead of leaving them as `bytes`. Together they give you the modern one-liner for 'run this and let me read the string output' — `subprocess.run(args, capture_output=True, text=True)`.",
+      "answer_explanation_md": "Without `capture_output=True`, you see the output in your terminal but `result.stdout` is `None` — useless for programmatic reading. Without `text=True`, `result.stdout` is `bytes`; printing works (`print(b'hello')`) but string comparison silently fails (`b'ok' != 'ok'`). The pair is mandatory together in modern code; treating either as optional is the source of half the subprocess bugs in the wild."
+    },
+
+    {
+      "id": "m2-s5-c6",
+      "type": "code_trap",
+      "topic": "Without text=True, result.stdout is bytes — comparisons silently fail",
+      "topic_ru": "Без text=True result.stdout — это bytes, сравнения молча падают",
+      "difficulty": 3,
+      "tags": ["subprocess", "text", "bytes", "subtle"],
+      "code_snippet": "import subprocess\n\nresult = subprocess.run(\n    ['echo', 'ready'],\n    capture_output=True,    # note: no text=True\n)\n\nif result.stdout.strip() == 'ready':\n    print('go')\nelse:\n    print('not yet')",
+      "question": "What does this print?",
+      "options": [
+        "'go' — strings and bytes compare by value.",
+        "'not yet' — `result.stdout` is `bytes` (because `text=True` wasn't passed), so `b'ready' == 'ready'` is `False`. Python returns `False` silently from cross-type equality between `bytes` and `str`.",
+        "Raises `TypeError` — bytes and str can't be compared.",
+        "'go' — `echo` adds a newline that `.strip()` removes, so it matches."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Without `text=True`, `result.stdout` is `bytes` (e.g. `b'ready\\n'`). Python's `==` between `bytes` and `str` returns `False` instead of raising — which is the worst possible behavior here, because the script keeps running and just takes the wrong branch.\n\nThe fix is one keyword:\n\n```python\nresult = subprocess.run(['echo', 'ready'], capture_output=True, text=True)\nif result.stdout.strip() == 'ready':\n    ...\n```\n\nWith `text=True`, `result.stdout` is the `str` `'ready\\n'`, the comparison works, the branch is correct. **Always pair `capture_output=True` with `text=True`** unless you genuinely need raw bytes (binary output from `ffmpeg`, `tar`, etc.)."
+    },
+
+    {
+      "id": "m2-s5-c7",
+      "type": "multiple_choice",
+      "topic": "Modern subprocess.run vs older check_output",
+      "topic_ru": "Современный subprocess.run vs устаревший check_output",
+      "difficulty": 2,
+      "tags": ["subprocess", "check-output", "run"],
+      "question": "Both `subprocess.check_output(args, text=True)` and `subprocess.run(args, capture_output=True, text=True, check=True)` are commonly seen in Python codebases. Which is the modern idiom, and why?",
+      "options": [
+        "`check_output` — it's shorter and returns stdout directly.",
+        "`subprocess.run(...)` — it's the unified entry point introduced in Python 3.5. `check_output` is now a thin wrapper that exists for backward compatibility. `run` captures *both* stdout and stderr (where `check_output` only returns stdout), gives you a `CompletedProcess` object with `returncode`, and reads as one consistent shape across all subprocess use cases.",
+        "They're identical aliases; pick whichever you prefer.",
+        "Use `os.popen` instead — both `run` and `check_output` are deprecated."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Shorter, true, but stdout-only and the older shape. Modern code prefers `run` for the consistency and the stderr capture.",
+        "Correct. `subprocess.run` was introduced in Python 3.5 explicitly to replace `call`, `check_call`, `check_output`, `getoutput`. All those older functions still work but are documented as 'older high-level API'. New code should use `run`. The `check_output` shape is fine in 5-year-old code; don't bother migrating, but don't reach for it in fresh code.",
+        "Wrong — they have different return shapes and different stderr handling.",
+        "Wrong — `os.popen` is the older, less-safe API. `subprocess` is its modern replacement."
+      ]
+    },
+
+    {
+      "id": "m2-s5-c8",
+      "type": "code_trap",
+      "topic": "subprocess.run without timeout hangs on a hung child",
+      "topic_ru": "subprocess.run без timeout зависает на зависшем дочернем процессе",
+      "difficulty": 3,
+      "tags": ["subprocess", "timeout", "production", "interview-classic"],
+      "code_snippet": "import subprocess\n\n# Some upstream tool occasionally hangs on stdin instead of exiting.\nresult = subprocess.run(\n    ['some-flaky-tool', '--input', path],\n    capture_output=True,\n    text=True,\n    check=True,\n)",
+      "question": "If `some-flaky-tool` hangs (the process is alive but never exits and never writes more output), what does this code do?",
+      "options": [
+        "`subprocess.run` has a default 30-second timeout; it raises `TimeoutExpired`.",
+        "Blocks indefinitely. `subprocess.run` has *no* default timeout — it waits for the child to exit, however long that takes. The CI job runs forever (or until the pipeline-level timeout fires hours later).",
+        "Returns immediately with an empty `result.stdout`.",
+        "Raises `CalledProcessError` because the child hasn't produced output."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`subprocess.run` has no default timeout — same shape as `requests.get` in `m2-s4-c8`. The parent process `wait()`s on the child PID for as long as the child stays alive. A hung child means a hung parent, no exception, no log line.\n\nThe fix is `timeout=N`:\n\n```python\ntry:\n    subprocess.run(args, capture_output=True, text=True, check=True, timeout=60)\nexcept subprocess.TimeoutExpired as e:\n    log.error('child timed out after %ds; killing', e.timeout)\n    raise\n```\n\nOn timeout, `subprocess.run` sends `SIGKILL` to the child and raises `subprocess.TimeoutExpired`. Treat the absence of `timeout=` in production subprocess code as a code-review blocker, exactly like the `requests` rule."
+    },
+
+    {
+      "id": "m2-s5-c9",
+      "type": "flip",
+      "topic": "check=True semantics",
+      "topic_ru": "Семантика check=True",
+      "difficulty": 2,
+      "tags": ["subprocess", "check", "calledprocesserror"],
+      "question": "What does `check=True` do for `subprocess.run`, and what's the default behavior without it?",
+      "answer": "`check=True` raises `subprocess.CalledProcessError` on any non-zero exit code (treating the command's failure as a Python exception). Without it (the default), `subprocess.run` returns normally with a `CompletedProcess` whose `returncode` is non-zero, and your script continues — the failure is silent unless you remember to check `result.returncode != 0` yourself.",
+      "answer_explanation_md": "Treat `check=True` as the default for every `subprocess.run` call. Failures should be loud and exception-shaped, not buried in a field the script might forget to read. The pattern: `try / subprocess.run(..., check=True) / except CalledProcessError as e: log.error(...)`."
+    },
+
+    {
+      "id": "m2-s5-c10",
+      "type": "code_trap",
+      "topic": "Without check=True, subprocess failure is silent",
+      "topic_ru": "Без check=True ошибка subprocess проходит молча",
+      "difficulty": 3,
+      "tags": ["subprocess", "check", "silent-failure", "ci-cd", "interview-classic"],
+      "code_snippet": "import subprocess\n\ndef deploy():\n    subprocess.run(['kubectl', 'apply', '-f', 'deploy.yml'])\n    subprocess.run(['kubectl', 'rollout', 'status', 'deploy/api'])\n    print('deploy complete')\n    return 0\n\nimport sys\nsys.exit(deploy())",
+      "question": "`kubectl apply` exits with code 1 because the manifest is malformed. What happens?",
+      "options": [
+        "Python raises `CalledProcessError` and `deploy()` aborts.",
+        "The first `kubectl apply` returns a non-zero `CompletedProcess`, but `subprocess.run` does NOT raise without `check=True`. The script continues to `kubectl rollout status`, prints `'deploy complete'`, and exits 0 — Jenkins marks the deploy step green even though nothing was applied.",
+        "Python's exit handler catches the failure and propagates it.",
+        "The script raises `RuntimeError` because the second command fails on a non-deployed app."
+      ],
+      "correct_index": 1,
+      "explanation_md": "Without `check=True`, a failed command produces a `CompletedProcess` with `returncode != 0` and the script continues. The `deploy complete` line is misleading; the CI runner reads the script's final exit (0) and marks the step green. This is the canonical 'silent CI failure' pattern and the question interviewers reach for to test whether you've actually shipped automation code.\n\nThe fix per call:\n\n```python\nsubprocess.run(['kubectl', 'apply', '-f', 'deploy.yml'], check=True)\nsubprocess.run(['kubectl', 'rollout', 'status', 'deploy/api'], check=True)\n```\n\nNow the failed apply raises `CalledProcessError`; `deploy()` aborts; the script exits non-zero; Jenkins marks the step red. Make `check=True` muscle memory."
+    },
+
+    {
+      "id": "m2-s5-c11",
+      "type": "multiple_choice",
+      "topic": "CalledProcessError attributes",
+      "topic_ru": "Атрибуты CalledProcessError",
+      "difficulty": 3,
+      "tags": ["subprocess", "calledprocesserror", "exception-handling"],
+      "question": "You catch `subprocess.CalledProcessError as e` after a failed `run(..., check=True, capture_output=True, text=True)`. Which row lists the attributes you can actually read on `e` to log the failure?",
+      "options": [
+        "Only `e.message` — `CalledProcessError` is a plain `Exception` subclass with one field.",
+        "`e.returncode` (the non-zero exit code), `e.cmd` (the args list you passed), `e.output` / `e.stdout` (captured stdout, if any), `e.stderr` (captured stderr, if any).",
+        "`e.errno` and `e.strerror` — `CalledProcessError` inherits from `OSError`.",
+        "`e.exception_chain` and `e.process_id` — the standard subprocess error fields."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — `CalledProcessError` carries structured fields specific to the failed call.",
+        "Correct. These four fields are exactly what you want to log: returncode for severity classification, cmd for 'what did we actually run', stdout/stderr for 'what did the tool say'. `e.output` is an alias for `e.stdout` kept for backward compat with the `check_output` shape.",
+        "Wrong — `CalledProcessError` inherits from `subprocess.SubprocessError`, not `OSError`. It has no `errno`/`strerror`.",
+        "Wrong — these aren't standard library attributes; invented for the distractor."
+      ]
+    }
+  ]
+}
