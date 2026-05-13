@@ -1,0 +1,342 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s7",
+  "cards": [
+    {
+      "id": "m4-s7-c1",
+      "type": "code_trap",
+      "topic": "SQL injection via f-string concatenation — the canonical disaster",
+      "topic_ru": "SQL-инъекция через f-string — каноническая катастрофа",
+      "difficulty": 4,
+      "tags": ["security", "sql-injection", "interview-classic", "footgun-pair"],
+      "code_snippet": "# Web endpoint that looks up a user by name.\n\n@app.get(\"/users\")\ndef get_user():\n    name = request.args[\"name\"]     # user input from query string\n    cursor.execute(f\"SELECT * FROM users WHERE name = '{name}'\")\n    return cursor.fetchall()\n\n# An attacker sends:  /users?name=';%20DROP%20TABLE%20users;%20--",
+      "question": "What SQL actually runs at the database, and what's the mechanism that makes this possible?",
+      "options": [
+        "The DB rejects the request because the name contains a quote.",
+        "**The DB receives `SELECT * FROM users WHERE name = ''; DROP TABLE users; --'` and EXECUTES BOTH STATEMENTS.** The user's table is dropped. **Mechanism:** the f-string interpolates the attacker's `name` value directly into the SQL string before the DB driver ever sees it. The DB receives one blob of text and parses it as SQL — the closing `'` terminates the WHERE clause's string literal; the `;` ends the SELECT; `DROP TABLE users` becomes a second statement; `--` comments out the trailing quote. The DB cannot tell template from payload because they were never separated. **This is the bobby-tables story** (xkcd #327); it's been the same disaster for 25 years and remains one of the most common web vulnerabilities because the wrong code looks 'natural' (just an f-string) and the right code (parametrized queries — see `m4-s7-c2`) requires a deliberate habit.",
+        "Python's f-string automatically escapes quotes when used in a SQL context.",
+        "The DB ignores everything after the first `;` for safety."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The exact mechanics of why string concatenation can never be made safe:\n\n1. Python evaluates `f\"SELECT * FROM users WHERE name = '{name}'\"`. With `name = \"';\\nDROP TABLE users; --\"`, the resulting Python string is `SELECT * FROM users WHERE name = ''; DROP TABLE users; --'`.\n2. That string is passed to `cursor.execute()` as a single argument.\n3. The DB driver sends the entire string to the DB server as the SQL statement to execute.\n4. The DB's parser tokenizes the string. It sees a valid `SELECT`, terminated by `;`, followed by a valid `DROP TABLE`, terminated by `;`, followed by a comment `--`. It executes everything before the comment.\n\nDefenses that DON'T work:\n\n- **Blacklisting quote characters in user input** — works until the attacker uses Unicode variants, encoding tricks, or content-type tricks that bypass naive filtering.\n- **Manual escaping** (`name.replace(\"'\", \"''\")`) — fragile; every quote variant, every encoding edge case is a potential bypass; you have to remember it every time.\n- **'Input validation'** — necessary for other reasons (length limits, format checks) but NOT a complete defense against SQL injection. Plenty of legitimate names contain quotes (`O'Brien`).\n\nThe ONE defense that works is **structural separation of template from values**: parametrized queries (covered in `m4-s7-c2`). This card is the 'recognize the vulnerability' half of the N041 footgun-pair; c2 is the 'pick the right fix' half. Together they're the highest-leverage SQL injection question shape."
+    },
+
+    {
+      "id": "m4-s7-c2",
+      "type": "multiple_choice",
+      "topic": "SQL injection — which fix is correct (and why ORMs / escaping are wrong answers)",
+      "topic_ru": "SQL-инъекция — какое исправление правильное (и почему ORM / экранирование — неверные ответы)",
+      "difficulty": 3,
+      "tags": ["security", "sql-injection", "parametrized-query", "interview-classic", "footgun-pair"],
+      "question": "You're asked to fix the SQL injection from `m4-s7-c1`. Four candidate approaches:\n\n```python\n(A)  cursor.execute(\"SELECT * FROM users WHERE name = ?\", (name,))\n(B)  cursor.execute(f\"SELECT * FROM users WHERE name = '{name.replace(chr(39), chr(39)*2)}'\")\n(C)  user = User.objects.filter(name=name).first()   # Django ORM\n(D)  if not name.isalnum(): abort(400)\n     cursor.execute(f\"SELECT * FROM users WHERE name = '{name}'\")\n```\n\nWhich is the canonical correct fix, and what's wrong with the others?",
+      "options": [
+        "All four are equivalent — pick whichever your codebase already uses.",
+        "**(A) is the canonical correct fix: parametrized query.** The DB driver receives the SQL template (`SELECT ... WHERE name = ?`) and the values (`(name,)`) as SEPARATE arguments and substitutes them into the prepared statement in a way that cannot terminate the string or inject new statements. Injection becomes impossible *by construction*, not by escaping. **What's wrong with the others:** **(B) manual escaping** — fragile (quote variants, encodings, charset tricks all bypass naive replacement) and you have to remember to do it every time; structural correctness is replaced with vigilance, which fails. **(C) ORM** — works in practice (Django ORM uses parametrized queries under the hood) but is the WRONG INTERVIEW ANSWER: 'we use an ORM' is naming the tool, not the defense. The defense IS parametrization; the ORM happens to deliver it. Senior interviewers probe this distinction. **(D) input validation alone** — `isalnum()` blocks the bobby-tables payload but also blocks legitimate names with hyphens, apostrophes (`O'Brien`), spaces, accents. Validation is a necessary layer for other reasons but not a complete defense against injection.",
+        "(B) is the safest because it does the escaping explicitly.",
+        "(D) is the strongest defense because it never lets attacker input touch SQL."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — the four approaches have meaningfully different security properties and the interviewer is probing whether you can articulate them.",
+        "Correct. This is the N041 footgun-pair completion: `m4-s7-c1` builds recognition of the bug shape; this card builds prescription of the canonical fix and discrimination from second-best alternatives. **The interview-relevant level of detail:** when asked 'how do you prevent SQL injection?' the best one-sentence answer is 'parametrized queries — the driver sends the SQL template and values separately, so user input cannot terminate the string or inject new statements'. Naming an ORM is acceptable as a follow-up ('and ORMs parametrize by default'), but not the primary answer.",
+        "Wrong. Manual escaping is the *fragile* fix — see options breakdown. Parametrization is the safe fix.",
+        "Wrong on completeness. Validation is necessary for other reasons (length caps, type checks) but is *incomplete* as the only defense. A name field that genuinely needs to accept apostrophes, hyphens, spaces (`O'Brien-Smith Jr.`) cannot be restricted to `isalnum()`. The defense must work for legitimate inputs that look like injection."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c3",
+      "type": "flip",
+      "topic": "Parametrized queries — what the DB driver actually does",
+      "topic_ru": "Параметризованные запросы — что реально делает DB-драйвер",
+      "difficulty": 3,
+      "tags": ["security", "sql-injection", "parametrized-query", "mechanism"],
+      "question": "When you call `cursor.execute(\"SELECT * FROM users WHERE name = ?\", (name,))`, what actually happens between your Python code and the DB? Why is this safe regardless of what `name` contains?",
+      "answer": "Two separate things are sent to the database:\n\n1. **The SQL template** — `SELECT * FROM users WHERE name = ?` — with `?` (or `%s`, or `:name` depending on the driver) as a *placeholder*.\n2. **The value(s)** — `(name,)` — as a *separate argument*, transmitted in the DB's binary protocol distinctly from the SQL text.\n\nThe DB **prepares** the SQL template once (parses, compiles a query plan), then **executes** it with the value substituted *into the placeholder slot* — not as text concatenation. The value is treated as data the whole way through; it cannot escape its slot to become SQL, regardless of what bytes it contains.\n\n**The contrast with manual escaping:** with escaping, the SQL string still contains the user's value as inline text; the safety relies on having correctly escaped every special character (which is fragile). With parametrization, the value never becomes part of the SQL text at all — there's no special character to escape because there's no string context the character could escape from.\n\n**ORMs use parametrized queries internally.** When you write `User.objects.filter(name=name)` in Django or `session.query(User).filter(User.name == name)` in SQLAlchemy, the ORM generates a parametrized query with placeholders and passes the values separately. You're getting the safe path 'for free' as long as you don't drop into raw SQL with `.raw()` or `.execute(text(...))` and concatenate by hand.",
+      "answer_explanation_md": "**The escape hatch that breaks the safety:** every ORM has a way to drop into raw SQL for cases that need it, and those escape hatches recreate the injection risk if you use them with f-strings:\n\n```python\n# Django — raw with parameters (safe):\nUser.objects.raw(\"SELECT * FROM users WHERE name = %s\", [name])\n\n# Django — raw with f-string (VULNERABLE):\nUser.objects.raw(f\"SELECT * FROM users WHERE name = '{name}'\")\n\n# SQLAlchemy — text with bindparams (safe):\nsession.execute(text(\"SELECT * FROM users WHERE name = :n\"), {\"n\": name})\n\n# SQLAlchemy — text with f-string (VULNERABLE):\nsession.execute(text(f\"SELECT * FROM users WHERE name = '{name}'\"))\n```\n\nThe rule generalizes: **any SQL with user data has to use parameter substitution, even when the SQL is hand-written.** ORMs default to the safe path; the danger is when the codebase has a mix of high-level ORM queries and hand-written raw SQL, and a maintainer reaches for an f-string in the latter case because 'it's just internal data'. Internal-feeling data still gets attacker-controlled inputs eventually (admin features, data import paths); parametrize *everywhere* SQL is constructed."
+    },
+
+    {
+      "id": "m4-s7-c4",
+      "type": "flip",
+      "topic": "Password storage: bcrypt/argon2 yes, MD5/SHA-1 no, plaintext never",
+      "topic_ru": "Хранение паролей: bcrypt/argon2 — да, MD5/SHA-1 — нет, plaintext — никогда",
+      "difficulty": 3,
+      "tags": ["security", "password-hashing", "bcrypt", "argon2", "interview-classic"],
+      "question": "An interviewer asks: 'How would you store user passwords?' Give the answer in three claims (algorithm, what's wrong with MD5/SHA-256, salt).",
+      "answer": "**Three claims:**\n\n1. **Use `bcrypt` or `argon2id` from a maintained library** — never plaintext (catastrophe on any breach), never your own crypto. Modern teams default to `argon2id`; `bcrypt` remains a battle-tested, widely-available alternative with a tunable cost factor.\n2. **General-purpose hashes (MD5, SHA-1, SHA-256) are WRONG for passwords.** They're designed to be *fast* — attackers brute-force them at billions of guesses per second on commodity GPUs. Password-specific algorithms (bcrypt, argon2, scrypt) are designed to be *slow* and memory-hard so the per-guess cost makes brute-force impractical. The cost factor is tunable upward as hardware gets faster (e.g., `bcrypt.gensalt(12)` — 2^12 = 4096 iterations, currently appropriate; bump to 14 in a few years).\n3. **Salt prevents rainbow-table attacks.** A salt is a random per-password value mixed in before hashing — two users with the same password produce different hashes, so a precomputed table is useless. `bcrypt` and `argon2` **handle the salt internally**: the salt is generated when you hash and embedded in the output, so the verify call can recover it. You don't manage salts by hand.\n\nCanonical pattern:\n\n```python\nimport bcrypt\nhashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(12))\nok = bcrypt.checkpw(submitted.encode(), hashed)\n```",
+      "answer_explanation_md": "**Wrong-answer disqualifiers in this question:**\n\n- 'MD5 with a salt' — MD5 is broken on multiple axes; the salt helps but the speed remains the problem.\n- 'SHA-256 with a salt' — better than MD5 but still too fast; modern attackers can compute billions of SHA-256 hashes per second per GPU.\n- 'I'd write my own algorithm' — 'never roll your own crypto' is a senior-engineer reflex; the wrong-answer signal is large.\n- 'I'd encrypt the passwords' — encryption is reversible by design; you'd be able to recover plaintext on a breach. Hashing is one-way, which is the right primitive.\n\n**The cost-factor knob is the second-level question.** Senior interviewers may follow up with 'how do you decide the cost factor?' — answer: aim for ~250ms per hash on your production hardware. That's slow enough to make brute force expensive, fast enough that login isn't perceptibly delayed. Re-evaluate as hardware improves; bump the cost when current hardware drops below 100ms per hash.\n\n**`argon2id` parameters** to know: it has memory cost (KiB), time cost (iterations), and parallelism. Modern defaults (e.g., from `argon2-cffi`): `memory=65536, time=3, parallelism=4`. The memory parameter is what makes argon2 resistant to GPU/ASIC brute force — GPUs are fast at parallel hashing but bad at parallel large-memory operations."
+    },
+
+    {
+      "id": "m4-s7-c5",
+      "type": "code_trap",
+      "topic": "MD5 for password storage — billions of guesses per second on commodity GPUs",
+      "topic_ru": "MD5 для паролей — миллиарды переборов в секунду на GPU",
+      "difficulty": 4,
+      "tags": ["security", "password-hashing", "md5", "speed", "interview-classic"],
+      "code_snippet": "# Tutorial code circa 2010, still occasionally found in production:\n\nimport hashlib\n\ndef store_password(password: str) -> str:\n    salt = \"company_secret_salt_2024\"\n    return hashlib.md5((password + salt).encode()).hexdigest()\n\ndef check_password(password: str, stored_hash: str) -> bool:\n    return store_password(password) == stored_hash",
+      "question": "List THREE things wrong with this code, in order of severity.",
+      "options": [
+        "Nothing major — MD5 with a salt is acceptable for low-value accounts.",
+        "**(1) MD5 is designed to be FAST. Modern GPUs compute ~100 BILLION MD5 hashes per SECOND** — a leaked password hash database is cracked in hours regardless of the password's strength for any password under ~12 characters. Use bcrypt or argon2id, which are designed to be slow + memory-hard. **(2) The salt is a SINGLE GLOBAL CONSTANT, not per-password.** This defeats the entire purpose of salting: two users with the same password produce identical hashes, so a single precomputed rainbow table for that constant salt cracks every password in the database at once. Salts must be random and per-password. **(3) MD5 itself is cryptographically broken** — collision attacks are practical, second-preimage attacks are within reach for motivated adversaries. Even if you wanted a fast hash for some reason, MD5 is the wrong fast hash to pick. **The right rewrite:**\n\n```python\nimport bcrypt\ndef store_password(password: str) -> bytes:\n    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(12))\ndef check_password(password: str, stored_hash: bytes) -> bool:\n    return bcrypt.checkpw(password.encode(), stored_hash)\n```\n\nbcrypt generates a random salt per call (embedded in the output); cost factor 12 makes each verification ~250ms — fast enough for users, slow enough that brute force is impractical.",
+        "MD5 is fine; the only issue is that `hexdigest()` should be `digest()`.",
+        "Add a longer salt and bump to SHA-256."
+      ],
+      "correct_index": 1,
+      "explanation_md": "**The speed numbers are not hypothetical.** Public benchmarks for hashcat on consumer GPUs (RTX 4090-class hardware) circa 2024 show ~100 billion MD5/sec, ~50 billion SHA-1/sec, ~10 billion SHA-256/sec, and ~10,000 bcrypt-at-cost-12/sec. The ratio is ~10 million to one. A password hashed with MD5 that takes 1 hour to crack would take ~1000 years with bcrypt at cost 12; the asymmetry is *the point* of choosing the right algorithm.\n\n**'Pepper'** (a global secret stored separately from the DB, mixed into the hash) is sometimes added as a defense-in-depth layer alongside per-password salt. It can help if the DB is compromised but the pepper isn't, but it's a small marginal improvement compared to using a slow algorithm. The cost factor and the per-password salt are the load-bearing defenses.\n\n**Migration path** when you discover a legacy MD5 database: don't try to 'upgrade in place' (you can't — you don't have the plaintexts). Instead, on each user's next login, accept the MD5-hashed password (verify it as before), then re-hash with bcrypt and replace the stored value. Flag MD5-hashed accounts that haven't been re-hashed after N months and force a password reset to migrate the long-tail.\n\nCross-link to `m4-s7-c4` for the canonical-correct pattern this card is the failure-case of."
+    },
+
+    {
+      "id": "m4-s7-c6",
+      "type": "multiple_choice",
+      "topic": "bcrypt cost factor — what it does and how to tune it",
+      "topic_ru": "bcrypt cost factor — что делает и как настроить",
+      "difficulty": 3,
+      "tags": ["security", "bcrypt", "cost-factor", "hashing"],
+      "question": "Two `bcrypt.gensalt` invocations, two cost factors. What's the difference, and how should you pick the right value?\n\n```python\nhashed_a = bcrypt.hashpw(password.encode(), bcrypt.gensalt(10))\nhashed_b = bcrypt.hashpw(password.encode(), bcrypt.gensalt(14))\n```",
+      "options": [
+        "The cost factor controls hash length; pick whatever fits your DB column.",
+        "**The cost factor is the EXPONENT in 2^cost iterations.** Cost 10 = 1024 iterations (~50ms on a 2024 CPU); cost 14 = 16384 iterations (~800ms). Each unit increment DOUBLES the work. **The right value:** aim for ~250ms per hash on your production hardware. That's slow enough to make brute-force attacks expensive, fast enough that the user doesn't notice the delay on login. In 2026, cost 12 is the common starting point for typical server hardware; bump it as hardware gets faster (every few years, increment by 1). **Why this knob is the entire point of bcrypt:** unlike general-purpose hashes, bcrypt is *parameterized on its cost*. As GPUs get faster, defenders increase the cost factor and re-hash on next login; attackers' brute-force rate stays the same per unit of hash work. The library handles the rest: salt is generated per call and embedded in the output; verification recovers the cost and salt from the stored hash.",
+        "Higher cost is always better; use cost=20.",
+        "The cost factor only affects salt length, not hash strength."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — cost factor controls *work*, not output size. bcrypt outputs are always 60 characters regardless of cost.",
+        "Correct. **Cost-factor tuning is operational:** measure on your production machine, target ~250ms. Don't blindly copy a cost from a tutorial — a 2018 tutorial saying 'cost 12' may now be appropriate as cost 13 or 14 depending on your hardware. The migration pattern when bumping cost: keep the old code path that verifies old-cost hashes, but on successful login re-hash with the new cost and update the stored value. Over time the database transitions to the new cost without disrupting users.",
+        "Wrong — cost too high (e.g., 18+) makes login perceptibly slow (multiple seconds) without adding meaningful security beyond ~250ms. You're trading user experience for marginal attacker pain. Tune to a target time, not 'as high as possible'.",
+        "Wrong on mechanism. Salts in bcrypt are always 128 bits and randomly generated regardless of cost. The cost factor purely controls work."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c7",
+      "type": "flip",
+      "topic": "JWT structure: header.payload.signature, base64 not encrypted",
+      "topic_ru": "JWT-структура: header.payload.signature, base64, НЕ зашифровано",
+      "difficulty": 3,
+      "tags": ["security", "jwt", "interview-classic"],
+      "question": "What are the three parts of a JWT, what's in each, and what does the signature actually prove? What's the most common JWT-related misconception?",
+      "answer": "A JWT is three base64-encoded segments separated by dots: `header.payload.signature`.\n\n- **Header** — JSON like `{\"alg\":\"HS256\",\"typ\":\"JWT\"}`. Names the signing algorithm and token type.\n- **Payload (claims)** — JSON like `{\"user_id\":42,\"exp\":1715000000,\"iss\":\"myapp\"}`. The user info / authorization data the token carries. Standard claims include `sub` (subject), `exp` (expiry), `iat` (issued at), `iss` (issuer), `aud` (audience).\n- **Signature** — HMAC-SHA256 (or RSA/ECDSA) of `base64(header) + \".\" + base64(payload)`, keyed with the server's secret.\n\n**What the signature proves:** the token was issued by someone who holds the server's secret. Tampering with the payload (e.g., changing `user_id` from 42 to 1) requires recomputing the signature, which requires the secret. The server validates the signature on each request; if it doesn't match, the token is rejected.\n\n**The most common misconception:** 'JWT is encrypted'. **It's not.** The payload is base64-encoded, which is reversible — anyone with the token can decode the middle segment and read the claims. Don't put sensitive data in JWT claims; if you need confidentiality, use **JWE** (JSON Web Encryption), a separate spec.\n\n**Try it in your browser console** with any JWT: `atob(\"eyJ1c2VyX2lkIjo0Mn0\")` returns `'{\"user_id\":42}'`. The token is *signed*, not *secret*.",
+      "answer_explanation_md": "Three patterns worth knowing:\n\n- **'alg: none' attack** — a famous early-JWT vulnerability: some libraries honored a JWT header claiming `alg: none` (no signature required) and accepted the token without verification. Modern libraries reject this; the lesson is to specify the expected algorithm explicitly in your verifier (`jwt.decode(token, secret, algorithms=[\"HS256\"])`), not blindly trust the header.\n- **Symmetric vs asymmetric signing** — HS256 uses a shared secret (both the issuer and verifier hold the same key — fine for monoliths). RS256 / ES256 use public-key crypto (issuer has the private key; verifiers only need the public key — better for microservices where multiple services verify tokens issued by one auth service).\n- **`exp` claim is the typical revocation strategy** — JWTs are hard to revoke before expiry without server-side state; the common pattern is short-lived access tokens (15 min) plus long-lived refresh tokens kept in a server-side denylist. See `m4-s7-c8` for the sessions-vs-JWT tradeoff this generates."
+    },
+
+    {
+      "id": "m4-s7-c8",
+      "type": "multiple_choice",
+      "topic": "JWT vs sessions — the revocation-vs-statelessness tradeoff",
+      "topic_ru": "JWT vs сессии — компромисс отзыв-vs-statelessness",
+      "difficulty": 3,
+      "tags": ["security", "jwt", "sessions", "tradeoff", "interview-classic"],
+      "question": "When should you use server-side sessions vs JWT? What's the operational tradeoff?",
+      "options": [
+        "JWT is always better because it scales without server state.",
+        "**Sessions** store user state server-side (in Redis, a DB, or memory); the client gets an opaque session ID in a cookie; the server looks up the session on each request. **JWT** is a signed token containing user info; the server validates the signature without a lookup. **The tradeoff:** **Sessions** — easy to revoke (delete the session record; the user is logged out instantly), but require server-side storage and a lookup per request. **JWT** — stateless (any server with the secret can verify a token without shared state, scaling horizontally is trivial), but hard to revoke before expiry. **The canonical workaround for JWT revocation:** short-lived access tokens (15 min) + long-lived refresh tokens kept in a server-side denylist. Revocation works by adding the refresh token to the denylist; the access token will expire shortly anyway. **When to pick which:** sessions for traditional monoliths with a shared cache (Redis is fast; the per-request lookup is microseconds). JWT for microservices / serverless / cross-domain auth (federated APIs, mobile clients), where shared state is awkward and the revocation-difficulty cost is acceptable.",
+        "Sessions are always better because they're easier to revoke.",
+        "They're functionally equivalent; pick either."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on framing. JWT scales without shared state but pays for it with revocation difficulty; 'always better' ignores the tradeoff.",
+        "Correct. The interview-relevant version: senior engineers can articulate the tradeoff *and* the workaround (short access tokens + refresh token denylist). The wrong-answer signal is treating 'stateless' as an unmitigated good; the right answer engages with what stateless costs.",
+        "Wrong on direction. Sessions are easier to revoke but harder to scale. 'Always better' in either direction misses the tradeoff that's the entire point.",
+        "Wrong — they have meaningfully different operational properties. Picking one over the other is a real architectural decision."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c9",
+      "type": "multiple_choice",
+      "topic": "Cookie flags: HttpOnly, Secure, SameSite — what each defends",
+      "topic_ru": "Флаги кук: HttpOnly, Secure, SameSite — что защищает каждый",
+      "difficulty": 3,
+      "tags": ["security", "cookies", "xss", "csrf", "interview-classic"],
+      "question": "A session cookie is set with these flags. What threat does EACH flag defend against?\n\n```http\nSet-Cookie: session=abc123; HttpOnly; Secure; SameSite=Lax\n```",
+      "options": [
+        "All three flags defend against the same threat (XSS); they're redundant.",
+        "**`HttpOnly`** — JavaScript cannot read or modify the cookie (`document.cookie` returns it as empty for that cookie). **Defends against XSS** stealing session tokens: even if an attacker injects JS into your page, that JS cannot exfiltrate the session cookie to their server. **`Secure`** — cookie is sent ONLY over HTTPS connections. **Defends against passive eavesdropping** on the network (and accidental leakage if the user is briefly redirected to plain HTTP). **`SameSite=Lax|Strict|None`** — restricts when the cookie is sent on cross-site requests. `Strict` (most restrictive) — only on same-site navigation. `Lax` (modern default) — allowed on top-level navigation, blocked on cross-site subresource requests like `<img>` and `<iframe>` form submissions. `None` (requires `Secure`) — sent on all cross-site requests. **Defends against CSRF**: an attacker's site can't trigger a cross-site request that includes your session cookie. **Modern defaults:** every session-auth cookie should set all three. Most frameworks (Django, Flask-Session, FastAPI sessions, Rails) set these defaults out of the box for session cookies in production mode.",
+        "`HttpOnly` is for HTTP-only sites; `Secure` is for HTTPS-only sites; `SameSite` is a typo.",
+        "All three are configuration noise; they don't actually change browser behavior."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — each flag defends against a distinct threat class. They're complementary, not redundant.",
+        "Correct. **The three threats they defend against:** **XSS** (an attacker's injected JS exfiltrating auth tokens) — defended by `HttpOnly`. **Network eavesdropping** (passive attacker reading cookies on the wire) — defended by `Secure`. **CSRF** (an attacker's site triggering authenticated requests against yours) — defended by `SameSite`. All three are mature, browser-enforced, and now standard. The modern default to memorize: `HttpOnly; Secure; SameSite=Lax` for session auth cookies (use `SameSite=Strict` if you don't need cross-site nav with the cookie at all).",
+        "Wrong on all three names. `HttpOnly` means 'no JS access' (not 'HTTP-only sites'); `Secure` means 'HTTPS-only'; `SameSite` is a real and important attribute.",
+        "Wrong — these are first-class browser-enforced security features. Most security audits start by checking that auth cookies have all three flags set."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c10",
+      "type": "flip",
+      "topic": "OAuth 2.0 authorization code flow — the six steps of \"Sign in with Google\"",
+      "topic_ru": "Authorization code flow OAuth 2.0 — шесть шагов 'Sign in with Google'",
+      "difficulty": 3,
+      "tags": ["security", "oauth", "authorization-code", "interview-classic"],
+      "question": "Walk through the six steps of OAuth 2.0 authorization code flow ('Sign in with Google'). Name the four roles.",
+      "answer": "**Four roles:**\n\n- **Resource Owner** — the user.\n- **Client** — your app.\n- **Authorization Server** — Google's OAuth endpoint (issues tokens).\n- **Resource Server** — Google's API (accepts tokens).\n\n**Six steps:**\n\n1. User clicks 'Sign in with Google' on your app.\n2. Your app **redirects the browser** to Google's authorization URL with `client_id`, `redirect_uri`, `scope` (e.g., `email profile`), and a `state` parameter (CSRF defense).\n3. User authenticates with Google directly (Google's login UI, not yours) and approves your app's requested scopes.\n4. Google **redirects the browser back to your `redirect_uri`** with a short-lived **authorization code** in the query string (`?code=abc123&state=...`).\n5. Your **server** (not the browser) exchanges the code for an **access token** via a server-to-server POST to Google's token endpoint, including `client_secret` for authentication.\n6. Your server uses the access token to call Google APIs on the user's behalf, until it expires (~1 hour). A **refresh token** (longer-lived) can mint new access tokens without re-prompting the user.\n\n**Why this shape:** OAuth is about **delegated authorization** — your app gets a scoped, time-limited token to act on the user's behalf without ever seeing the user's Google password. The two-step (code → access token) exchange via your server keeps the `client_secret` server-side, where it can be protected; the browser only ever sees the short-lived code, which is useless without the secret.",
+      "answer_explanation_md": "**Common confused-junior moments:**\n\n- 'OAuth lets me log in users with Google passwords' — NO. Your app never receives the password; OAuth gives you delegated authorization, not credentials. The user authenticates with Google; you get a token saying 'Google says this user authorized you to call these APIs on their behalf'.\n- 'OpenID Connect is a competitor to OAuth' — NO. OIDC is built ON TOP of OAuth 2.0. It adds an `id_token` (a JWT) for *authentication* (proving who the user is), where OAuth alone is about *authorization* (what the bearer of the token can do). 'Sign in with Google' is OIDC; pure OAuth would be 'Connect your Google Drive to MyApp'.\n- 'I should store the access token in localStorage' — depends. Cookies with `HttpOnly; Secure; SameSite` are safer (see `m4-s7-c9`); localStorage is readable by any JS on the page, which means XSS exfiltrates the token. For browser clients, cookies are the default.\n\n**Implicit flow** (where the access token came back directly in the redirect URL) is deprecated for browsers because the token lived in the URL (browser history, server logs, referer headers). Modern browser clients use **authorization code + PKCE** (Proof Key for Code Exchange) — a session-local challenge/response that replaces the `client_secret` for public clients that can't safely hold secrets."
+    },
+
+    {
+      "id": "m4-s7-c11",
+      "type": "multiple_choice",
+      "topic": "OAuth is delegated authorization, not 'login convenience'",
+      "topic_ru": "OAuth — делегированная авторизация, а не 'удобный логин'",
+      "difficulty": 3,
+      "tags": ["security", "oauth", "delegation", "interview-classic"],
+      "question": "An interviewer asks: 'In one sentence, what is OAuth 2.0 actually for?' Which answer captures the substance?",
+      "options": [
+        "OAuth is a faster way to log users into your app using Google/Facebook accounts.",
+        "**OAuth 2.0 is a protocol for DELEGATED AUTHORIZATION — letting one app act on a user's behalf at another service, without sharing the user's password.** The user authenticates with the *authorization server* (Google), grants the *client* (your app) scoped permission to act at the *resource server* (Google's API). Your app receives a time-limited, scope-limited access token; it never sees the user's password. **'Sign in with Google' is a USE CASE** of OAuth (extended with OpenID Connect to add identity), but OAuth's purpose is broader: a Zapier integration that posts to Slack on your behalf, a calendar app that reads your Google Calendar, a CI/CD tool that creates GitHub releases — all are OAuth flows where one service delegates scoped capability to another. **The interview probe distinguishes 'I've used Sign in with Google' from 'I understand the authorization model'.** A senior candidate names the delegation; a junior names the convenience.",
+        "OAuth replaces passwords — once you have OAuth, users no longer need their own password.",
+        "OAuth is an encryption protocol for HTTP traffic."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on substance. Login convenience is a downstream consequence; the substance is delegated authorization with scope and revocability.",
+        "Correct. **The senior-vs-junior signal in this question:** can you articulate that the user's password never leaves the authorization server? Can you name the four roles (Resource Owner, Client, Auth Server, Resource Server)? Can you say 'scopes are the authorization granularity' and mean it? Cross-link to `m4-s7-c10` for the six-step flow this card describes the *purpose* of.",
+        "Wrong — OAuth doesn't replace passwords; it lets users continue to use one password (at the authorization server) while sharing scoped access with other apps that never see the password.",
+        "Wrong — OAuth is about authorization; HTTPS/TLS is the encryption layer (covered in `m4-s7-c16`). They're orthogonal concerns; OAuth runs over HTTPS but is not itself an encryption protocol."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c12",
+      "type": "code_trap",
+      "topic": "client_secret in the browser — the OAuth public-client trap",
+      "topic_ru": "client_secret в браузере — ловушка публичного OAuth-клиента",
+      "difficulty": 4,
+      "tags": ["security", "oauth", "client-secret", "pkce", "subtle"],
+      "code_snippet": "// Browser-side OAuth implementation that looks correct but ships secrets:\n\nasync function exchangeCodeForToken(code) {\n  return fetch(\"https://oauth.example.com/token\", {\n    method: \"POST\",\n    body: JSON.stringify({\n      code,\n      client_id: \"public-client-123\",\n      client_secret: \"REDACTED-LOOKING-SECRET-IN-JS-BUNDLE\",\n      redirect_uri: \"https://myapp.com/callback\",\n    }),\n  });\n}",
+      "question": "What's the problem with this code, and what's the right pattern for browser/mobile clients?",
+      "options": [
+        "Nothing wrong — `client_secret` is a standard part of the token exchange.",
+        "**`client_secret` is in the JavaScript bundle the browser downloads** — anyone can read it (`view-source`, browser dev tools, decompiled mobile app binaries). Once leaked, any attacker can impersonate your client and exchange stolen auth codes for tokens. **Browsers and mobile apps are PUBLIC CLIENTS — they cannot safely hold a `client_secret`.** The right pattern is **PKCE (Proof Key for Code Exchange)**: the client generates a random `code_verifier` and its SHA-256 hash `code_challenge` at the START of the flow, sends `code_challenge` with the authorization request, and proves possession of `code_verifier` at the token-exchange step. The verifier never leaves the client; the challenge is one-way-hashed; replay attacks are prevented without a long-lived secret. **For server-side apps** (web app with a backend, native server-side daemon), `client_secret` is fine because the secret lives on the server. **For browser SPAs / mobile / desktop apps** — PKCE is mandatory; OAuth 2.1 (the next iteration) makes PKCE required for ALL clients regardless of confidentiality.",
+        "Move `client_secret` to `localStorage` so it's not in the bundle.",
+        "Use HTTPS — that protects the secret from the network."
+      ],
+      "correct_index": 1,
+      "explanation_md": "PKCE flow walkthrough:\n\n```\n1. Client generates code_verifier = random 43-128 char string.\n2. Client computes code_challenge = base64url(sha256(code_verifier)).\n3. Client redirects to auth server with code_challenge + code_challenge_method=S256.\n4. User authenticates; auth server stores the challenge alongside the issued code.\n5. Auth server redirects back with the authorization code.\n6. Client POSTs code + code_verifier to the token endpoint.\n7. Auth server verifies sha256(code_verifier) == code_challenge.\n8. If match, returns access_token. No client_secret involved.\n```\n\nThe attacker who intercepts the redirect URL (sees the `code`) cannot exchange it without the `code_verifier`, which never left the client.\n\n**Implicit flow** (where the access token came back directly in the redirect URL) was the old solution for public clients and is now **deprecated** because the token lived in the URL — browser history, server logs, `Referer` headers. PKCE + authorization code is the modern replacement.\n\n**Server-side OAuth flows** (your web app's backend doing the exchange) keep using `client_secret` — that's the 'confidential client' case OAuth was originally designed for. The trap is when teams write a browser-only OAuth client and copy a server-side example that uses `client_secret` without realizing the bundle ships the secret to every visitor."
+    },
+
+    {
+      "id": "m4-s7-c13",
+      "type": "flip",
+      "topic": "CORS basics: same-origin policy and the opt-in mechanism",
+      "topic_ru": "CORS-основы: same-origin policy и opt-in механика",
+      "difficulty": 3,
+      "tags": ["security", "cors", "same-origin", "interview-warmup"],
+      "question": "What is the same-origin policy, and how does CORS extend it? When does the browser actually block requests vs hide responses?",
+      "answer": "**Same-origin policy:** browsers prevent JavaScript loaded from one origin (`scheme + host + port`) from reading responses from a different origin. JS on `https://app.example.com` cannot `fetch(\"https://api.other.com/data\")` and read the response by default.\n\n**CORS (Cross-Origin Resource Sharing)** is the server-side mechanism to **opt in** to cross-origin requests by sending specific response headers:\n\n- `Access-Control-Allow-Origin: https://app.example.com` — allow this specific origin to read responses.\n- `Access-Control-Allow-Origin: *` — allow any origin.\n- `Access-Control-Allow-Credentials: true` — allow cookies / auth headers to be sent (with caveats; see `m4-s7-c14`).\n\n**Critical mental model: the browser usually doesn't BLOCK the request — it BLOCKS THE RESPONSE from JS.** For simple requests, the request reaches the server, the server executes the handler (queries the DB, performs side effects), and returns a response. The browser then checks the CORS headers on the response. If they don't permit the requesting origin, the browser refuses to expose the response body to JS, BUT the server side-effect already happened. (Note: for preflight requests — see `m4-s7-c15` — the browser does block the actual request entirely if the preflight check fails.)\n\n**Practical consequence:** CORS is exclusively a browser-enforced guardrail to protect users from malicious cross-origin JS. `curl`, Postman, and server-to-server calls ignore CORS entirely; CORS is not server-side request blocking.",
+      "answer_explanation_md": "**Why the policy exists:** without same-origin, malicious JS on `evil.com` could `fetch(\"https://bank.example.com/balance\")` while the user is logged into the bank (cookies sent automatically), read the response, and exfiltrate the user's data. Same-origin blocks the read, neutralizing this attack class.\n\n**'Origin' is precise:** `scheme + host + port`. Different in *any* of those = different origin.\n\n```\nhttps://app.example.com      vs   http://app.example.com       (different scheme)\nhttps://app.example.com      vs   https://api.example.com      (different host)\nhttps://app.example.com      vs   https://app.example.com:8080 (different port)\nhttps://app.example.com      vs   https://app.example.com/foo  (SAME — path doesn't count)\n```\n\n**What 'simple request' means** (no preflight): GET / POST / HEAD with no custom headers (only standard ones like `Accept`, `Content-Language`) and content type one of `application/x-www-form-urlencoded`, `text/plain`, or `multipart/form-data`. Anything else (PUT, DELETE, `Authorization: Bearer`, `Content-Type: application/json`) triggers preflight — see `m4-s7-c15`."
+    },
+
+    {
+      "id": "m4-s7-c14",
+      "type": "multiple_choice",
+      "topic": "Access-Control-Allow-Origin: * + credentials — browser rejection",
+      "topic_ru": "Access-Control-Allow-Origin: * + credentials — браузер отклоняет",
+      "difficulty": 4,
+      "tags": ["security", "cors", "credentials", "wildcard", "subtle"],
+      "question": "Your API needs to accept authenticated cross-origin requests (cookies sent across origins). You configure these CORS headers. The browser console shows an error. Why?\n\n```http\nAccess-Control-Allow-Origin: *\nAccess-Control-Allow-Credentials: true\n```",
+      "options": [
+        "These headers are missing a comma; combine them on one line.",
+        "**Browsers reject this combination as a SECURITY GUARDRAIL.** The CORS spec forbids `Access-Control-Allow-Origin: *` together with `Access-Control-Allow-Credentials: true`. Reasoning: `*` means 'any origin can read this response', and combined with credentials it would mean 'any origin can read responses to authenticated requests', which would let `evil.com` make authenticated requests against your API using the user's cookies and read the response. **The fix is to explicitly name the allowed origin instead of using `*`:**\n\n```http\nAccess-Control-Allow-Origin: https://app.example.com\nAccess-Control-Allow-Credentials: true\nVary: Origin\n```\n\nFor multi-origin allowlists, your server reads the request's `Origin` header, validates it against an internal list of allowed origins, and echoes it back if approved (always with `Vary: Origin` so caches don't return the wrong origin's response to a different client). **The browser will refuse to expose the response** to JS until both rules are satisfied: an explicit (non-wildcard) origin, and `Allow-Credentials: true`. Cross-link to `m4-s7-c13` for the basic CORS opt-in; this card is the security-guardrail subtlety on top of it.",
+        "`Access-Control-Allow-Credentials` must be a quoted string `\"true\"`.",
+        "These two headers cancel each other out; remove one."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — the headers don't combine; each `Set-Cookie`-style header is its own line.",
+        "Correct. The interview-relevant version: senior engineers reach for 'explicit origin allowlist + Vary: Origin' for any API that takes cross-origin authenticated requests. The wildcard-plus-credentials combination is a common misconfiguration — devs add `*` while testing and then enable credentials without realizing the browser will reject the combination. The browser-side rejection is *intentional*, not a bug; the spec deliberately makes the dangerous combination impossible.",
+        "Wrong — `Access-Control-Allow-Credentials: true` (unquoted) is the correct form per the spec. Header values are strings; this one accepts only `true` (boolean false is signaled by omitting the header).",
+        "Wrong — both headers serve legitimate purposes; the problem is that the SPECIFIC combination (`*` origin AND `true` credentials) is forbidden, not that either header alone is wrong."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c15",
+      "type": "multiple_choice",
+      "topic": "CORS preflight — when does the browser send OPTIONS first?",
+      "topic_ru": "CORS preflight — когда браузер шлёт OPTIONS первым?",
+      "difficulty": 3,
+      "tags": ["security", "cors", "preflight", "options", "interview-classic"],
+      "question": "Which of these cross-origin requests triggers a CORS preflight `OPTIONS` request, and which goes through directly?\n\n```\n(A)  GET /api/data\n(B)  POST /api/users   (Content-Type: application/x-www-form-urlencoded)\n(C)  POST /api/users   (Content-Type: application/json)\n(D)  DELETE /api/users/42\n(E)  GET /api/data     (Authorization: Bearer <token>)\n```",
+      "options": [
+        "All five trigger preflight — every cross-origin request gets an OPTIONS.",
+        "**(A) and (B) are 'simple' requests** — no preflight. The browser sends them directly and applies CORS to the response. **(C), (D), and (E) trigger a preflight `OPTIONS` request** because they're non-simple: (C) uses `Content-Type: application/json` (not one of the simple types `x-www-form-urlencoded`/`text/plain`/`multipart/form-data`); (D) uses the `DELETE` method (not `GET`/`POST`/`HEAD`); (E) includes a custom header (`Authorization`). For non-simple requests, the browser sends `OPTIONS /api/...` first with `Access-Control-Request-Method` and `Access-Control-Request-Headers` headers describing the intended actual request. The server must respond with matching `Access-Control-Allow-Method` and `Access-Control-Allow-Headers`; only then does the browser send the actual request. Preflight responses can include `Access-Control-Max-Age: 86400` to cache the preflight result and skip it for subsequent requests in the same session.",
+        "Only (D) triggers preflight — DELETE is the only non-simple method.",
+        "None of them trigger preflight on modern browsers."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — 'simple' requests (matching specific constraints on method, headers, and content type) skip preflight by design.",
+        "Correct. The three things that trigger preflight (any one of them is enough):\n\n1. **Non-simple method** — anything other than GET, POST, HEAD.\n2. **Non-simple content type** — anything other than `application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`.\n3. **Custom request headers** — anything beyond the CORS-safe list (`Accept`, `Accept-Language`, `Content-Language`, `Content-Type`). `Authorization` is custom; any `X-*` header is custom.\n\n**Most modern APIs trigger preflight** because they use JSON content types and `Authorization: Bearer` headers — both non-simple. This is fine operationally; preflight adds one round trip on the first request of each path, then can be cached via `Access-Control-Max-Age`.",
+        "Wrong — DELETE triggers preflight, but so do (C) and (E). Multiple things can be non-simple at once.",
+        "Wrong — preflight is mandatory in modern browsers for non-simple requests, regardless of browser version."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c16",
+      "type": "flip",
+      "topic": "HTTPS / TLS — what it provides (and what it doesn't)",
+      "topic_ru": "HTTPS / TLS — что обеспечивает (и что нет)",
+      "difficulty": 3,
+      "tags": ["security", "https", "tls", "certificates", "interview-warmup"],
+      "question": "What three properties does TLS provide? What's encrypted vs visible to a network observer? What does TLS NOT protect against?",
+      "answer": "**TLS provides three properties:**\n\n1. **Confidentiality** — the connection content is encrypted; eavesdroppers see only ciphertext.\n2. **Integrity** — tampering with packets in flight is detected; modification breaks the cipher's MAC and the connection drops.\n3. **Server identity** — the server's certificate is signed by a Certificate Authority (CA) the browser trusts; you're talking to the real `bank.example.com`, not a man-in-the-middle.\n\n**Encrypted:** HTTP headers, body, URL path, query string.\n\n**Visible to a network observer:**\n- Destination IP (from the IP packet header).\n- Server hostname (via TLS Server Name Indication / SNI — sent unencrypted in the ClientHello so the server can present the right certificate for multi-tenant hosting). Encrypted-SNI (ECH) is rolling out but not yet universal.\n- Packet sizes and timing (traffic analysis can infer behavior — was the user logging in? watching video? — without decrypting).\n\n**TLS does NOT protect against:**\n- **SQL injection** (server-side bug, unrelated to transport).\n- **XSS** (browser-side bug, after TLS has done its job).\n- **CORS misconfiguration** (still need correct headers over HTTPS).\n- **Server compromise** (TLS authenticates the server's identity, not the safety of its code).\n- **Phishing** (TLS proves you're connected to `bank-secure-2024-login.com` — accurately — but doesn't verify you meant to type that domain instead of `bank.com`).",
+      "answer_explanation_md": "**`Let's Encrypt`** provides free CA-signed certificates with 90-day validity and fully automated renewal. The 90-day window is deliberate: shorter cert lifetimes limit the damage if a key is compromised, and automation makes the short cycle painless. For any public service in 2026, Let's Encrypt is the default unless you have a specific reason for a paid commercial CA.\n\n**Self-signed certificates** technically provide encryption (the TLS handshake works), but no CA vouches for the identity. Browsers show a big red warning because the user has no way to verify the server is who it claims to be. Self-signed is fine for development (`localhost`, internal-only services); it's never appropriate for public-facing production.\n\n**`HSTS` (HTTP Strict Transport Security)** is a response header (`Strict-Transport-Security: max-age=31536000; includeSubDomains`) that tells browsers 'always use HTTPS for this domain, even if the user types `http://`'. Defends against downgrade attacks where a network attacker rewrites HTTPS links to HTTP. Modern best practice: enable HSTS on any HTTPS-serving site."
+    },
+
+    {
+      "id": "m4-s7-c17",
+      "type": "multiple_choice",
+      "topic": "'HTTPS makes my server secure' — what HTTPS actually protects",
+      "topic_ru": "'HTTPS делает сервер защищённым' — что HTTPS реально защищает",
+      "difficulty": 3,
+      "tags": ["security", "https", "scope", "interview-classic", "common-misconception"],
+      "question": "A teammate argues: 'We're on HTTPS, so we don't need to worry about SQL injection or password hashing or CORS — TLS handles all of that.' What's wrong with this framing?",
+      "options": [
+        "Nothing — HTTPS is a complete security solution.",
+        "**HTTPS protects the TRANSPORT (the network connection between client and server). It does NOT protect against server-side bugs.** SQL injection happens in the application code after the request has already arrived and been decrypted; the encrypted transport is irrelevant. Password storage happens in the database; how the password reached the server (HTTPS or not) is orthogonal to how the server handles it. CORS is a browser-enforced cross-origin guardrail; HTTPS doesn't fulfill that role. XSS executes in the user's browser AFTER the (encrypted) response arrived; TLS doesn't help. **The right framing:** HTTPS is a NECESSARY baseline (any modern service needs it for any meaningful security), but it's NOT a complete answer. The cross-domain threats — injection, hashing, JWT exposure, CORS, OAuth misuse, XSS, CSRF — still apply at full force on HTTPS sites. Senior engineers internalize this; junior engineers sometimes treat HTTPS as a magic shield. The interview probe is whether you can articulate the SCOPE of what TLS does and doesn't do.",
+        "HTTPS protects against everything except DDoS.",
+        "HTTPS is unnecessary if you have a firewall."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — HTTPS is a baseline, not a panacea. Treating it as complete is the misconception this card exists to fight.",
+        "Correct. **The senior signal:** the candidate names HTTPS's exact scope ('transport-layer confidentiality + integrity + server identity') and explicitly enumerates what's outside that scope (server bugs, browser bugs, configuration). This is the same kind of scope-articulation that distinguishes 'understands the security model' from 'has heard of security'. **Cross-link to the orthogonality observation across this sphere:** SQL injection (`m4-s7-c1`), password hashing (`m4-s7-c4`), JWT visibility (`m4-s7-c7`), CORS (`m4-s7-c13`–`m4-s7-c15`) all have their own defenses; HTTPS is the layer beneath them, not a substitute for any of them.",
+        "Wrong — DDoS is its own concern (rate limiting, WAF, CDN absorption), but the list of things HTTPS doesn't protect against is much broader than 'just DDoS'. SQL injection, XSS, CSRF, password storage failures, server compromise, phishing — all of these happen at full force on HTTPS sites.",
+        "Wrong — firewalls control which ports/IPs can talk to which services, but they don't encrypt traffic, don't authenticate servers, and don't replace HTTPS. The two are complementary, not substitutes."
+      ]
+    },
+
+    {
+      "id": "m4-s7-c18",
+      "type": "multiple_choice",
+      "topic": "Certificate authorities, Let's Encrypt, self-signed certs",
+      "topic_ru": "Certificate authorities, Let's Encrypt, self-signed сертификаты",
+      "difficulty": 2,
+      "tags": ["security", "https", "tls", "certificates", "letsencrypt"],
+      "question": "Three approaches to TLS certificates. Which is appropriate for which use case?\n\n```\n(A)  Self-signed certificate generated with openssl\n(B)  Let's Encrypt certificate (free, 90-day, auto-renewed via certbot)\n(C)  Paid commercial CA (DigiCert, GoDaddy, etc.) — multi-year, EV/OV options\n```",
+      "options": [
+        "(A) is the most secure — no third-party trust required.",
+        "**(A) self-signed:** appropriate for DEVELOPMENT (`localhost`, internal-only services, automated tests). NOT for production — browsers show a big red 'NET::ERR_CERT_AUTHORITY_INVALID' warning because no trusted CA vouches for the identity; users have no way to verify they're talking to the real server. **(B) Let's Encrypt:** the modern default for PUBLIC production services. Free, automated, 90-day rotation (short lifetime limits damage on key compromise; automation makes the short cycle painless). Backed by trusted CAs; recognized by all major browsers and OS trust stores. **(C) Paid commercial CA:** appropriate for organizations needing EV (Extended Validation — formerly showed a green org-name bar; now mostly dropped by browsers) or OV (Organization Validation) certs with manual identity verification, multi-domain wildcards with specific compliance requirements, or commercial-support SLAs. For typical web services without these specific needs, Let's Encrypt does the same job for free. **The 'right answer' for most 2026 production services:** Let's Encrypt via certbot or your platform's built-in TLS termination (AWS ACM, Cloudflare, Vercel, Fly.io, etc., all integrate Let's Encrypt or equivalent for free).",
+        "(C) is always best — paying for certs ensures better encryption.",
+        "All three are functionally identical; pick by price."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on framing. Self-signed doesn't avoid third-party trust; it just removes the *valid* third-party trust, leaving users with no way to verify identity. The browser warning is correct: 'I cannot tell if this is the real server'.",
+        "Correct. **The encryption strength is identical across all three** — same cipher suites, same TLS protocol, same handshake. The differences are: who *vouches* for the identity (self-signed: no one; Let's Encrypt: free automated CA; paid CA: commercial CA with optional extended validation), how *long* the cert lasts (90 days vs multi-year), and the *automation story* (Let's Encrypt automation is the modern standard).",
+        "Wrong — paid certs use the same encryption as free ones. You pay for the CA's trust + commercial support + extended validation features, not for stronger crypto.",
+        "Wrong — they have meaningfully different identity-verification properties. Self-signed has none (browsers warn); Let's Encrypt and paid CAs both provide CA-backed identity but with different validation depth and lifetime properties."
+      ]
+    }
+  ]
+}
