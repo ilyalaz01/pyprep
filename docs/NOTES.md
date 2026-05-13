@@ -1138,3 +1138,66 @@ constraint was inferred but not codified before m3-s3.
 access to stdlib + any package listed in the card's `allowlist`.
 Limited only by what fits in two files.
 
+---
+
+## N044 — code_tasks must verify pyproject.toml deps before importing non-stdlib [AUTHORING]
+
+**Phase:** 9 (m3-s4) · **Date:** 2026-05-13 · **Status:** active
+
+The host validator runs code_task pytest invocations using the
+project's own Python environment (via `[sys.executable, "-m",
+"pytest", ...]`). Imports inside `solution.py` or `test_solution.py`
+resolve against **what's installed in that env**, not against an
+isolated minimal interpreter.
+
+**Implication:** a code_task that imports `requests`, `pytest-cov`,
+`numpy`, `pandas`, or any other third-party package fails at validation
+time with `ModuleNotFoundError` if the package isn't in
+`pyproject.toml` dependencies.
+
+**Authoring rule:** before authoring a code_task that imports a
+non-stdlib package, verify the package is in `pyproject.toml` deps.
+If absent, choose one of:
+
+1. **Switch to stdlib equivalent.** Most teaching scenarios have a
+   stdlib mirror — `urllib.request` for `requests`, `http.client` for
+   low-level HTTP, `subprocess` for shelling out, `csv` for CSV, etc.
+   The mocking / patching / error-handling pedagogy transfers
+   one-to-one.
+2. **Inject the dependency as a parameter.** Instead of
+   `solution.py` doing `import third_party_thing`, design the
+   function to take the dependency as an argument; the test passes a
+   `Mock()`. This is also better production-code shape (dependency
+   injection at the boundary).
+3. **Route through code_trap / multiple_choice.** The card teaches
+   the same concept without executing code. Predict-the-output is
+   often *better* pedagogy for library-specific behavior than asking
+   the learner to write against the library.
+
+**Discovery:** m3-s4-c9 first attempt imported `requests` directly;
+validator failed with `ModuleNotFoundError: No module named 'requests'`.
+Rewrote with `urllib.request` (stdlib); same patch-where-used lesson,
+same difficulty rating, no harness changes. Lesson preserved.
+
+**Currently-available third-party packages** (from `pyproject.toml`
+as of 2026-05-13): `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`,
+`email-validator`, `pyyaml`, `pytest`, `pytest-cov`, `pytest-asyncio`,
+`jsonschema`, `httpx`, `passlib`, `python-jose`, `python-multipart`,
+`alembic`, `sqlalchemy`. Anything outside this list is unavailable
+to code_task execution.
+
+**Pyodide harness has a different constraint surface:** Pyodide
+ships with its own bundled package set (numpy, pandas, matplotlib,
+pyyaml, requests-like via pyfetch, etc.) but those need explicit
+`loadPackage()` or `micropip.install()` calls. The host validator's
+deps and Pyodide's available packages are *not the same set*. A
+code_task that validates on host might fail in the browser if its
+imports aren't in Pyodide's allowlist. Default to stdlib where
+possible to dodge both constraints at once.
+
+**Related:** N039 (Pyodide-vs-CPython divergences), N043 (single-
+file harness constraint). The three together form the emerging
+"code_task authoring constraints" cluster; promotion to a dedicated
+appendix in `PRD_code_sandbox.md` is on the post-Module-4 polish
+todo list per owner brief.
+
