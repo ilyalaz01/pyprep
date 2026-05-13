@@ -1,0 +1,269 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 4,
+  "sphere_id": "m4-s4",
+  "cards": [
+    {
+      "id": "m4-s4-c1",
+      "type": "flip",
+      "topic": "SELECT + WHERE basics + AND / OR / IN / LIKE / ORDER BY / LIMIT",
+      "topic_ru": "Основы SELECT + WHERE + AND / OR / IN / LIKE / ORDER BY / LIMIT",
+      "difficulty": 2,
+      "tags": ["sql", "select", "where", "interview-warmup"],
+      "question": "Walk through a typical filter-and-paginate query. What do `WHERE ... AND ... OR ...`, `IN (...)`, `LIKE 'A%'`, `ORDER BY ... DESC`, and `LIMIT 10 OFFSET 20` each do?",
+      "answer": "```sql\nSELECT id, name, age\nFROM users\nWHERE age >= 18 AND (status = 'active' OR status = 'pending')\n  AND country IN ('IL', 'US', 'DE')\n  AND name LIKE 'A%'\nORDER BY created_at DESC\nLIMIT 10 OFFSET 20;\n```\n\n- `WHERE age >= 18 AND (...)` — row-level filter; `AND` requires both, `OR` requires either, parentheses control precedence (AND binds tighter than OR by default).\n- `IN ('IL', 'US', 'DE')` — match any value in the list (equivalent to `country = 'IL' OR country = 'US' OR country = 'DE'`).\n- `LIKE 'A%'` — pattern match: `%` is the multi-char wildcard, `_` is the single-char wildcard. So `'A%'` is 'starts with A', `'%@gmail.com'` is 'ends with @gmail.com', `'_lice'` is 'one char then lice' (matches `Alice` but not `Aslice`).\n- `ORDER BY created_at DESC` — sort by `created_at`, newest first (default is `ASC`).\n- `LIMIT 10 OFFSET 20` — pagination: skip 20 rows, return up to 10 (so rows 21–30 in `ORDER BY` order).",
+      "answer_explanation_md": "`SELECT *` returns every column — convenient for ad-hoc exploration in `psql`, fragile in production code (adding a column changes the result-set shape; ORMs and consumers can break silently). Production code lists columns explicitly: `SELECT id, name, email FROM users`.\n\n`ORDER BY` matters for `LIMIT` / `OFFSET` to be deterministic. Without `ORDER BY`, the database is free to return rows in any order — usually consistent within one execution but not guaranteed across pages. Always pair `LIMIT/OFFSET` with `ORDER BY` (and ideally a tie-breaker like `id` to make ordering total when the primary sort key has duplicates).\n\n**Pagination caveat:** `OFFSET 1000000` is expensive — the database has to compute and discard the first million rows. For deep pagination, switch to keyset pagination (`WHERE id > $last_seen_id ORDER BY id LIMIT 10`), which uses an index lookup instead of a counted scan."
+    },
+
+    {
+      "id": "m4-s4-c2",
+      "type": "code_trap",
+      "topic": "WHERE col = NULL silently returns zero rows — use IS NULL",
+      "topic_ru": "WHERE col = NULL молча возвращает 0 строк — нужно IS NULL",
+      "difficulty": 4,
+      "tags": ["sql", "null", "where", "interview-classic", "subtle"],
+      "code_snippet": "-- users:  id  | name   | email\n--         1  | Alice  | alice@x.com\n--         2  | Bob    | NULL\n--         3  | Carol  | NULL\n\n-- We want users with no email. Beginner writes:\nSELECT * FROM users WHERE email = NULL;\n-- 0 rows. Why?",
+      "question": "Why does `WHERE email = NULL` return zero rows even though two rows have NULL emails, and what's the correct query?",
+      "options": [
+        "`NULL` is interpreted as the literal string 'NULL'; you need to escape it.",
+        "**`NULL` is not a value; it represents 'unknown'. Comparisons with NULL evaluate to NULL (a third truth value besides TRUE and FALSE), and `WHERE` filters out anything that isn't TRUE.** So `email = NULL` evaluates to `NULL` for every row — including rows where `email` IS NULL, because 'NULL = NULL' is also NULL (not TRUE; you can't know if two unknowns are equal). The correct form is `WHERE email IS NULL` (or `IS NOT NULL`), which is special syntax that does NULL-aware comparison. **Same trap applies to `<>` and `!=`:** `WHERE email <> 'alice@x.com'` ALSO excludes rows where email IS NULL, because `NULL <> 'alice@x.com'` is NULL (not TRUE). If you want 'not Alice OR no email', you have to write it explicitly: `WHERE email <> 'alice@x.com' OR email IS NULL`.",
+        "PostgreSQL requires `WHERE email = NULL::text` with an explicit cast.",
+        "It returns zero rows because the query is invalid SQL and silently no-ops."
+      ],
+      "correct_index": 1,
+      "explanation_md": "SQL uses three-valued logic: TRUE, FALSE, and NULL (sometimes called UNKNOWN). The relevant rules:\n\n- `NULL = anything` → NULL\n- `NULL <> anything` → NULL\n- `NULL = NULL` → NULL (not TRUE — you cannot know if two unknowns are equal)\n- `NULL AND TRUE` → NULL; `NULL AND FALSE` → FALSE; `NULL OR TRUE` → TRUE; `NULL OR FALSE` → NULL\n- `WHERE` keeps rows where the expression evaluates to **TRUE only** (NULL and FALSE are both filtered out).\n\nThe NULL-aware operators:\n\n```sql\nWHERE col IS NULL          -- only NULL\nWHERE col IS NOT NULL      -- anything but NULL\nWHERE col IS DISTINCT FROM 'x'      -- NULL-safe inequality (treats NULL as a value)\nWHERE col IS NOT DISTINCT FROM 'x'  -- NULL-safe equality\nWHERE COALESCE(col, '') = 'x'       -- treat NULL as a default before comparing\n```\n\nThe NULL trap recurs across SQL: aggregates (`m4-s4-c8`, `m4-s4-c9`) and joins (`m4-s4-c15` anti-join) each have their own NULL story. **Internalizing NULL semantics is the single highest-leverage SQL skill** for interview signal."
+    },
+
+    {
+      "id": "m4-s4-c3",
+      "type": "fill_in",
+      "topic": "LIKE wildcards: % (any) and _ (single char)",
+      "topic_ru": "Шаблоны LIKE: % (любые) и _ (одиночный символ)",
+      "difficulty": 2,
+      "tags": ["sql", "like", "pattern-matching"],
+      "code_snippet_with_blanks": "-- Three pattern-match queries. Fill in the LIKE expression:\n\n-- Names starting with 'A':\nSELECT * FROM users WHERE name LIKE '___';\n\n-- Emails ending with '@gmail.com':\nSELECT * FROM users WHERE email LIKE '___';\n\n-- Names with exactly one character before 'lice' (matches 'Alice', NOT 'Aslice'):\nSELECT * FROM users WHERE name LIKE '___';",
+      "accepted_answers": [
+        ["A%"],
+        ["%@gmail.com"],
+        ["_lice"]
+      ],
+      "explanation_md": "Two LIKE wildcards:\n\n- **`%`** — matches **zero or more** characters of any kind. `'A%'` is 'starts with A'; `'%search%'` is 'contains search'; `'%.pdf'` is 'ends with .pdf'.\n- **`_`** — matches **exactly one** character. `'_lice'` matches 5-letter names ending in `lice` (Alice, Slice, ...); `'A____'` matches names exactly 5 chars long starting with A.\n\n**Escape literals** with `ESCAPE`: `LIKE '50\\%' ESCAPE '\\'` matches the literal string `50%`.\n\n**Case sensitivity** depends on the database and collation:\n\n- PostgreSQL `LIKE` is case-SENSITIVE; use `ILIKE` for case-insensitive (or `LOWER(col) LIKE LOWER(pattern)` for portability).\n- MySQL `LIKE` is case-insensitive by default (depends on column collation).\n- SQLite `LIKE` is case-insensitive for ASCII by default.\n\n**Performance note:** `LIKE 'prefix%'` (no leading wildcard) can use a B-tree index. `LIKE '%suffix'` and `LIKE '%middle%'` cannot — they trigger a full scan. For leading-wildcard searches at scale, use a full-text index or trigram index instead."
+    },
+
+    {
+      "id": "m4-s4-c4",
+      "type": "flip",
+      "topic": "INSERT / UPDATE / DELETE basics + multi-row + RETURNING",
+      "topic_ru": "Основы INSERT / UPDATE / DELETE + multi-row + RETURNING",
+      "difficulty": 2,
+      "tags": ["sql", "insert", "update", "delete", "interview-warmup"],
+      "question": "Write the three DML statements that: (a) insert one row into `users`, (b) update Alice's age to 31, (c) delete the user with id 5. Show the multi-row INSERT form and the Postgres `RETURNING` clause too.",
+      "answer": "```sql\n-- INSERT one row:\nINSERT INTO users (email, age) VALUES ('a@x.com', 30);\n\n-- INSERT multiple rows in one statement (more efficient than N separate INSERTs):\nINSERT INTO users (email, age) VALUES\n  ('a@x.com', 30),\n  ('b@y.com', 25),\n  ('c@z.com', 40);\n\n-- UPDATE specific rows:\nUPDATE users SET age = 31 WHERE name = 'Alice';\n\n-- DELETE specific rows:\nDELETE FROM users WHERE id = 5;\n\n-- Postgres: see the affected rows in the response\nINSERT INTO users (email) VALUES ('a@x.com') RETURNING id, created_at;\nUPDATE users SET age = 31 WHERE id = 5 RETURNING *;\nDELETE FROM users WHERE id = 5 RETURNING name, email;\n```",
+      "answer_explanation_md": "The three DML statements share one absolute rule: **`UPDATE` and `DELETE` MUST include a `WHERE` clause** unless you genuinely intend to change/delete every row. `UPDATE users SET age = 31` (no WHERE) sets EVERY user's age to 31. `DELETE FROM users` (no WHERE) empties the table. Both run silently — covered in `m4-s4-c5`.\n\nMulti-row INSERT is faster than N single-row INSERTs because (a) only one round-trip to the database, (b) only one transaction (implicit per statement) instead of N. For bulk ingest, batch into multi-row INSERTs of ~100–1000 rows each, not 1 row per statement.\n\nThe `RETURNING` clause (PostgreSQL, SQLite 3.35+) lets a single round-trip both modify and return — useful for getting auto-generated IDs after INSERT (`INSERT ... RETURNING id`), or for showing 'these are the rows I just deleted' as a sanity check before commit."
+    },
+
+    {
+      "id": "m4-s4-c5",
+      "type": "code_trap",
+      "topic": "UPDATE / DELETE without WHERE — the production disaster",
+      "topic_ru": "UPDATE / DELETE без WHERE — производственная катастрофа",
+      "difficulty": 4,
+      "tags": ["sql", "update", "delete", "where", "danger", "incident", "interview-classic"],
+      "code_snippet": "-- DBA console session. You meant to set ONE user's status, but autocomplete betrayed you:\n\nBEGIN;\nUPDATE users SET status = 'banned';   -- typed early, forgot the WHERE\n-- Affected: 4,521,012 rows.   <-- everyone is now banned\n\nROLLBACK;   -- you caught it because of BEGIN/COMMIT discipline",
+      "question": "Two questions: (a) without `BEGIN/ROLLBACK`, what state would the table be in after the bad UPDATE? (b) Name two disciplines that prevent this disaster.",
+      "options": [
+        "(a) The UPDATE would auto-cancel because no WHERE clause. (b) Use stronger autocomplete.",
+        "**(a) Every row in `users` would be permanently set to `status = 'banned'`** — a missing `WHERE` is valid SQL meaning 'all rows'. There is NO automatic confirmation, NO warning, NO undo. The only thing that saved this session was running inside an explicit transaction (`BEGIN`); `ROLLBACK` undid the change. Without it, you'd be restoring from backup. **(b) Disciplines:** (1) **Type the `WHERE` clause first**, then prepend `UPDATE / DELETE` — hard to forget what you typed first. (2) **Wrap destructive statements in a transaction**: `BEGIN; UPDATE ...; -- check row count; SELECT ... ; COMMIT;` (or `ROLLBACK` to abort). (3) **Mirror the WHERE with a SELECT first**: `SELECT * FROM users WHERE id = 5;` confirms the target, then change `SELECT *` to `UPDATE ... SET ... `. (4) **Set autocommit OFF** in your client (`\\set AUTOCOMMIT off` in psql) so every statement runs inside an implicit transaction needing explicit COMMIT.",
+        "(a) Postgres requires `--force-empty-where` to allow UPDATE without WHERE. (b) Just don't make typos.",
+        "(a) The whole transaction errors out because UPDATE without WHERE is a syntax error. (b) The DB enforces it."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The 'forgot the WHERE' incident is one of the canonical SQL disaster shapes (alongside `DROP TABLE` typos and unqualified deletes via ORM bugs). It happens to senior engineers; the only defense is process discipline, not skill.\n\nThe most-bang-for-buck single discipline: **always work inside an explicit transaction when running ad-hoc DML on production**:\n\n```sql\nBEGIN;\nUPDATE users SET status = 'inactive' WHERE last_login < '2025-01-01';\n-- Postgres tells you: UPDATE 1247\n-- Sanity-check before committing:\nSELECT count(*) FROM users WHERE status = 'inactive' AND last_login >= '2025-01-01';\n-- Should be 0. If not, ROLLBACK.\nCOMMIT;   -- only if happy\n```\n\nMany teams set their `psql` config so transactions are required (`\\set AUTOCOMMIT off`), making the BEGIN implicit and the COMMIT explicit. Some database UIs (DataGrip, DBeaver, TablePlus) prompt before running UPDATE / DELETE without a WHERE clause — useful but not bulletproof.\n\nThe interview probe — 'worst thing you can do with an UPDATE?' — is testing whether you've internalized this. The right answer is the missing WHERE plus the prevention disciplines, not just the syntax."
+    },
+
+    {
+      "id": "m4-s4-c6",
+      "type": "multiple_choice",
+      "topic": "INSERT ... ON CONFLICT (upsert) + multi-row pattern",
+      "topic_ru": "INSERT ... ON CONFLICT (upsert) + multi-row паттерн",
+      "difficulty": 3,
+      "tags": ["sql", "insert", "upsert", "on-conflict", "postgres"],
+      "question": "You want to insert a user, but if the email already exists, update the existing row's `last_seen` timestamp instead of erroring out. Which Postgres clause expresses this?\n\n```sql\nINSERT INTO users (email, last_seen)\nVALUES ('a@x.com', NOW())\n???\n```",
+      "options": [
+        "`UPDATE OR INSERT` — Postgres has a dedicated keyword for this.",
+        "**`ON CONFLICT (email) DO UPDATE SET last_seen = EXCLUDED.last_seen`** — Postgres's `ON CONFLICT` clause turns an INSERT into an 'upsert'. `(email)` names the unique-constraint column that conflicts can be detected on (must have a UNIQUE index or PRIMARY KEY). `DO UPDATE SET ...` says what to do on conflict; `EXCLUDED` is a special table-alias referring to the row that *would have been* inserted. Alternative: `ON CONFLICT (email) DO NOTHING` — silently ignore the duplicate. **Why this beats the obvious alternative** (`SELECT first, then INSERT or UPDATE based on the result`): the upsert is **atomic** — there's no race window between the SELECT and the INSERT where another transaction could insert the same email and your code would still issue an INSERT that then fails. With concurrency, the SELECT-then-INSERT pattern needs explicit locking; `ON CONFLICT` does the right thing in one round-trip.",
+        "`MERGE INTO users USING ...` — `MERGE` is the only standard-SQL form.",
+        "Postgres doesn't support upserts; do `SELECT` then `INSERT or UPDATE` in application code."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong — there's no `UPDATE OR INSERT` keyword. The Postgres syntax is `INSERT ... ON CONFLICT ... DO UPDATE / DO NOTHING`.",
+        "Correct. The full pattern:\n\n```sql\nINSERT INTO users (email, last_seen)\nVALUES ('a@x.com', NOW())\nON CONFLICT (email)\nDO UPDATE SET last_seen = EXCLUDED.last_seen;\n```\n\nThe atomicity matters in production — multi-instance services where two requests might try to insert the same email simultaneously rely on this to avoid race-condition duplicates and serialization errors.",
+        "Wrong on availability. `MERGE` is in the SQL standard and supported by Postgres 15+, but `ON CONFLICT` predates it in Postgres and is more idiomatic for the upsert case. `MERGE` is broader (handles INSERT + UPDATE + DELETE in one statement); `ON CONFLICT` is the focused upsert form.",
+        "Wrong — `ON CONFLICT` (since Postgres 9.5) and `MERGE` (since 15) are both first-class. The SELECT-then-INSERT pattern is exactly what `ON CONFLICT` exists to avoid."
+      ]
+    },
+
+    {
+      "id": "m4-s4-c7",
+      "type": "flip",
+      "topic": "Aggregates: COUNT / SUM / AVG / MAX / MIN basics",
+      "topic_ru": "Агрегаты: COUNT / SUM / AVG / MAX / MIN основы",
+      "difficulty": 2,
+      "tags": ["sql", "aggregates", "count", "sum", "avg"],
+      "question": "What do `COUNT(*)`, `COUNT(col)`, `COUNT(DISTINCT col)`, `SUM(col)`, `AVG(col)`, `MAX(col)`, `MIN(col)` each return?",
+      "answer": "- `COUNT(*)` — total **rows** in the result. Counts every row, regardless of NULLs in any column.\n- `COUNT(col)` — count of rows where `col IS NOT NULL`. **NULLs are excluded.**\n- `COUNT(DISTINCT col)` — count of **unique non-NULL values** in `col`.\n- `SUM(col)` — sum of non-NULL numeric values. **Returns NULL if all values are NULL** (not 0).\n- `AVG(col)` — average of non-NULL values. Denominator is `COUNT(col)`, not `COUNT(*)`.\n- `MAX(col)` / `MIN(col)` — largest / smallest non-NULL value. Works on numbers, dates, and strings (strings are compared lexicographically).",
+      "answer_explanation_md": "Every aggregate except `COUNT(*)` ignores NULLs. This isn't a quirk — it's the SQL standard, and it follows from the three-valued logic covered in `m4-s4-c2`: you can't include 'unknown' in an arithmetic operation meaningfully.\n\nThe most common pitfall is treating `AVG` as 'sum divided by row count'. It isn't; it's 'sum of non-NULL divided by count of non-NULL'. See `m4-s4-c9` for the worked example.\n\n`SUM` returning NULL on an all-NULL input is also worth knowing: `SUM(deleted_amount) FROM orders WHERE id = 0` returns NULL (no rows), not 0. Use `COALESCE(SUM(col), 0)` when you want a numeric default.\n\nAggregates with no `GROUP BY` operate on the entire result set and return a single row. With `GROUP BY` they operate per-group (see `m4-s4-c10`)."
+    },
+
+    {
+      "id": "m4-s4-c8",
+      "type": "multiple_choice",
+      "topic": "COUNT(*) vs COUNT(col) — NULL handling",
+      "topic_ru": "COUNT(*) vs COUNT(col) — обработка NULL",
+      "difficulty": 4,
+      "tags": ["sql", "count", "null", "aggregates", "interview-classic", "subtle"],
+      "question": "Given this `orders` table:\n\n```\nid | customer_id | amount\n 1 |     42      | 100\n 2 |     NULL    |  50    -- guest checkout, no customer\n 3 |     42      | NULL   -- amount pending\n 4 |     NULL    | NULL\n```\n\nWhat do these three queries return?\n\n```sql\n(A)  SELECT COUNT(*)            FROM orders;\n(B)  SELECT COUNT(customer_id)  FROM orders;\n(C)  SELECT COUNT(DISTINCT customer_id) FROM orders;\n```",
+      "options": [
+        "All three return 4 — COUNT always counts rows.",
+        "**(A) `COUNT(*)` = 4** — counts every row in the result, regardless of NULL columns. **(B) `COUNT(customer_id)` = 2** — counts rows where `customer_id IS NOT NULL` (rows 1 and 3). **(C) `COUNT(DISTINCT customer_id)` = 1** — counts unique non-NULL `customer_id` values (just `42`; NULLs are excluded from DISTINCT too). **The rule:** `COUNT(*)` is for 'how many rows'; `COUNT(col)` is for 'how many non-NULL values'; `COUNT(DISTINCT col)` is for 'how many unique non-NULL values'. NULL is consistently excluded by every form except `COUNT(*)` (which doesn't look at column values at all, just counts rows).",
+        "(A) 4, (B) 4 (NULL counts as 0), (C) 3 (DISTINCT keeps NULL).",
+        "(A) 2, (B) 2, (C) 1 — `COUNT` always skips rows with any NULLs."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on (B) and (C). `COUNT(col)` excludes NULLs in `col`; `COUNT(DISTINCT col)` also excludes NULLs and only counts unique values.",
+        "Correct. This is the SQL aggregate's most-asked NULL question. Memorize: **`COUNT(*)` ignores NULLs; everything else excludes them**. The reason `COUNT(*)` differs is that it doesn't reference a column at all — it's literally 'count of rows in the result set', orthogonal to NULL semantics. Cross-link to `m4-s4-c2` (NULL is not a value) and `m4-s4-c9` (AVG NULL semantics).",
+        "Wrong. NULLs do NOT count as 0 in `COUNT(col)` — they're excluded entirely (giving 2, not 4). `COUNT(DISTINCT customer_id)` excludes NULLs too (giving 1, not 3).",
+        "Wrong on (A). `COUNT(*)` counts every row including rows with all-NULL columns (4, not 2). `COUNT(col)` only skips rows where THAT column is NULL, not rows with any NULL."
+      ]
+    },
+
+    {
+      "id": "m4-s4-c9",
+      "type": "code_trap",
+      "topic": "AVG ignores NULLs — denominator is non-NULL count, not row count",
+      "topic_ru": "AVG игнорирует NULL — знаменатель = число не-NULL, не строк",
+      "difficulty": 4,
+      "tags": ["sql", "avg", "sum", "null", "aggregates", "subtle", "interview-classic"],
+      "code_snippet": "-- employees table:\n-- name    | salary\n-- Alice   | 100\n-- Bob     | 200\n-- Carol   | NULL   -- on unpaid leave, salary not set\n-- Dave    | 400\n\nSELECT AVG(salary) FROM employees;",
+      "question": "What does `AVG(salary)` return for this table?",
+      "options": [
+        "`175.0` — sum / row count = (100 + 200 + 0 + 400) / 4. NULL counts as 0.",
+        "**`233.33` — sum of non-NULL values divided by count of non-NULL values: (100 + 200 + 400) / 3 = 233.33.** AVG (like SUM, MAX, MIN) **ignores NULLs entirely** — NULLs are not treated as 0; they're excluded from BOTH the sum AND the count. The denominator is `COUNT(salary)` (3), not `COUNT(*)` (4). **Why this matters:** if you specifically want the 'NULL means 0' semantics, you must opt in explicitly: `AVG(COALESCE(salary, 0))` would give 175. If you want a different mean (e.g., 'average over all employees including those without a recorded salary'), you have to choose what NULL means in your domain — the database refuses to guess. **Defensive check:** when reporting an average from a column that might have NULLs, always sanity-check the row count vs the non-NULL count: `SELECT COUNT(*), COUNT(salary), AVG(salary), AVG(COALESCE(salary, 0)) FROM employees;` shows the full picture in one query.",
+        "`NULL` — any NULL in the input makes the whole aggregate NULL.",
+        "Errors out — AVG refuses to operate on a column with NULLs without an explicit NULL handler."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The SQL standard mandates NULL-ignoring behavior for `SUM`, `AVG`, `MAX`, `MIN`. The mental model: **aggregates are computed over the column's *known values* only**. NULL means 'unknown', and you can't sum or average unknowns meaningfully — so they're dropped from the calculation entirely.\n\nThe consequences:\n\n```sql\nSELECT\n  COUNT(*)                          AS total_rows,        -- 4\n  COUNT(salary)                     AS rows_with_salary,  -- 3\n  SUM(salary)                       AS total_salary,      -- 700\n  AVG(salary)                       AS avg_known,         -- 233.33\n  SUM(salary) / COUNT(*)            AS avg_assume_zero,   -- 175.0\n  AVG(COALESCE(salary, 0))          AS avg_explicit_zero  -- 175.0\nFROM employees;\n```\n\nFour different interpretations of 'average salary', three different numbers — pick the one that matches your domain question.\n\nA special case: **`AVG` on an empty result set (or all-NULL column) returns NULL**, not zero, not error. `COALESCE(AVG(salary), 0)` gives a safe zero when 'no data' should display as 0.\n\nCross-link to `m4-s4-c2` (NULL semantics) and `m4-s4-c8` (COUNT/NULL). The three-card NULL story across this sphere is meant to be read together — each card builds the same principle in a different context."
+    },
+
+    {
+      "id": "m4-s4-c10",
+      "type": "flip",
+      "topic": "GROUP BY mechanics + every non-aggregated column rule",
+      "topic_ru": "Механика GROUP BY + правило каждой не-агрегированной колонки",
+      "difficulty": 3,
+      "tags": ["sql", "group-by", "aggregates"],
+      "question": "Write the SQL for 'headcount and average salary per department'. What's the rule about which columns can appear in `SELECT` when using `GROUP BY`?",
+      "answer": "```sql\nSELECT department, COUNT(*) AS headcount, AVG(salary) AS avg_salary\nFROM employees\nGROUP BY department;\n```\n\n**The rule:** every column in `SELECT` must either be (a) listed in `GROUP BY`, or (b) wrapped in an aggregate function (`COUNT`, `SUM`, `AVG`, `MAX`, `MIN`, etc.).\n\nThe reason: after `GROUP BY department` collapses many rows into one row per department, the database doesn't know which `name` (out of many) to put in the output for that department. So either you group by `name` (then each name is its own group), or you aggregate it (`MAX(name)`, `STRING_AGG(name, ', ')`, etc.).\n\nViolating the rule produces (in Postgres) `column \"name\" must appear in the GROUP BY clause or be used in an aggregate function`. MySQL historically allowed it and returned a random row's value; modern strict modes reject it like Postgres.",
+      "answer_explanation_md": "The mental model: think of `GROUP BY department` as folding all rows with the same department into a single conceptual row. That folded row has one well-defined value for `department` (it's the grouping key) and N values for everything else — you have to tell SQL how to reduce those N values to one.\n\nThe most useful aggregate-shaped reductions of non-key columns:\n\n```sql\nSTRING_AGG(name, ', ')        -- 'Alice, Bob, Carol' — Postgres/SQLite\nGROUP_CONCAT(name, ', ')      -- same, MySQL\nARRAY_AGG(name)               -- ['Alice', 'Bob', 'Carol'] — Postgres\nMAX(name), MIN(name)          -- alphabetically last/first name\nMAX(salary), MIN(salary)      -- salary range\nCOUNT(DISTINCT title)         -- how many distinct titles in this dept\n```\n\nFor 'group-then-pick-one-representative-row-per-group' (e.g., 'newest order per customer'), `GROUP BY` is the wrong tool — use window functions (`ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC)` then filter by rank). Window functions are out of scope for this sphere; the interview-relevant point is recognizing when `GROUP BY` isn't the right shape."
+    },
+
+    {
+      "id": "m4-s4-c11",
+      "type": "multiple_choice",
+      "topic": "WHERE vs HAVING — filter timing relative to GROUP BY",
+      "topic_ru": "WHERE vs HAVING — момент фильтрации относительно GROUP BY",
+      "difficulty": 4,
+      "tags": ["sql", "where", "having", "group-by", "interview-classic"],
+      "question": "Three queries with subtle differences. Which one(s) are valid SQL, and what's the correct query for 'departments with average salary above 80k, considering only active employees'?\n\n```sql\n(A)  SELECT department, AVG(salary)\n     FROM employees\n     WHERE active = TRUE AND AVG(salary) > 80000\n     GROUP BY department;\n\n(B)  SELECT department, AVG(salary)\n     FROM employees\n     WHERE active = TRUE\n     GROUP BY department\n     HAVING AVG(salary) > 80000;\n\n(C)  SELECT department, AVG(salary)\n     FROM employees\n     GROUP BY department\n     HAVING active = TRUE AND AVG(salary) > 80000;\n```",
+      "options": [
+        "(A) is correct — both filters in WHERE is cleanest.",
+        "**(B) is correct.** `WHERE` filters rows BEFORE grouping; `HAVING` filters groups AFTER aggregation. So:\n- (A) is INVALID — `AVG(salary)` doesn't exist yet at WHERE time (aggregates are computed at GROUP BY time). Postgres errors: `aggregate functions are not allowed in WHERE`.\n- (B) is the correct shape: row-level filter (`active = TRUE`) goes in WHERE; group-level filter (`AVG(salary) > 80000`) goes in HAVING.\n- (C) is INVALID — `active` is a per-row column, but after GROUP BY each group has many `active` values; HAVING can only reference the grouping key or aggregates. Postgres errors: `column \"active\" must appear in the GROUP BY clause or be used in an aggregate function`.\n\n**Mental model — logical evaluation order:** FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT. WHERE happens BEFORE aggregates exist; HAVING happens AFTER. This is also a performance reason to push row-level conditions into WHERE: filtering rows before grouping reduces how many rows GROUP BY has to process.",
+        "(A) and (B) are both valid; (B) is just stylistically preferred.",
+        "(C) is correct — `HAVING` accepts any condition; `WHERE` is for joins only."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. (A) errors out: `AVG(salary)` cannot appear in WHERE — aggregates are computed at GROUP BY time, which is *after* WHERE.",
+        "Correct. This is the most-asked GROUP BY question because the WHERE-vs-HAVING distinction discriminates 'I've written SQL' from 'I've memorized SELECT'. Internalize the evaluation order — it explains both the syntactic rules and the performance shape. **Cross-link** to `m4-s4-c2` (WHERE row-level filter), `m4-s4-c1` (WHERE basics), `m4-s4-c10` (GROUP BY column rule).",
+        "Wrong on (A). It's not a stylistic issue; (A) is a hard SQL error.",
+        "Wrong on both counts. HAVING is restricted to expressions that are constant within a group (grouping-key columns or aggregates); per-row columns like `active` are invalid in HAVING after grouping. WHERE is general row-level filtering, not 'for joins only'."
+      ]
+    },
+
+    {
+      "id": "m4-s4-c12",
+      "type": "code_trap",
+      "topic": "SELECT column missing from GROUP BY — the canonical error",
+      "topic_ru": "SELECT-колонка, отсутствующая в GROUP BY — типичная ошибка",
+      "difficulty": 3,
+      "tags": ["sql", "group-by", "error-message", "common-error"],
+      "code_snippet": "-- employees: id, name, department, salary\n-- We want 'show employee names and the department's average salary':\n\nSELECT name, department, AVG(salary)\nFROM employees\nGROUP BY department;\n\n-- Postgres error:\n-- column \"employees.name\" must appear in the GROUP BY clause\n-- or be used in an aggregate function",
+      "question": "Why does this error happen, and what are the two correct shapes depending on what you actually want?",
+      "options": [
+        "Postgres has a bug in its GROUP BY implementation. Use MySQL instead.",
+        "**`name` is per-row, but `GROUP BY department` collapsed many rows into one per department — which `name` should appear?** The database refuses to pick arbitrarily. **Two correct shapes depending on intent:**\n\n(1) **'Show each employee with their department's average':** don't use GROUP BY on `employees` directly. Either join `employees` to a subquery, or use a window function:\n```sql\nSELECT name, department, AVG(salary) OVER (PARTITION BY department) AS dept_avg\nFROM employees;\n```\n(2) **'Show each department with aggregated employee info':** group by department and aggregate `name`:\n```sql\nSELECT department, STRING_AGG(name, ', ') AS members, AVG(salary)\nFROM employees\nGROUP BY department;\n```\n\nThe error is a deliberate guard — it forces you to make the ambiguity explicit. MySQL with `ONLY_FULL_GROUP_BY` disabled used to return arbitrary `name` values silently; modern strict mode rejects this query the same way Postgres does.",
+        "The query is fine; the error is a misconfiguration. Set `set group_by_strict = off`.",
+        "You need `SELECT FIRST(name)` to pick a representative name per group."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The conceptual gap that causes this error: students think of `GROUP BY` as 'tagging rows with a group' rather than 'collapsing rows into one row per group'. After `GROUP BY department`, each output row represents an *entire department*, not an employee. There's no way to put 'the employee's name' on a row that represents the department — many names exist; the database doesn't pick.\n\nThe two intent-disambiguation questions to ask yourself:\n\n1. **'Do I want one row per employee or one row per group?'** Per employee → window function (don't GROUP BY at all). Per group → GROUP BY + aggregate everything that varies within the group.\n2. **'If I do want one row per group, how should non-aggregated columns be reduced?'** Common choices: STRING_AGG to concat, ARRAY_AGG to collect, MAX/MIN to pick alphabetically/numerically, COUNT(DISTINCT) to count uniques.\n\nWindow functions (`OVER (PARTITION BY ...)`) compute per-group aggregates *without* collapsing rows — they're 'GROUP BY but I still want each original row'. They're out of scope for this sphere but worth knowing they exist; they solve the recurring 'I want each row alongside its group's average' shape that GROUP BY can't express."
+    },
+
+    {
+      "id": "m4-s4-c13",
+      "type": "flip",
+      "topic": "INNER JOIN vs LEFT JOIN — basic shape and Venn-diagram mental model",
+      "topic_ru": "INNER JOIN vs LEFT JOIN — базовая форма и модель Венна",
+      "difficulty": 3,
+      "tags": ["sql", "join", "inner-join", "left-join", "interview-classic"],
+      "question": "Given `users (id, name)` and `orders (id, user_id, amount)`, what's the difference between `INNER JOIN` and `LEFT JOIN`? When does each apply?",
+      "answer": "```sql\n-- INNER JOIN: rows that match in BOTH tables\nSELECT u.name, o.amount\nFROM users u\nINNER JOIN orders o ON u.id = o.user_id;\n```\n\nReturns one row per matching pair. Users with no orders are EXCLUDED; orders without a user (orphaned `user_id`s) are also excluded.\n\n```sql\n-- LEFT JOIN: ALL rows from the LEFT table; NULLs from RIGHT when no match\nSELECT u.name, o.amount\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id;\n```\n\nReturns every user. Users with orders appear once per order; users with NO orders appear once with `o.amount = NULL` (and `o.id = NULL`).\n\n**Venn-diagram mental model:**\n- `INNER JOIN` = the **intersection** (rows in both A and B that satisfy the ON condition).\n- `LEFT JOIN` = **left circle** (every row from the left; right contributes only matching values, NULL-padded otherwise).\n- `RIGHT JOIN` = mirror; rarely used — swap the table order and write `LEFT JOIN` instead.\n- `FULL OUTER JOIN` = **union** (every row from both; NULLs on whichever side has no match).\n\n**When to use which:** use `INNER` when you specifically want pairs (e.g., 'show orders with their customer's name'). Use `LEFT` when the left table is your 'main' set and the right table is optional/augmenting (e.g., 'show every user, with their order count if any').",
+      "answer_explanation_md": "Two practical hints:\n\n- **Choose the left table deliberately**: `users LEFT JOIN orders` returns every user (the left table). `orders LEFT JOIN users` returns every order (and would NULL-pad missing users). The 'main' table goes on the left.\n- **`ON` vs `WHERE` in joins**: conditions on the join itself go in `ON`; row-level filters AFTER the join go in `WHERE`. The distinction matters for LEFT JOIN: `LEFT JOIN orders o ON u.id = o.user_id AND o.amount > 100` keeps every user but only the >100 orders; `LEFT JOIN orders o ON u.id = o.user_id WHERE o.amount > 100` filters out users with no orders entirely (because their `o.amount` is NULL, and `NULL > 100` is NULL/false). This is a subtle source of bugs in LEFT JOIN queries — see `m4-s4-c15` for the anti-join shape that depends on this behavior."
+    },
+
+    {
+      "id": "m4-s4-c14",
+      "type": "multiple_choice",
+      "topic": "INNER vs LEFT join — predicting row counts",
+      "topic_ru": "INNER vs LEFT join — предсказание числа строк",
+      "difficulty": 4,
+      "tags": ["sql", "join", "row-count", "discrimination"],
+      "question": "Given these two tables:\n\n```\nusers:                 orders:\n id | name             id | user_id | amount\n  1 | Alice             1 |   1     | 100\n  2 | Bob               2 |   1     | 200\n  3 | Carol             3 |   2     |  50\n                       4 |  99     |  75    -- orphan: no user 99\n```\n\nHow many rows does each query return?\n\n```sql\n(A)  SELECT * FROM users u INNER JOIN orders o ON u.id = o.user_id;\n(B)  SELECT * FROM users u LEFT  JOIN orders o ON u.id = o.user_id;\n```",
+      "options": [
+        "(A) 4, (B) 4 — joins don't change row counts.",
+        "**(A) INNER JOIN returns 3 rows.** Match rows where `u.id = o.user_id`: Alice paired with orders 1 and 2 → 2 rows; Bob paired with order 3 → 1 row; Carol has no orders → excluded; order 4 has orphan `user_id=99` → excluded. Total: 3 rows. **(B) LEFT JOIN returns 4 rows.** Every user from the left table appears at least once: Alice × 2 orders (2 rows), Bob × 1 order (1 row), Carol with no orders → 1 row with `o.id` and `o.amount` set to NULL. Total: 4 rows. Order 4 (orphan) is still excluded — LEFT JOIN keeps all *left* rows; it doesn't keep unmatched right rows. **Rule for counting:** for INNER, count the matching pairs. For LEFT, count the matching pairs PLUS one row per unmatched left row (with right columns NULL).",
+        "(A) 3, (B) 5 — LEFT JOIN includes the orphan order too.",
+        "(A) 4, (B) 5 — both joins include everything."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong. JOINs change row counts: INNER drops unmatched rows; LEFT keeps left-side unmatched rows as NULL-padded.",
+        "Correct. Practice this counting on paper for any join question — the row count is a leading indicator of which join shape you need. If you say 'INNER' but actually want 'show every user even those with no orders', you'll silently drop Carol from your report.",
+        "Wrong on (B). LEFT JOIN keeps only unmatched LEFT rows; the orphan order (user_id=99 with no matching user) is on the RIGHT and is excluded. To include orphan orders, you'd want `RIGHT JOIN` (or `FULL OUTER JOIN`).",
+        "Wrong on (A). INNER excludes Carol (no order) AND the orphan order (no user) — 3 rows, not 4."
+      ]
+    },
+
+    {
+      "id": "m4-s4-c15",
+      "type": "code_trap",
+      "topic": "Anti-join: LEFT JOIN + IS NULL for 'rows in A with no match in B'",
+      "topic_ru": "Анти-join: LEFT JOIN + IS NULL для 'строк в A без совпадения в B'",
+      "difficulty": 4,
+      "tags": ["sql", "left-join", "anti-join", "null", "is-null", "interview-classic"],
+      "code_snippet": "-- Interview classic: 'Find users who have NEVER placed an order.'\n-- Tables: users(id, name), orders(id, user_id, amount).\n\n-- Beginner attempt 1:\nSELECT * FROM users WHERE id NOT IN (SELECT user_id FROM orders);\n-- ^^^ has a subtle bug.\n\n-- The canonical idiomatic answer:\nSELECT u.*\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nWHERE o.id IS NULL;",
+      "question": "Why is `LEFT JOIN ... WHERE o.id IS NULL` the canonical 'anti-join' pattern, and what's the subtle bug in the `NOT IN` version?",
+      "options": [
+        "They're equivalent; the LEFT JOIN form is just more verbose.",
+        "**The LEFT JOIN form returns every user, NULL-padding the right side for users with no matching order; `WHERE o.id IS NULL` then keeps only those NULL-padded rows — i.e., the users who had no match.** It's idiomatic, performant (the planner recognizes the pattern), and unambiguous about NULL handling. **The subtle bug in `NOT IN`:** if ANY row in the subquery has `user_id IS NULL`, **the entire `NOT IN` expression returns NULL for every comparison**, and `WHERE NULL` filters out every row. So a single NULL `user_id` in `orders` (e.g., a guest checkout) makes `WHERE id NOT IN (SELECT user_id FROM orders)` return zero rows, regardless of what's actually in `users`. **Three safe alternatives** for 'A with no match in B':\n\n```sql\n-- (1) LEFT JOIN + IS NULL — the canonical anti-join.\nSELECT u.* FROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nWHERE o.id IS NULL;\n\n-- (2) NOT EXISTS — explicit, NULL-safe.\nSELECT u.* FROM users u\nWHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);\n\n-- (3) NOT IN — but ONLY if you filter NULLs out of the subquery first.\nSELECT u.* FROM users u\nWHERE u.id NOT IN (SELECT user_id FROM orders WHERE user_id IS NOT NULL);\n```",
+        "`NOT IN` is faster than `LEFT JOIN` so it should always win.",
+        "The `LEFT JOIN` form is wrong because it returns each user multiple times when they have multiple non-matches."
+      ],
+      "correct_index": 1,
+      "explanation_md": "The anti-join pattern is the canonical 'find absences' shape in SQL and shows up in roughly every other technical screen as one of these:\n\n- 'Find customers who have never placed an order.'\n- 'Find products that have never been sold.'\n- 'Find users who never confirmed their email.'\n- 'Find departments with no employees.'\n\nAll three of the answers above (LEFT JOIN + IS NULL; NOT EXISTS; defensive NOT IN) produce the right result. The performance difference is small in most cases; the readability and NULL-safety difference is large.\n\n**Why NOT IN is dangerous with NULLs:** the SQL semantics of `x NOT IN (a, b, NULL)` is `x <> a AND x <> b AND x <> NULL`. The last term is NULL (NULL comparisons return NULL — see `m4-s4-c2`), and `TRUE AND NULL = NULL`, so the whole conjunction is NULL, which `WHERE` treats as false. A single NULL in the IN-list poisons every comparison. This is the same three-valued logic that makes `WHERE col = NULL` fail; the anti-join trap is its downstream consequence.\n\n**Cross-link** to `m4-s4-c2` (NULL semantics, the foundation), `m4-s4-c8` and `m4-s4-c9` (NULL in aggregates), and `m4-s4-c13` (LEFT JOIN mechanics). The NULL story threads across this entire sphere — same principle (NULL is unknown, not a value) shows up in WHERE, in aggregates, and in joins; each appearance is a card."
+    }
+  ]
+}
