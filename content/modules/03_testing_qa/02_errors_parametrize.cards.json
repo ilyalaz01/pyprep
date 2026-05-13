@@ -1,0 +1,207 @@
+{
+  "$schema": "../../schema/card.schema.json",
+  "module_id": 3,
+  "sphere_id": "m3-s2",
+  "cards": [
+    {
+      "id": "m3-s2-c1",
+      "type": "flip",
+      "topic": "pytest.raises basic with-block pattern",
+      "topic_ru": "Базовый with-block pytest.raises",
+      "difficulty": 1,
+      "tags": ["pytest", "raises", "patterns", "interview-warmup"],
+      "question": "What's the canonical shape of `pytest.raises` for asserting that a call raises a specific exception?",
+      "answer": "`with pytest.raises(ExceptionType): <call>`. The call that should raise lives **inside** the `with` block. If it raises `ExceptionType` (or a subclass), the test passes; if it raises anything else, the test fails with the unexpected exception; if it raises nothing, pytest raises `Failed: DID NOT RAISE`. Optional `match=r\"pattern\"` checks the exception message against a regex.",
+      "answer_explanation_md": "Code after the `with` block is unreachable on the failing-path test (since the exception unwound out of the block, the post-block lines were never going to execute anyway). Putting an `else: pytest.fail(...)` after is anti-pattern; pytest already handles the no-exception case. Use `excinfo = pytest.raises(...)` followed by `excinfo.value` if you need to inspect the raised exception further (`assert excinfo.value.args[0] == 42`)."
+    },
+
+    {
+      "id": "m3-s2-c2",
+      "type": "code_trap",
+      "topic": "pytest.raises without a with-block does nothing useful",
+      "topic_ru": "pytest.raises без with-block ничего полезного не делает",
+      "difficulty": 3,
+      "tags": ["pytest", "raises", "with-block", "subtle"],
+      "code_snippet": "import pytest\n\ndef divide(a, b):\n    return a / b\n\ndef test_divide_by_zero_raises():\n    pytest.raises(ZeroDivisionError)\n    divide(10, 0)",
+      "question": "What does this test actually do?",
+      "options": [
+        "Passes — `pytest.raises(ZeroDivisionError)` registers an expectation that the next line will raise.",
+        "Fails with `ZeroDivisionError` thrown from `divide(10, 0)`. `pytest.raises(ZeroDivisionError)` called *without* a `with` block just returns a context manager object that's immediately discarded — it has no effect on the next line. The actual division then raises, and the test reports the unhandled exception as a failure.",
+        "Passes silently because `pytest.raises` has been called.",
+        "Raises `TypeError` because `pytest.raises` requires both a type and a callable."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`pytest.raises(Exc)` is a context manager *constructor*. It only does anything inside `with pytest.raises(Exc): ...`. Calling it bare creates the context manager and throws it away — no `__enter__`, no `__exit__`, no exception-catching.\n\nThe correct form:\n\n```python\ndef test_divide_by_zero_raises():\n    with pytest.raises(ZeroDivisionError):\n        divide(10, 0)\n```\n\nThe `with` block enters the context manager, which installs a hook that catches the expected exception during execution of the body. Without `with`, you've imported a thing and discarded it. A common drift in code-review-by-pattern: the `pytest.raises` is right there, the test reads like it expects an exception, but the structure doesn't actually enforce that expectation."
+    },
+
+    {
+      "id": "m3-s2-c3",
+      "type": "code_task",
+      "topic": "Function raises ValueError with specific message; hidden tests use match=",
+      "topic_ru": "Функция бросает ValueError с конкретным сообщением; тесты используют match=",
+      "difficulty": 3,
+      "tags": ["pytest", "raises", "match", "patterns"],
+      "prompt_md": "Implement `parse_age(s: str) -> int` that:\n\n- Returns the integer value of `s` if `s` represents a non-negative integer within `[0, 150]`.\n- Raises `ValueError` with message exactly `\"age must be a non-negative integer\"` when `s` is not a valid integer (e.g. `\"abc\"`, `\"3.14\"`, `\"-5\"`).\n- Raises `ValueError` with message exactly `\"age out of range\"` when the integer is outside `[0, 150]`.\n\nThe hidden tests use `pytest.raises(ValueError, match=...)` to verify both the type and the message shape.",
+      "starter_code": "def parse_age(s):\n    # your code here\n    pass\n",
+      "solution_code": "def parse_age(s):\n    try:\n        n = int(s)\n    except ValueError:\n        raise ValueError('age must be a non-negative integer') from None\n    if n < 0:\n        raise ValueError('age must be a non-negative integer')\n    if n > 150:\n        raise ValueError('age out of range')\n    return n\n",
+      "tests": "import pytest\nfrom solution import parse_age\n\ndef test_returns_int_in_range():\n    assert parse_age('30') == 30\n    assert parse_age('0') == 0\n    assert parse_age('150') == 150\n\ndef test_non_integer_string_raises_with_message():\n    with pytest.raises(ValueError, match=r'non-negative integer'):\n        parse_age('abc')\n\ndef test_float_string_raises_with_same_message():\n    with pytest.raises(ValueError, match=r'non-negative integer'):\n        parse_age('3.14')\n\ndef test_negative_raises_with_message():\n    with pytest.raises(ValueError, match=r'non-negative integer'):\n        parse_age('-5')\n\ndef test_out_of_range_raises_with_different_message():\n    with pytest.raises(ValueError, match=r'out of range'):\n        parse_age('200')\n\ndef test_both_error_paths_raise_value_error_type():\n    with pytest.raises(ValueError):\n        parse_age('nope')\n    with pytest.raises(ValueError):\n        parse_age('999')\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s2-c4",
+      "type": "code_trap",
+      "topic": "match= is a regex; unescaped special chars match too much",
+      "topic_ru": "match= — это регекс; неэкранированные спецсимволы матчат лишнее",
+      "difficulty": 4,
+      "tags": ["pytest", "raises", "match", "regex", "subtle", "interview-classic"],
+      "code_snippet": "import pytest\n\ndef compute():\n    raise RuntimeError('database error: connection refused')\n\ndef test_compute_raises_value_error():\n    with pytest.raises(RuntimeError, match='ValueError'):\n        compute()",
+      "question": "Does this test pass, and what does that tell us about `match=`?",
+      "options": [
+        "Fails — the message is 'database error...', not 'ValueError'.",
+        "Passes — because `match=` is a **regex** searched (not anchored) against the message. `'ValueError'` parses as the regex `V`, `a`, `l`, `u`, `e`, then `.` (wildcard matching ANY char), `r`, `r`, `o`, `r`. The string `'database error: connection refused'` contains a substring matching `Value.rror` ... actually no — there's no `Value` substring at all here, so this specific test fails. But the lesson stands: `match='value.error'` would match `value Xerror`, `valueXerror`, anything with `value` then-any-char-then `error`, because `.` is a regex wildcard.",
+        "Raises `pytest.RegexError` because the pattern is malformed.",
+        "Always passes — `match=` is informational only and doesn't affect outcome."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`match=` is passed to `re.search`, not `str.__contains__`. Every special regex character (`.` `(` `[` `*` `+` `?` `^` `$` `\\` `|` `{`) is interpreted as regex syntax inside the pattern. The most-bitten case is `.`: `match='value.error'` matches `value-error`, `valueXerror`, `value error`, anything with that shape. A passing test on the wrong-shape message ships to production.\n\nTwo fixes:\n\n```python\n# Option A: escape with re.escape\nimport re\nwith pytest.raises(ValueError, match=re.escape('result (3.14)')):\n    compute()\n\n# Option B: write the literal regex\nwith pytest.raises(ValueError, match=r'result \\(3\\.14\\)'):\n    compute()\n```\n\nAlso note: `match=` does a **search** (not a fullmatch), so unanchored patterns match anywhere in the string. Use `match=r'^exact message$'` to anchor to the whole message, or accept partial-match semantics deliberately.\n\nThe interview test: 'what's wrong with `pytest.raises(ValueError, match=\"value error\")`?' — Answer: `match=` is regex, the space between words is fine, but if the pattern contained any of `.()[]*+?^$\\|{}`, it would match more than the literal string. Use `re.escape` when in doubt."
+    },
+
+    {
+      "id": "m3-s2-c5",
+      "type": "flip",
+      "topic": "parametrize basics + pytest.param + ids",
+      "topic_ru": "Основы parametrize + pytest.param + ids",
+      "difficulty": 2,
+      "tags": ["pytest", "parametrize", "patterns"],
+      "question": "Sketch a parametrized test for `is_prime(n) -> bool` covering 4 cases, with at least one case using `pytest.param(..., id=...)` for a readable name.",
+      "answer": "```python\n@pytest.mark.parametrize('n, expected', [\n    (2, True),\n    (4, False),\n    pytest.param(97, True, id='medium-prime'),\n    pytest.param(91, False, id='looks-prime-but-is-7x13'),\n])\ndef test_is_prime(n, expected):\n    assert is_prime(n) == expected\n```\nThe decorator's first arg is a comma-separated string of parameter names (or a tuple of names). The second arg is a list of value tuples. Each row becomes one test: `test_is_prime[2-True]`, `test_is_prime[4-False]`, `test_is_prime[medium-prime]`, etc. `pytest.param(..., id=...)` overrides the auto-generated bracket name with a readable label.",
+      "answer_explanation_md": "Auto-generated IDs (`[2-True]`, `[4-False]`) are fine for simple types. They get unreadable fast for complex inputs (`[{'a': 1, 'b': 2}-True]`), boundary cases that look identical numerically, or any time the test name would clash. `pytest.param(..., id='descriptive-name')` is the fix; reach for it whenever a reader at `-v` output would have to think to understand which case failed."
+    },
+
+    {
+      "id": "m3-s2-c6",
+      "type": "code_task",
+      "topic": "Implement function; hidden tests parametrize over boundary cases",
+      "topic_ru": "Реализовать функцию; скрытые тесты параметризуют граничные случаи",
+      "difficulty": 3,
+      "tags": ["pytest", "parametrize", "boundary-testing"],
+      "prompt_md": "Implement `clamp(value: float, lo: float, hi: float) -> float` that returns `value` clamped to the inclusive range `[lo, hi]`:\n\n- If `value < lo`, return `lo`.\n- If `value > hi`, return `hi`.\n- Otherwise, return `value`.\n- Raise `ValueError` with message `'lo must be <= hi'` if `lo > hi`.\n\nThe hidden tests use `@pytest.mark.parametrize` to cover boundaries, midpoints, equal-bounds, and the error path in one well-shaped test per behavior.",
+      "starter_code": "def clamp(value, lo, hi):\n    # your code here\n    pass\n",
+      "solution_code": "def clamp(value, lo, hi):\n    if lo > hi:\n        raise ValueError('lo must be <= hi')\n    if value < lo:\n        return lo\n    if value > hi:\n        return hi\n    return value\n",
+      "tests": "import pytest\nfrom solution import clamp\n\n@pytest.mark.parametrize('value, lo, hi, expected', [\n    pytest.param(5, 0, 10, 5,   id='midrange-unchanged'),\n    pytest.param(0, 0, 10, 0,   id='at-low-bound'),\n    pytest.param(10, 0, 10, 10, id='at-high-bound'),\n    pytest.param(-1, 0, 10, 0,  id='below-clamps-to-lo'),\n    pytest.param(99, 0, 10, 10, id='above-clamps-to-hi'),\n    pytest.param(7, 7, 7, 7,    id='equal-bounds-value-matches'),\n    pytest.param(3, 7, 7, 7,    id='equal-bounds-below'),\n])\ndef test_clamp_returns_expected(value, lo, hi, expected):\n    assert clamp(value, lo, hi) == expected\n\ndef test_clamp_inverted_bounds_raises():\n    with pytest.raises(ValueError, match=r'lo must be <= hi'):\n        clamp(5, 10, 0)\n\ndef test_clamp_works_for_floats():\n    assert clamp(0.5, 0.0, 1.0) == 0.5\n    assert clamp(-0.5, 0.0, 1.0) == 0.0\n    assert clamp(1.5, 0.0, 1.0) == 1.0\n",
+      "allowlist": ["pytest"]
+    },
+
+    {
+      "id": "m3-s2-c7",
+      "type": "multiple_choice",
+      "topic": "Stacked parametrize = cartesian product",
+      "topic_ru": "Стек parametrize = декартово произведение",
+      "difficulty": 4,
+      "tags": ["pytest", "parametrize", "stacking", "interview-classic"],
+      "question": "How many tests does pytest generate from this function?\n\n```python\n@pytest.mark.parametrize('a', [1, 2, 3, 4])\n@pytest.mark.parametrize('b', [10, 20, 30])\ndef test_combo(a, b):\n    ...\n```",
+      "options": [
+        "4 — pytest takes the larger list and ignores the inner one.",
+        "7 — pytest sums the items in each list (4 + 3).",
+        "12 — stacked `parametrize` decorators produce the **cartesian product**. 4 × 3 = 12 tests, one per (a, b) pair. The same shape generalizes: N stacked decorators with sizes k₁, k₂, ..., kN run k₁ × k₂ × ... × kN tests.",
+        "1 — only the innermost decorator's first row runs; outer decorators are ignored."
+      ],
+      "correct_index": 2,
+      "option_explanations": [
+        "Wrong — pytest doesn't pick one list. Both apply.",
+        "Wrong — the lists aren't summed; they're crossed.",
+        "Correct. Each `@parametrize` introduces an axis of variation; stacking them gives the cartesian product. The output of `pytest -v` shows test names like `test_combo[10-1]`, `test_combo[10-2]`, ..., `test_combo[30-4]`. This is also how the test count balloons unexpectedly — three stacked `parametrize` decorators with 5 items each is 125 tests, not 15.",
+        "Wrong — all rows of all decorators contribute. The misconception comes from confusing decorator stacking (which adds dimensions) with decorator chaining (which would be a different language feature)."
+      ]
+    },
+
+    {
+      "id": "m3-s2-c8",
+      "type": "code_trap",
+      "topic": "Without id=, parametrize test names become unreadable",
+      "topic_ru": "Без id= имена parametrize-тестов становятся нечитаемыми",
+      "difficulty": 3,
+      "tags": ["pytest", "parametrize", "ids", "readability"],
+      "code_snippet": "@pytest.mark.parametrize('payload, expected', [\n    ({'role': 'admin', 'enabled': True, 'tier': 'gold'}, True),\n    ({'role': 'admin', 'enabled': False, 'tier': 'gold'}, False),\n    ({'role': 'user',  'enabled': True, 'tier': 'gold'}, False),\n    ({'role': 'admin', 'enabled': True, 'tier': 'free'}, False),\n])\ndef test_can_access_premium(payload, expected):\n    assert can_access_premium(payload) == expected",
+      "question": "Three months from now, one of these test rows fails in CI. What does the failure name look like in the `pytest -v` output, and what's the fix?",
+      "options": [
+        "`test_can_access_premium[admin-True-gold-True]` — pytest auto-generates a readable name from the values.",
+        "`test_can_access_premium[payload3-False]` — pytest falls back to positional index naming for dict values (`payload0`, `payload1`, ...), so you can't tell *which* row failed without counting from the top of the decorator. The fix is `pytest.param(..., id='admin-enabled-but-free-tier')` per row, which makes the failed test name self-describing.",
+        "`test_can_access_premium[FAILED]` — pytest shows only the outcome, never the input.",
+        "The full dict is rendered in the test name."
+      ],
+      "correct_index": 1,
+      "explanation_md": "pytest auto-IDs the parameter values, but for complex types (dicts, lists, objects) the auto-ID is just `payloadN` where N is the index in the decorator list. Three months later, CI reports `test_can_access_premium[payload2-False]` and you have to open the test file and count rows to figure out which case broke.\n\nThe fix is `pytest.param(..., id=...)`:\n\n```python\n@pytest.mark.parametrize('payload, expected', [\n    pytest.param({'role': 'admin', 'enabled': True, 'tier': 'gold'}, True,\n                 id='admin-enabled-gold'),\n    pytest.param({'role': 'admin', 'enabled': False, 'tier': 'gold'}, False,\n                 id='admin-disabled-gold'),\n    pytest.param({'role': 'user',  'enabled': True, 'tier': 'gold'}, False,\n                 id='user-enabled-gold'),\n    pytest.param({'role': 'admin', 'enabled': True, 'tier': 'free'}, False,\n                 id='admin-enabled-free'),\n])\n```\n\nNow CI reports `test_can_access_premium[admin-enabled-free]` and the test name *is* the failure description. Use `id=` whenever the auto-ID would force a reader to count or guess."
+    },
+
+    {
+      "id": "m3-s2-c9",
+      "type": "flip",
+      "topic": "skip vs xfail — when to use which",
+      "topic_ru": "skip vs xfail — когда какой",
+      "difficulty": 2,
+      "tags": ["pytest", "skip", "xfail", "markers", "interview-classic"],
+      "question": "What's the difference between `@pytest.mark.skip` and `@pytest.mark.xfail`, and when do you reach for each?",
+      "answer": "`skip` tells pytest **don't run this** — the test body is bypassed entirely; the test is reported as `s` in the output but doesn't affect pass/fail. Use it when the test isn't valid in this environment (POSIX-only test on Windows, integration test without DB credentials in CI). `xfail` tells pytest **run it, expect failure** — the test executes; if it fails, it's reported as `XFAIL` (pass for the suite); if it unexpectedly passes, it's reported as `XPASS`. Use `xfail` when the test *is* valid but the code under test currently has a known bug you're tracking.",
+      "answer_explanation_md": "The reflex distinction: `skip` is for environmental incompatibility (test can't run here at all); `xfail` is for tracked-but-unfixed bugs (test runs, but we expect it to fail). A red flag is `@pytest.mark.skip` for a test you intend to come back to — that often means 'broken and ignored' rather than 'doesn't apply here'. Use `xfail` in that case, especially `xfail(strict=True)` (see next card), so the marker fails the build the moment the bug gets fixed."
+    },
+
+    {
+      "id": "m3-s2-c10",
+      "type": "multiple_choice",
+      "topic": "skipif condition vs skip vs xfail — choosing the right marker",
+      "topic_ru": "skipif vs skip vs xfail — выбор маркера",
+      "difficulty": 3,
+      "tags": ["pytest", "skip", "skipif", "xfail", "markers"],
+      "question": "Which marker is correct for each situation?",
+      "options": [
+        "Test only runs on Linux: `@pytest.mark.skip(reason='POSIX-only')`. Test for a known bug to be fixed in v2: `@pytest.mark.skip`. Test requires `redis` server which isn't always running: `@pytest.mark.xfail`.",
+        "Test only runs on Linux: `@pytest.mark.skipif(sys.platform != 'linux', reason='POSIX-only')`. Test for a known bug to be fixed in v2: `@pytest.mark.xfail(reason='tracked in issue #123')` (prefer `strict=True`). Test requires `redis` server which isn't always running: `@pytest.mark.skipif(not redis_available(), reason='no redis in this env')`.",
+        "Test only runs on Linux: `@pytest.mark.platform('linux')`. Test for a known bug: `@pytest.mark.bug`. Test requires `redis`: `@pytest.mark.requires_redis`.",
+        "All three should use `@pytest.mark.xfail` — it's the most flexible."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Wrong on two counts: an environmental constraint that's *conditional* needs `skipif` (with the condition), not bare `skip`. And a known bug should be `xfail` (run, expect fail), not `skip` (don't run) — `skip` rots because nothing tells you when it gets fixed.",
+        "Correct. Three reflexes: `skipif(condition, reason=...)` for conditional environmental skip; `xfail` (ideally `strict=True`) for known bugs you're tracking; `skipif` again for missing-dependency-this-env. Each marker matches a different operational reality.",
+        "Wrong — those are made-up marker names. pytest has built-in `skip`, `skipif`, `xfail`; everything else needs custom markers registered in `pytest.ini` / `pyproject.toml`.",
+        "Wrong — `xfail` for an environmental incompatibility runs the test (which probably crashes spectacularly on the wrong OS) and records the failure. Use `skip`/`skipif` for don't-run, `xfail` for run-but-tolerate-failure."
+      ]
+    },
+
+    {
+      "id": "m3-s2-c11",
+      "type": "code_trap",
+      "topic": "xfail without strict=True silently rots when the bug is fixed",
+      "topic_ru": "xfail без strict=True молча гниёт после фикса",
+      "difficulty": 4,
+      "tags": ["pytest", "xfail", "strict", "subtle", "interview-classic"],
+      "code_snippet": "# 2026-01: a known bug. Marked xfail to keep CI green.\n@pytest.mark.xfail(reason='returns wrong value for empty input — fix in v2')\ndef test_average_empty_returns_nan():\n    assert math.isnan(average([]))   # actually raises ZeroDivisionError today\n\n# 2026-06: someone fixes average() to return float('nan') for empty input.\n# The test now passes. What does pytest report?",
+      "question": "After the bug is fixed and the test starts passing, what does pytest report — and what's the danger of leaving `strict=True` off?",
+      "options": [
+        "Pytest reports `PASSED`; the `xfail` marker is automatically removed.",
+        "Pytest reports `XPASS` (unexpected pass). Without `strict=True`, this is **NOT a failure** — the suite stays green. The marker rots: the bug got fixed, but nobody notices the `xfail` is stale. Six months later the marker is still there, anyone reading the code thinks the bug still exists, and a regression that reintroduces the bug would be hidden by the (now-inappropriate) marker. With `@pytest.mark.xfail(strict=True, reason=...)`, an unexpected pass becomes a test failure — CI lights up red, you delete the marker, the test joins the normal suite.",
+        "Pytest reports `FAILED` because the test passed when it was expected to fail.",
+        "Pytest raises a `MarkerError`."
+      ],
+      "correct_index": 1,
+      "explanation_md": "`xfail` semantics: 'run, expect failure'. When the test passes, that's an `XPASS` — *unexpected pass*. The default behavior is to record it as `XPASS` in the report without failing the suite, because the original use case was 'sometimes flaky, sometimes not, don't fail CI either way'. The cost is the marker rots silently.\n\n`strict=True` turns `XPASS` into a real failure:\n\n```python\n@pytest.mark.xfail(strict=True, reason='returns wrong value for empty input — issue #123')\ndef test_average_empty_returns_nan():\n    ...\n```\n\nNow when someone fixes `average`, CI fails on this test with `[XPASS(strict)]`. The dev removes the `xfail`, the test joins the normal suite, and the marker is correctly retired.\n\n**Rule:** `xfail` for tracked bugs should almost always be `strict=True`. `xfail` without `strict` is for genuinely flaky tests where you accept either outcome — a much narrower use case than most engineers reach for it. The interview probe: 'why use `xfail(strict=True)`?' — Answer: 'to catch the bug being fixed; without strict, the marker rots and a future regression is silently masked.'"
+    },
+
+    {
+      "id": "m3-s2-c12",
+      "type": "fill_in",
+      "topic": "Canonical pytest.mark.skip / xfail invocations",
+      "topic_ru": "Канонические вызовы pytest.mark.skip / xfail",
+      "difficulty": 1,
+      "tags": ["pytest", "markers", "patterns"],
+      "code_snippet_with_blanks": "import sys, pytest\n\n@pytest.mark.___(sys.platform != 'linux', reason='POSIX-only')\ndef test_uses_unix_socket():\n    ...\n\n@pytest.mark.xfail(___=True, reason='tracked in issue #123')\ndef test_known_bug():\n    ...",
+      "accepted_answers": [
+        ["skipif"],
+        ["strict"]
+      ],
+      "explanation_md": "Two reflexes worth burning in: `@pytest.mark.skipif(condition, reason=...)` for conditional environmental skip (not bare `skip` — the condition is the load-bearing part), and `@pytest.mark.xfail(strict=True, reason=...)` for tracked-but-unfixed bugs (not bare `xfail` — without `strict`, the marker rots when the bug is fixed). Memorize these two with their flags; they're not separable from their flags in practice."
+    }
+  ]
+}
