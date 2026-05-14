@@ -116,7 +116,7 @@ describe('SessionPage — state machine', () => {
       cardsTotal: 3, completedCount: 0,
     }))
     renderAt(SESSION_URL)
-    expect(await screen.findByText(/card 1 of 3/i)).toBeInTheDocument()
+    expect(await screen.findByText('1/3')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reveal/i })).toBeInTheDocument()
   })
 

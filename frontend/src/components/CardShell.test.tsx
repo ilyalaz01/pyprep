@@ -16,7 +16,7 @@ describe('CardShell', () => {
         <div>body</div>
       </CardShell>,
     )
-    expect(screen.getByText(/card 7 of 20/i)).toBeInTheDocument()
+    expect(screen.getByText('7/20')).toBeInTheDocument()
     expect(screen.getByText('m1-s0')).toBeInTheDocument()
   })
 
@@ -78,6 +78,6 @@ describe('CardShell', () => {
     )
     expect(screen.queryByText('m1-s0')).not.toBeInTheDocument()
     // Position eyebrow still renders.
-    expect(screen.getByText(/card 1 of 1/i)).toBeInTheDocument()
+    expect(screen.getByText('1/1')).toBeInTheDocument()
   })
 })
