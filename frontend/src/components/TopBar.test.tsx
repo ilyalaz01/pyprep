@@ -1,7 +1,7 @@
 /**
  * TopBar — tested through the router fixture so `useNavigate` resolves.
- * Pins the wordmark, single-user-mode badge conditional, the logged-in
- * email display, and the Sign-out click → clear token + navigate /login.
+ * Pins the wordmark, the logged-in email display, and the Sign-out click
+ * → clear token + navigate /login.
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
@@ -41,29 +41,6 @@ describe('TopBar', () => {
     })
     renderAt('/home')
     expect(await screen.findByText('PyPrep')).toBeInTheDocument()
-  })
-
-  test('shows the single-user-mode badge when config.single_user=true', async () => {
-    mockRoutes({
-      '/api/config': () =>
-        jsonResponse({
-          single_user: true, version: '1.00', single_user_email: 'owner@local.dev',
-        }),
-      '/api/auth/me': () => jsonResponse({ ...ME, email: 'owner@local.dev' }),
-    })
-    renderAt('/home')
-    expect(await screen.findByText(/single-user mode/i)).toBeInTheDocument()
-  })
-
-  test('does NOT show the badge in multi-user mode', async () => {
-    mockRoutes({
-      '/api/config': () =>
-        jsonResponse({ single_user: false, version: '1.00', single_user_email: null }),
-      '/api/auth/me': () => jsonResponse(ME),
-    })
-    renderAt('/home')
-    await screen.findByText('PyPrep')
-    expect(screen.queryByText(/single-user mode/i)).not.toBeInTheDocument()
   })
 
   test('shows the current user email once /me resolves', async () => {

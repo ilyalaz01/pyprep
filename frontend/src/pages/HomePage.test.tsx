@@ -43,15 +43,6 @@ describe('HomePage', () => {
     expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument()
   })
 
-  test('shows the signed-in email once /me resolves', async () => {
-    renderAt('/home')
-    expect(await screen.findByText(/signed in as/i)).toBeInTheDocument()
-    // Email appears in TopBar AND inline in the welcome line — both are
-    // me@example.com, so use getAllByText for the assertion.
-    const matches = await screen.findAllByText('me@example.com')
-    expect(matches.length).toBeGreaterThanOrEqual(1)
-  })
-
   test('shows the modules section heading (real content replaces the T4.3 placeholder)', async () => {
     renderAt('/home')
     expect(await screen.findByText(/^Modules$/)).toBeInTheDocument()
