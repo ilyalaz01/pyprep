@@ -1480,3 +1480,59 @@ illustrates the rule operationally.
 
 → Promoted to PRD_code_sandbox.md §10.5 (Phase 10 T10.8)
 
+---
+
+## N048 — T10.6 Lighthouse baseline closed; Tier 2 deferred post-MVP-1
+
+**Phase:** 10 (T10.6) · **Date:** 2026-05-14 · **Status:** closed
+
+(Commits e686879/6034a65/a7bd0b9 carry `p10.n037` prefix from a
+mislabel in the prior chat's handoff brief. The literal N037 identifier
+was already taken for the Pyodide-actual coverage gap resolved in
+P6.5/P1-2 — see existing NOTES.md L245/L269. Work tracked under T10.6
+in TODO.md; this entry reconciles the naming.)
+
+Final scores on `/login` prod Desktop (vite preview, no backend):
+P99 / A100 / BP92 / SEO100. Core Web Vitals all green
+(LCP 0.8s, FCP 0.6s, TBT 0ms, CLS 0, SI 0.6s).
+
+Floor analysis (why scores plateau where they do):
+- BP 92 capped by two audits:
+  - errors-in-console (8 items) — CORS to offline backend at :8000.
+    Resolves to 0 when backend is up with proper CORS for :4173.
+  - inspector-issues (1 item) — CSP violation. Requires prod hosting
+    policy decision before fixable (Tier 3).
+- P 99 within run-to-run noise. unused-javascript reports 1058 KiB
+  potential savings but score remains 99 — login route uses ~30% of
+  main bundle, splitting would help /session and /stats more.
+
+Deferred items (tracked, not blocking MVP-1):
+
+1. **Tier 2: route-level code splitting** — TanStack `createLazyFileRoute`
+   for HomePage, SessionPage, StatsPage, ModuleDetailPage, LessonPage,
+   LoginPage + dynamic imports for codemirror, shiki, react-markdown
+   inside their respective routes. Justification gated on /session prod
+   LCP measurement (predicted 1.5-2.5s post-minification — likely still
+   green band). Re-evaluate post-MVP-1.
+
+2. **/session and /stats prod audit with auth** — requires backend running
+   with CORS configured for :4173. Owner has backend startup command
+   (PYPREP_SECRET_KEY + PYPREP_SINGLE_USER + PYPREP_SINGLE_USER_PASSWORD
+   env vars + `uv run pyprep-api`). Audit deferred post-MVP-1.
+
+3. **CSP header (Tier 3)** — blocks BP→100. Requires prod hosting
+   context (Netlify/Vercel/self-host) before policy can be written.
+   Defer until deployment target chosen.
+
+Commits in this wave:
+  e686879  Tier 1   (meta description, robots.txt v1, hidden sourcemaps)
+  6034a65  Tier 1.5 (sourcemap mode correction, remove robots.txt v1)
+  a7bd0b9  Tier 1.6 (robots.txt v2 with Allow:/)
+  <this>   N037 closure
+
+Net Lighthouse delta from dev-server baseline:
+  Performance:    63 → 99   (+36)
+  Best Practices: 96 → 92   (-4, floor reasons above)
+  SEO:            82 → 100  (+18)
+  Accessibility:  100 → 100 (unchanged)
+

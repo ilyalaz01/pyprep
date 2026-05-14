@@ -404,7 +404,7 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker compose -f compose.prod.yml up` serves SPA + API on one port; CORS is no-op (same origin) | ⬜ |
 | T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ⬜ |
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
-| T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | Report saved | ⬜ |
+| T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | P99/A100/BP92/SEO100 on /login prod Desktop; Tier 2 + /session+/stats + CSP deferred post-MVP-1 (see N048) | ✅ |
 | T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |
 | T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044/N045/N047 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | 🟨 (appendix landed in `PRD_code_sandbox.md` §10 — five constraints N039+N043+N044+N045+N047; section renamed to "Card authoring constraints" since §10.4 + §10.5 are broader than code_task; retroactive N041 pairs still pending owner authorization, see candidate list below) |
 
