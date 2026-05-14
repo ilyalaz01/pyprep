@@ -61,7 +61,7 @@ describe('WeaknessWidget — async states', () => {
     ).toBeInTheDocument()
   })
 
-  test('ready: rows with retention% on right', async () => {
+  test('ready: rows with retention bar + compact % on right', async () => {
     stubFetch({
       top: [
         { sphere_id: 'm1-s4', reviews_total: 8, retention: 0.5, weakness: 0.4, lesson_title: null },
@@ -71,9 +71,11 @@ describe('WeaknessWidget — async states', () => {
     renderWidget()
     await screen.findByTestId('weakness-list')
     expect(screen.getByText('m1-s4')).toBeInTheDocument()
-    expect(screen.getByText(/50% retention/)).toBeInTheDocument()
+    expect(screen.getByText('50%')).toBeInTheDocument()
     expect(screen.getByText('Generators')).toBeInTheDocument()
-    expect(screen.getByText(/66% retention/)).toBeInTheDocument()
+    expect(screen.getByText('66%')).toBeInTheDocument()
+    // Each row gets a ProgressBar primitive carrying the retention value.
+    expect(screen.getAllByRole('progressbar')).toHaveLength(2)
   })
 
   test('lesson_title primary + sphere_id caption when title available', async () => {

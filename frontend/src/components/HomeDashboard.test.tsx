@@ -107,7 +107,7 @@ describe('HomeDashboard — Weakness section', () => {
     expect(screen.queryByText(/weakness/i)).not.toBeInTheDocument()
   })
 
-  test('renders sphere + retention% when reviews_total >= 10', async () => {
+  test('renders sphere + retention bar + % when reviews_total >= 10', async () => {
     // NB: more-specific paths MUST come first — `/api/stats/me` is a
     // substring of `/api/stats/me/weakness`, and the matcher is first-hit-wins.
     mockRoutes({
@@ -124,9 +124,9 @@ describe('HomeDashboard — Weakness section', () => {
     renderDashboard()
     expect(await screen.findByText(/top 3 weakness areas/i)).toBeInTheDocument()
     expect(await screen.findByText('m1-s4')).toBeInTheDocument()
-    expect(screen.getByText(/50% retention/)).toBeInTheDocument()
+    expect(screen.getByText('50%')).toBeInTheDocument()
     expect(screen.getByText('m1-s5')).toBeInTheDocument()
-    expect(screen.getByText(/66% retention/)).toBeInTheDocument()
+    expect(screen.getByText('66%')).toBeInTheDocument()
   })
 
   test('weakness row shows lesson_title prominent + sphere_id caption (T4.5.6)', async () => {

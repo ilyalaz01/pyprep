@@ -14,8 +14,10 @@
  * the same cached response.
  *
  * Row shape: lesson_title primary, sphere_id mono caption beneath
- * when a title is available. retention % on the right. tabular-nums.
- * Matches the T4.5.6 "Address-vs-Label" rule.
+ * when a title is available. Slim retention bar (ProgressBar shared
+ * with the session card progress bar) + compact percentage on the
+ * right; tabular-nums for digit-stable alignment. Matches the T4.5.6
+ * "Address-vs-Label" rule.
  *
  * Anti-Duolingo discipline: "weak" is the audit-given name but the
  * UI copy stays neutral — "No weak spheres yet. Keep practicing."
@@ -24,6 +26,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { api } from '../lib/api'
+import { ProgressBar } from './ProgressBar'
 import { Section } from './Section'
 
 interface WeaknessWidgetProps {
@@ -101,8 +104,13 @@ function WeaknessBody({ isLoading, isError, data }: BodyProps) {
               </span>
             )}
           </span>
-          <span className="shrink-0 text-xs text-[color:var(--color-fg-muted)] tabular-nums">
-            {Math.round(s.retention * 100)}% retention
+          <span className="shrink-0 flex items-center gap-2 text-xs text-[color:var(--color-fg-muted)] tabular-nums">
+            <ProgressBar
+              value={s.retention}
+              ariaLabel={`${Math.round(s.retention * 100)} percent retention`}
+              className="w-24"
+            />
+            <span className="w-10 text-right">{Math.round(s.retention * 100)}%</span>
           </span>
         </li>
       ))}
