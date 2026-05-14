@@ -50,7 +50,7 @@ function KeymapCheatsheet() {
       data-testid="keymap-cheatsheet"
       className="text-center text-xs text-[color:var(--color-fg-subtle)] font-mono"
     >
-      ⎵ reveal · 1234 rate · esc exit
+      ⎵ reveal · 1 Again · 2 Hard · 3 Good · 4 Easy · esc exit
     </p>
   )
 }

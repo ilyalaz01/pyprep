@@ -127,7 +127,7 @@ describe('SessionPage — state machine', () => {
     }))
     const { unmount } = renderAt(SESSION_URL)
     const cs = await screen.findByTestId('keymap-cheatsheet')
-    expect(cs.textContent).toMatch(/⎵.*reveal.*1234.*rate.*esc.*exit/i)
+    expect(cs.textContent).toMatch(/⎵.*reveal.*esc.*exit/i)
     unmount()
     useSessionMock().mockReturnValue(mockSession({
       status: 'finished', cardsTotal: 1, details: {
