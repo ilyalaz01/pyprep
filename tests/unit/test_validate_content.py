@@ -233,3 +233,70 @@ def test_emoji_lint_flags_emoji_in_card_json(tmp_path: Path) -> None:
     )
     errors = validate(tmp_path, execute_code_tasks=False)
     assert any("emoji" in e for e in errors), errors
+
+
+# --- T10.8 / N047: credential-shape content lint regression guards -----
+
+
+def test_secret_lint_flags_aws_access_key(tmp_path: Path) -> None:
+    _seed_with_lesson_text(tmp_path, "## Bad\n\nDo not paste `AKIAIOSFODNN7XBTSAMS` here.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("N047" in e and "AKIA" in e for e in errors), errors
+
+
+def test_secret_lint_flags_full_jwt(tmp_path: Path) -> None:
+    jwt = (
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        ".eyJ1c2VyIjoiYWxpY2UifQ"
+        ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    )
+    _seed_with_lesson_text(tmp_path, f"## Leak\n\nA leaked token: `{jwt}`.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("N047" in e and "JWT" in e for e in errors), errors
+
+
+def test_secret_lint_flags_bcrypt_hash(tmp_path: Path) -> None:
+    bcrypt = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+    _seed_with_lesson_text(tmp_path, f"## Hash\n\nstored: `{bcrypt}`.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("N047" in e and "bcrypt" in e for e in errors), errors
+
+
+def test_secret_lint_flags_ghp_token(tmp_path: Path) -> None:
+    pat = "ghp_1234567890abcdef1234567890abcdef1234"
+    _seed_with_lesson_text(tmp_path, f"## Leak\n\nA PAT: `{pat}`.\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("N047" in e and "ghp_" in e for e in errors), errors
+
+
+def test_secret_lint_exempts_redacted_substring(tmp_path: Path) -> None:
+    """Match containing REDACTED is treated as a teaching placeholder."""
+    _seed_with_lesson_text(tmp_path, "## Teaching\n\nKey: `AKIAREDACTEDPLACE` (fake).\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert all("N047" not in e for e in errors), errors
+
+
+def test_secret_lint_exempts_actions_sha_pinning(tmp_path: Path) -> None:
+    """40-hex SHA after `actions/<name>@` is GitHub Actions pinning — public, exempt."""
+    sha_pin = "actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab"
+    _seed_with_lesson_text(tmp_path, f"## Pinning\n\n- uses: {sha_pin}\n")
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert all("N047" not in e for e in errors), errors
+
+
+def test_secret_lint_flags_bare_sha_outside_actions_context(tmp_path: Path) -> None:
+    """A 40-hex string with no `actions/<name>@` prefix is flagged."""
+    _seed_with_lesson_text(
+        tmp_path, "## Hash\n\nSHA1: `8e5e7e5ab8b370d6c329ec480221332ada57f0ab`.\n"
+    )
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert any("N047" in e and "40-hex" in e for e in errors), errors
+
+
+def test_secret_lint_passes_truncated_jwt_body(tmp_path: Path) -> None:
+    """A lone base64 fragment without 3-part `.`-separated structure is not a JWT."""
+    _seed_with_lesson_text(
+        tmp_path, "## Decode\n\nThe body `eyJ1c2VyX2lkIjo0Mn0` decodes to JSON.\n"
+    )
+    errors = validate(tmp_path, execute_code_tasks=False)
+    assert all("N047" not in e for e in errors), errors

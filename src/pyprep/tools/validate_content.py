@@ -2,7 +2,7 @@
 
 Scope: schema (T1.10), ID uniqueness (T1.10), sphere refs (T1.10),
 min cards per sub-task (NOTES N006), code_task execution (T2.5.4),
-emoji content-lint (NOTES N029).
+emoji content-lint (NOTES N029), credential-shape content-lint (NOTES N047).
 """
 
 from __future__ import annotations
@@ -19,6 +19,8 @@ from typing import Any
 
 import jsonschema
 
+from pyprep.tools._content_lint import check_no_emoji, check_no_realistic_secret
+
 CURRICULUM_FILE = "curriculum.md"
 SCHEMA_FILE = "schema/card.schema.json"
 MODULES_DIR = "modules"
@@ -27,9 +29,6 @@ CODE_TASK_TIMEOUT_S = 30
 
 _SPHERE_LINE = re.compile(r"^- `(m\d+-s\d+)` —")
 _SUBTASK_LINE = re.compile(r"^  - `(m\d+-s\d+-t\d+)` —")
-
-# T4.5.3 / NOTES N029 — content emoji lint (PRODUCT.md principle 1).
-_EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF☀-➿]")
 
 
 def parse_curriculum(text: str) -> dict[str, list[str]]:
@@ -136,19 +135,6 @@ def _check_code_task_executions(
     return out
 
 
-def _check_no_emoji(root: Path) -> list[str]:
-    """N029 — flag decorative emoji in lessons / cards (PRODUCT.md §1)."""
-    out: list[str] = []
-    for path in sorted((root / MODULES_DIR).rglob("*")):
-        if path.suffix not in {".md", ".json"}:
-            continue
-        for lineno, line in enumerate(path.read_text("utf-8").splitlines(), start=1):
-            m = _EMOJI_RE.search(line)
-            if m:
-                out.append(f"{path.relative_to(root)}:{lineno}: emoji {m.group(0)!r} (N029)")
-    return out
-
-
 def validate(root: Path, *, execute_code_tasks: bool = True) -> list[str]:
     curriculum = parse_curriculum((root / CURRICULUM_FILE).read_text("utf-8"))
     schema = json.loads((root / SCHEMA_FILE).read_text("utf-8"))
@@ -160,7 +146,8 @@ def validate(root: Path, *, execute_code_tasks: bool = True) -> list[str]:
         + _check_id_uniqueness(cards)
         + _check_sphere_refs(wrappers, curriculum)
         + _check_min_cards(wrappers, curriculum)
-        + _check_no_emoji(root)
+        + check_no_emoji(root)
+        + check_no_realistic_secret(root)
     )
     if execute_code_tasks:
         errors += _check_code_task_executions(wrappers)
