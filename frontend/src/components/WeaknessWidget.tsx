@@ -108,7 +108,7 @@ function WeaknessBody({ isLoading, isError, data }: BodyProps) {
             <ProgressBar
               value={s.retention}
               ariaLabel={`${Math.round(s.retention * 100)} percent retention`}
-              className="w-24"
+              className="w-40"
             />
             <span className="w-10 text-right">{Math.round(s.retention * 100)}%</span>
           </span>
