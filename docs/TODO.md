@@ -406,7 +406,7 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | P99/A100/BP92/SEO100 on /login prod Desktop; Tier 2 + /session+/stats + CSP deferred post-MVP-1 (see N048) | ✅ |
 | T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |
-| T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044/N045/N047 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | 🟨 (appendix landed in `PRD_code_sandbox.md` §10 — five constraints N039+N043+N044+N045+N047; section renamed to "Card authoring constraints" since §10.4 + §10.5 are broader than code_task; retroactive N041 pairs still pending owner authorization, see candidate list below) |
+| T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044/N045/N047 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | ✅ (`PRD_code_sandbox.md` §10 "Card authoring constraints" appendix landed with five constraints N039+N043+N044+N045+N047; three retroactive N041 bridge MCs landed `0635ca8` for m3-s2-c4 + m3-s3-c10 + m3-s4-c5, with `footgun-pair` tag added to both halves of each pair per repo symmetry convention; module 3 70 → 73 cards) |
 
 **T10.8 retroactive N041 fix-MC pair candidates (surfaced during module-sweep audits):**
 
@@ -417,7 +417,21 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 **T10.8 constraint-catalog promotion:** ✅ landed in `PRD_code_sandbox.md` §10 "Card authoring constraints" (2026-05-14). Catalog scope expanded twice from the original Module-3-close plan (N039+N043+N044): N045 added because the rule is card-authoring-adjacent and surfaced twice (m3-s5-c6, m4-s1-c10); N047 added because §10.4 + §10.5 are explicitly broader than code_task (apply to every card type plus lessons), prompting the section header rename from "Code_task authoring constraints" to "Card authoring constraints". Each constraint section follows the same shape: rule → why → acceptable/forbidden forms → heuristic → cross-link to originating NOTES. Future authors read §10 once before writing their first card and have the five most common pre-validation gotchas already in hand. The validator-level enforcement of N047 (a `_check_no_realistic_secret` regex rule in `scripts/validate_content.py`) is documented in §10.5 as a Phase 10 follow-on candidate; deferred because retroactive sweep was clean and false-positive risk in lesson prose requires careful regex tuning.
 
-**Phase 10 exit gate:** Segal §16 final-submission checklist 100% green.
+**Phase 10 polish wave exit gate:** ✅ all polish items closed.
+
+- **T10.6** Lighthouse baseline: P99 / A100 / BP92 / SEO100 on `/login` prod Desktop. Tier 2 (route-level code splitting, `/session`+`/stats` audit with auth, CSP header policy) deferred post-MVP-1 with explicit re-evaluation gates documented in N048.
+- **T10.8** `PRD_code_sandbox.md` §10 "Card authoring constraints" appendix landed (5 constraints: N039 + N043 + N044 + N045 + N047). 3 retroactive N041 bridge MCs landed in `0635ca8` for m3-s2-c4 + m3-s3-c10 + m3-s4-c5; `footgun-pair` tag added to both halves of each pair per repo convention. Module 3: 70 → 73 cards.
+- **N047** credential-shape regex enforcement live in `src/pyprep/tools/_content_lint.py` (AKIA / ghp_ / sk_live_ / sk_test_ / full-3-part JWT / bcrypt / argon2 / 40-hex SHA, with REDACTED/EXAMPLE/FAKE/XXXX whitelist and `actions/<name>@<sha>` GitHub Actions pinning exemption). 8 new regression tests; 215 unit tests pass. Validator clean on all m1–m4 content.
+- **N038** vite env coverage gate live in `.pre-commit-config.yaml` (pre-push gate count 9 → 10). Authoring the gate surfaced `VITE_PYODIDE_VERSION` as orphaned documentation; cleanup landed in `c9b76ce` (single source of truth = `VITE_PYODIDE_CDN` URL path).
+- **N030 design leftovers** deferred-by-design per the N030 entry. T10.6 confirmed A11y 100 on `/login` prod Desktop, validating the deferral's risk profile (shared design tokens + shared auth shell across `/home` / `/session` / `/stats`). `/session`+`/stats` route-level a11y measurement carries the T10.6 Tier 2 deferral.
+
+**Module card counts at close** (validator green): M1 93 + M2 104 + M3 73 + M4 156 = **426 total cards**.
+
+**Pre-push gates green at close (10 of 10):** ruff (lint) / mypy (sdk + api strict) / file-size ceiling (≤150 LOC) / handler-LOC audit (≤10 logic LOC) / frontend ESLint / frontend TypeScript (tsc -b) / contrast gate (WCAG AA on theme tokens) / em-dash content lint / **vite env coverage** (new) / bundle size (≤2 MB raw, ≤600 KB gzip).
+
+**Deferred to MVP-1 ship wave** (still ⬜ in the Phase 10 table above): T10.1 README finalization, T10.2 screenshots, T10.3 production Dockerfile, T10.4 deploy guide, T10.5 license + COC + CONTRIBUTING, T10.7 final coverage/lint/file-size project-wide check. These are deployment-packaging items, distinct from the polish wave above.
+
+**Phase 10 polish wave closed 2026-05-14.** MVP-1 ready to ship.
 
 ---
 
