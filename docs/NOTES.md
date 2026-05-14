@@ -844,13 +844,14 @@ The Phase 6.5 audit already raised the analogous local-side concern
 (env-var setup pairing) — the CI side is the same shape and just
 got added to the rule.
 
-**Phase 10 gate candidate:** `scripts/check-vite-env-coverage.mjs`
-that greps `VITE_*` references across `frontend/src/**`, compares
-against the union of `.env.example` keys and CI workflow `env:`
-keys, fails on any reference not covered. Same idea as the
+**Phase 10 gate landed:** `scripts/check-vite-env-coverage.mjs` ships
+in Phase 10 polish. Greps `VITE_*` references across `frontend/src/**`,
+compares against `.env-example` keys, fails on either direction
+(used-but-undocumented or documented-but-unused). Same shape as the
 contrast/em-dash/bundle gates: regression detection at push time
-instead of CI-failure time. Filed for Phase 10 polish; not
-blocking Phase 6.5 close.
+instead of CI-failure time. Authoring the gate surfaced
+`VITE_PYODIDE_VERSION` as orphaned documentation (declared but unread)
+and that var was cleaned up in the same Phase 10 wave.
 
 ---
 

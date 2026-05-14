@@ -64,6 +64,12 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: vite-env-coverage-gate
+        name: vite env coverage (frontend/src/ VITE_* == .env-example)
+        entry: node scripts/check-vite-env-coverage.mjs
+        language: system
+        pass_filenames: false
+
       - id: bundle-size-gate
         name: bundle size (raw <= 2MB, gzip <= 600KB per ADR-022)
         entry: bash -c 'pnpm --dir frontend build >/dev/null && node scripts/check-bundle-size.mjs'
