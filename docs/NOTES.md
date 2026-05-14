@@ -1380,3 +1380,93 @@ threads fail the "stands alone" test and produce cards whose
 cross-references load-bear what should be the card's own
 pedagogy.
 
+---
+
+## N047 — Obviously-fake placeholders for credential teaching examples [AUTHORING]
+
+**Phase:** 9 (m4-s8) · **Date:** 2026-05-14 · **Status:** active
+
+When a card or lesson includes a credential value as part of a
+teaching example (hardcoded API key in a workflow file, leaked
+token in an incident scenario, JWT, bcrypt hash, AWS access key,
+GitHub PAT, etc.), the placeholder text MUST be obviously fake
+on visual inspection. Realistic-looking values are forbidden even
+when they're invented from scratch.
+
+**Discovery:** m4-s8-c11 (hardcoded-secret-in-workflow-file
+incident scenario) was authored with a placeholder that looked
+plausibly like a real API key. GitHub push protection blocked the
+push at `git push` time, flagging the value as a potential leaked
+credential. The placeholder was rewritten to
+`REDACTED_FAKE_API_KEY_FOR_TEACHING` and the push went through.
+Push protection's false positive was the right call given how
+realistic the placeholder looked — the same shape would have made
+human readers wonder "is this a real key?" too.
+
+**The rule:** credential-shaped strings in teaching content must
+fail every realistic-secret heuristic:
+
+- **API keys / tokens:** use `REDACTED_FAKE_*_FOR_TEACHING`,
+  `EXAMPLE_KEY_NOT_REAL`, or descriptive sentinels like
+  `<your-api-key>`. Never a random-looking 32+ char alphanumeric
+  blob.
+- **JWTs:** truncate to a short prefix with `...` —
+  `eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo0Mn0.aBcDeF...`
+  (where the payload decodes to the teaching example
+  `{"user_id":42}` and the signature is obviously short / fake).
+- **Password hashes (bcrypt, argon2):** don't include literal
+  hash values; describe the shape in prose
+  (`$2b$12$<22-char-salt><31-char-hash>`) or use clearly
+  non-functional examples.
+- **AWS / GitHub / Stripe / Slack tokens:** avoid the real prefix
+  patterns (`AKIA*`, `ghp_*`, `sk_live_*`, `xoxb-*`) entirely.
+  These prefixes trigger every secret scanner on the planet.
+- **Git SHAs:** real SHAs are fine when teaching SHA-pinning
+  (e.g., `actions/checkout@<real-sha>` is the *correct* practice
+  to teach). A SHA isn't a secret; it's a public commit
+  identifier. The rule applies to *credentials*, not to public
+  identifiers that look hex-shaped.
+
+**Why this matters operationally:**
+
+1. **Push protection / pre-commit hooks block the push.**
+   `detect-secrets`, `gitleaks`, `trufflehog`, GitHub push
+   protection, Vercel deploy scanning — all flag realistic-shape
+   values. A teaching example that triggers them costs author
+   time (failed push, rewrite, re-push) at minimum, and can be
+   blocking in CI environments.
+2. **Reader cognitive load.** A reader seeing a realistic-looking
+   credential in a teaching example has to mentally answer "is
+   this a real leak? Should I rotate something?". Obviously-fake
+   values eliminate that question.
+3. **Accidental collision risk.** A randomly-generated
+   real-looking key could collide with a real credential
+   somewhere in the world (vanishingly small probability, but
+   non-zero). Sentinels like `REDACTED_FAKE_*` cannot collide
+   with anything real by construction.
+
+**Sweep result (2026-05-14, Module 4 close):** ran secret-shape
+greps across all four shipped modules
+(`m1`–`m4`) for AWS / GitHub / Stripe / Slack / Google API key
+prefixes, full-length JWTs, bcrypt/argon2 hash shapes, and 40+
+char hex strings. Only legitimate hits: the
+`REDACTED_FAKE_API_KEY_FOR_TEACHING` placeholder in m4-s8-c11
+(this rule applied correctly), the truncated JWT teaching
+example in m4-s7-c7 (within the rule), a real
+`actions/checkout` git SHA in m4-s8-c5 (public identifier, not a
+credential), and an IEEE-754 binary expansion of `0.1` in
+m3-s1 (math, not a hash). No retrospective fixes required.
+
+**Related:** N029 / `_check_no_emoji` is the validator-enforced
+authoring discipline; this rule (N047) is *not* validator-enforced
+— it relies on push protection / external scanners + authoring
+discipline. Promotion to validator-level enforcement is a
+candidate future enhancement: add a `_check_no_realistic_secret`
+rule to `scripts/validate_content.py` that flags strings matching
+`AKIA*`, `ghp_*`, `sk_live_*`, `^eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+$`,
+and the bcrypt/argon2 hash shapes. Deferred to Phase 10 polish.
+
+**Cross-references:** [[N029]] (validator-enforced authoring
+discipline pattern). The placeholder shape in m4-s8-c11
+illustrates the rule operationally.
+
