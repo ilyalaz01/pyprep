@@ -54,7 +54,7 @@
       "topic": "match= is a regex; unescaped special chars match too much",
       "topic_ru": "match= — это регекс; неэкранированные спецсимволы матчат лишнее",
       "difficulty": 4,
-      "tags": ["pytest", "raises", "match", "regex", "subtle", "interview-classic"],
+      "tags": ["pytest", "raises", "match", "regex", "subtle", "interview-classic", "footgun-pair"],
       "code_snippet": "import pytest\n\ndef compute():\n    raise RuntimeError('database error: connection refused')\n\ndef test_compute_raises_value_error():\n    with pytest.raises(RuntimeError, match='ValueError'):\n        compute()",
       "question": "Does this test pass, and what does that tell us about `match=`?",
       "options": [
@@ -65,6 +65,29 @@
       ],
       "correct_index": 1,
       "explanation_md": "`match=` is passed to `re.search`, not `str.__contains__`. Every special regex character (`.` `(` `[` `*` `+` `?` `^` `$` `\\` `|` `{`) is interpreted as regex syntax inside the pattern. The most-bitten case is `.`: `match='value.error'` matches `value-error`, `valueXerror`, `value error`, anything with that shape. A passing test on the wrong-shape message ships to production.\n\nTwo fixes:\n\n```python\n# Option A: escape with re.escape\nimport re\nwith pytest.raises(ValueError, match=re.escape('result (3.14)')):\n    compute()\n\n# Option B: write the literal regex\nwith pytest.raises(ValueError, match=r'result \\(3\\.14\\)'):\n    compute()\n```\n\nAlso note: `match=` does a **search** (not a fullmatch), so unanchored patterns match anywhere in the string. Use `match=r'^exact message$'` to anchor to the whole message, or accept partial-match semantics deliberately.\n\nThe interview test: 'what's wrong with `pytest.raises(ValueError, match=\"value error\")`?' — Answer: `match=` is regex, the space between words is fine, but if the pattern contained any of `.()[]*+?^$\\|{}`, it would match more than the literal string. Use `re.escape` when in doubt."
+    },
+
+    {
+      "id": "m3-s2-c13",
+      "type": "multiple_choice",
+      "topic": "Correct fix for unsafe regex chars in pytest.raises(match=)",
+      "topic_ru": "Правильное исправление спецсимволов regex в pytest.raises(match=)",
+      "difficulty": 3,
+      "tags": ["pytest", "raises", "match", "regex", "re-escape", "footgun-pair"],
+      "question": "You want `pytest.raises(ValueError, match=...)` to assert that the message is literally `'result (3.14)'`. Which approach is the canonical fix for the regex-vs-string footgun?",
+      "options": [
+        "Wrap the literal in `re.escape`: `match=re.escape('result (3.14)')`. Builds the escaped regex programmatically, no chance of missing a metacharacter.",
+        "Write a raw-string regex by hand, backslash-escaping each special char yourself: `match=r'result \\(3\\.14\\)'`.",
+        "Anchor the pattern with `^` and `$`: `match=r'^result (3.14)$'`. Forces a full-string match.",
+        "Switch to `assertRaisesRegex` from `unittest` because it does plain string comparison, not regex."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. `re.escape` produces the exact regex that matches the literal string, no matter what special characters it contains. You never have to enumerate the regex metacharacter set yourself, and it stays correct if the message gains a `+` or `?` later.",
+        "Works for THIS message, but the burden is on you to enumerate every regex metacharacter (`. ( ) [ ] * + ? ^ $ \\ | { }`). Easy to miss one, easy to drift wrong in maintenance. Use only when you genuinely want a regex (e.g., matching a varying numeric suffix with `\\d+`).",
+        "Incomplete defense. Anchoring fixes the search-vs-fullmatch issue (`match=` does `re.search`, not `re.fullmatch`), but `(` `)` and `.` are STILL regex metacharacters inside the anchors. `^result (3.14)$` still matches `result 314` because `(3.14)` is a capturing group around `3.14` where `.` is a wildcard. Combine anchoring WITH `re.escape` if you want both.",
+        "Wrong: `assertRaisesRegex` is ALSO regex-based, as its name says. You hit the same footgun under a different API. unittest.TestCase has no plain-string equivalent for raised-message assertions; the closest is catching the exception and writing `str(exc) == 'literal'` manually."
+      ]
     },
 
     {

@@ -157,7 +157,7 @@
       "topic": "Session-scoped mutable state contaminates later tests",
       "topic_ru": "Session-scoped mutable state контаминирует поздние тесты",
       "difficulty": 4,
-      "tags": ["pytest", "fixture", "scope", "mutable-state", "contamination", "interview-classic"],
+      "tags": ["pytest", "fixture", "scope", "mutable-state", "contamination", "interview-classic", "footgun-pair"],
       "code_snippet": "@pytest.fixture(scope='session')\ndef users():\n    return []                  # SHARED across the entire test run\n\ndef test_add_alice(users):\n    users.append({'name': 'alice'})\n    assert len(users) == 1     # passes — first to run\n\ndef test_add_bob(users):\n    users.append({'name': 'bob'})\n    assert len(users) == 1     # FAILS — sees alice from previous test",
       "question": "What kind of bug is hiding here, and why might it appear intermittently?",
       "options": [
@@ -168,6 +168,29 @@
       ],
       "correct_index": 1,
       "explanation_md": "Wider scope means longer-lived fixture; mutable fixture means tests can change it; the combination means tests can affect each other.\n\nThis is the canonical session-scope poison. Symptoms:\n\n- Tests pass locally where you happen to run them in one order, fail in CI where they run in another.\n- `pytest test_add_bob.py` alone passes; `pytest tests/` fails on `test_add_bob`.\n- Adding `pytest -p no:randomly` (or removing it) flips the outcome.\n- A new test introduced six months later breaks two unrelated tests that 'were passing yesterday'.\n\nThe fix is to use `function` scope (the default) so each test gets a fresh list:\n\n```python\n@pytest.fixture\ndef users():\n    return []                 # fresh per test\n```\n\nIf the *expensive* part is something else (DB connection), split: session-scoped *immutable* DB connection + function-scoped *mutable* session built on top. **Rule:** wider scope is only safe for read-only fixtures. Mutable state at wider-than-function is a code-review blocker."
+    },
+
+    {
+      "id": "m3-s3-c15",
+      "type": "multiple_choice",
+      "topic": "Correct fix for mutable-state contamination from session-scoped fixtures",
+      "topic_ru": "Правильное исправление контаминации mutable-state из session-scoped фикстур",
+      "difficulty": 3,
+      "tags": ["pytest", "fixture", "scope", "contamination", "function-scope", "footgun-pair"],
+      "question": "You have `@pytest.fixture(scope='session') def users(): return []` and tests that `.append()` to it. Tests pass in isolation, fail in CI. Which is the canonical fix?",
+      "options": [
+        "Drop the explicit scope: `@pytest.fixture def users(): return []`. Function scope (the default) gives each test a fresh list, structural isolation.",
+        "Keep `scope='session'` but return an immutable type like `tuple()` or `frozenset()`. Tests cannot mutate it, so contamination cannot happen.",
+        "Factory fixture: `@pytest.fixture(scope='session') def make_users(): return lambda: []`. Each test calls `make_users()` to get a fresh list; the factory itself is session-cached.",
+        "Inside each test, deep-copy the fixture before using it: `local_users = copy.deepcopy(users)`. Tests mutate the copy, not the shared list."
+      ],
+      "correct_index": 0,
+      "option_explanations": [
+        "Correct. The default `function` scope is exactly the right tool for mutable per-test state. The whole problem is that `session` was overreach: the fixture is cheap to construct (`return []`), so caching it across the run buys nothing and trades away all test isolation. Reach for wider scopes only when construction is expensive (DB connection, loaded model) AND the result is read-only.",
+        "Works only because immutability is structurally enforced; `tuple()` has no `.append`. But (a) most real fixtures aren't a single primitive, they're objects with mutable attributes, (b) `frozenset` doesn't compose with code that expects list semantics, (c) the rule 'session-scoped only if immutable' is a discipline that one careless future maintainer can break by adding a mutable field. Defense-in-depth, not the structural fix.",
+        "Works but adds indirection. Each test calls the factory; the factory always returns a fresh list. Useful when the *expensive* part (e.g., a configured Faker instance) is genuinely session-cacheable and you want fresh derivative data per test. For a plain `return []`, simpler to just use function scope.",
+        "Works but is bizarre. You've kept the dangerous shared fixture and pushed isolation discipline onto every test. One forgotten `deepcopy` and you're back to contamination. Pay the cost of correctness once at fixture definition, not at every callsite."
+      ]
     },
 
     {

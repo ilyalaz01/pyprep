@@ -66,7 +66,7 @@
       "topic": "assert_called_with checks only the LAST call",
       "topic_ru": "assert_called_with проверяет только ПОСЛЕДНИЙ вызов",
       "difficulty": 4,
-      "tags": ["mock", "assert-called-with", "last-call", "subtle", "interview-classic"],
+      "tags": ["mock", "assert-called-with", "last-call", "subtle", "interview-classic", "footgun-pair"],
       "code_snippet": "from unittest.mock import Mock\n\ndef test_emits_event_for_each_action():\n    emitter = Mock()\n    do_signup(emitter, user='alice')\n    # do_signup internally calls emitter.emit('user.created', 'alice')\n    # and then emitter.emit('audit.write', 'signup')\n\n    emitter.emit.assert_called_with('user.created', 'alice')",
       "question": "Does this assertion pass, and what does that tell us about `assert_called_with`?",
       "options": [
@@ -77,6 +77,29 @@
       ],
       "correct_index": 1,
       "explanation_md": "Common bug shape: the test asserts an early call's args, but the production code makes additional calls after the one the test cares about. `assert_called_with` silently checks the last call only and reports a confusing mismatch.\n\nTwo robust patterns:\n\n```python\n# Pattern A: order-agnostic, 'was this call made at some point?'\nemitter.emit.assert_any_call('user.created', 'alice')\n\n# Pattern B: assert full sequence of calls\nfrom unittest.mock import call\nemitter.emit.assert_has_calls([\n    call('user.created', 'alice'),\n    call('audit.write', 'signup'),\n], any_order=False)\n```\n\nThe `mock.call` helper builds the canonical call-args representation; `assert_has_calls(list, any_order=False)` checks the sequence in order. **Rule:** `assert_called_with` is correct only when you're certain the mock is called exactly once *or* you specifically care about the last call. Otherwise reach for `assert_called_once_with`, `assert_any_call`, or `assert_has_calls`."
+    },
+
+    {
+      "id": "m3-s4-c17",
+      "type": "multiple_choice",
+      "topic": "Correct fix for assert_called_with checking only the last call",
+      "topic_ru": "Правильное исправление assert_called_with, проверяющего только последний вызов",
+      "difficulty": 3,
+      "tags": ["mock", "assert-called-with", "assert-has-calls", "assert-any-call", "footgun-pair"],
+      "question": "Your code under test calls `emitter.emit(...)` multiple times. You want to verify BOTH `('user.created', 'alice')` AND `('audit.write', 'signup')` were emitted, in that order. Which is the canonical fix?",
+      "options": [
+        "`emitter.emit.assert_any_call('user.created', 'alice')` followed by a second `assert_any_call(...)` for the audit call.",
+        "`emitter.emit.assert_has_calls([call('user.created', 'alice'), call('audit.write', 'signup')], any_order=False)` using `mock.call`. One assertion captures both calls and their order.",
+        "Loop over `emitter.emit.call_args_list` and check each call's `.args` matches the expected tuple at that index.",
+        "Capture the calls in a list manually: define a `side_effect` function that appends each invocation's args to a list, then assert the list matches."
+      ],
+      "correct_index": 1,
+      "option_explanations": [
+        "Works for 'each call happened at some point' but loses ORDER. `assert_any_call` is order-agnostic; it would pass even if the audit call came before the user.created call. Correct fix when you only care about presence, but the stated intent here was 'in that order'.",
+        "Correct. `assert_has_calls(..., any_order=False)` is the canonical way to assert a sequence of mock calls including their relative order. `mock.call` builds the call-args representation (args + kwargs) so the comparison is exact. One expression, one failure message naming exactly which call in the sequence didn't match.",
+        "Works but reinvents `assert_has_calls`. You write your own loop, index, message format, kwargs handling, and it's already in the stdlib. Use this only if you need behavior `assert_has_calls` doesn't offer (e.g., custom partial-match logic).",
+        "Works but adds a second source of truth: the Mock now has both its built-in call tracking AND your manual list, easy to drift. `side_effect` also changes the mock's behavior (it can affect return values), which is heavier than needed for a pure assertion problem."
+      ]
     },
 
     {
