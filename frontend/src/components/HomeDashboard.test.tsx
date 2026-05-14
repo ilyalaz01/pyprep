@@ -107,29 +107,31 @@ describe('HomeDashboard — Weakness section', () => {
     expect(screen.queryByText(/weakness/i)).not.toBeInTheDocument()
   })
 
-  test('renders sphere + retention bar + % when reviews_total >= 10', async () => {
+  // Stats-S4 (Phase 10.5): /home renders the widget in mode="compact" —
+  // single-line "Weakest: {title} {N}%" — to differentiate from /stats'
+  // full top-N drill-down. /stats coverage stays in WeaknessWidget.test.tsx.
+  test('renders compact preview "Weakest: {title} {N}%" when reviews_total >= 10', async () => {
     // NB: more-specific paths MUST come first — `/api/stats/me` is a
     // substring of `/api/stats/me/weakness`, and the matcher is first-hit-wins.
     mockRoutes({
       '/api/stats/me/weakness': () =>
         jsonResponse({
           top: [
-            { sphere_id: 'm1-s4', reviews_total: 8, retention: 0.5, weakness: 0.42 },
-            { sphere_id: 'm1-s5', reviews_total: 6, retention: 0.66, weakness: 0.31 },
+            { sphere_id: 'm1-s4', reviews_total: 8, retention: 0.5, weakness: 0.42, lesson_title: null },
           ],
         }),
       '/api/review/queue': () => queue(),
       '/api/stats/me': () => overview(25, 0.7),
     })
     renderDashboard()
-    expect(await screen.findByText(/top 3 weakness areas/i)).toBeInTheDocument()
-    expect(await screen.findByText('m1-s4')).toBeInTheDocument()
+    expect(await screen.findByText(/^weakest area$/i)).toBeInTheDocument()
+    expect(await screen.findByTestId('weakness-compact')).toBeInTheDocument()
+    expect(screen.getByText(/weakest:/i)).toBeInTheDocument()
+    expect(screen.getByText('m1-s4')).toBeInTheDocument()
     expect(screen.getByText('50%')).toBeInTheDocument()
-    expect(screen.getByText('m1-s5')).toBeInTheDocument()
-    expect(screen.getByText('66%')).toBeInTheDocument()
   })
 
-  test('weakness row shows lesson_title prominent + sphere_id caption (T4.5.6)', async () => {
+  test('compact preview shows lesson_title when available (not sphere_id)', async () => {
     mockRoutes({
       '/api/stats/me/weakness': () =>
         jsonResponse({
@@ -143,7 +145,8 @@ describe('HomeDashboard — Weakness section', () => {
     })
     renderDashboard()
     expect(await screen.findByText(/closures and decorators/i)).toBeInTheDocument()
-    expect(screen.getByText('m1-s4')).toBeInTheDocument()
+    // Compact preview hides the sphere_id when lesson_title is present.
+    expect(screen.queryByText('m1-s4')).toBeNull()
   })
 
   test('eligible but empty top: shows "keep practicing" copy', async () => {

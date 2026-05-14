@@ -19,6 +19,13 @@
  * right; tabular-nums for digit-stable alignment. Matches the T4.5.6
  * "Address-vs-Label" rule.
  *
+ * Mode prop (Stats-S4 Phase 10.5 IA fix):
+ *   - compact: single-line "Weakest: {title} {N}%" — used on /home
+ *     dashboard to differentiate from /stats full view. No bar in
+ *     compact mode (too dense for a one-liner; the percentage
+ *     carries the signal).
+ *   - full: top-N rows with retention bars (default; used on /stats).
+ *
  * Anti-Duolingo discipline: "weak" is the audit-given name but the
  * UI copy stays neutral — "No weak spheres yet. Keep practicing."
  * is gentle; no "you're struggling with X" framing.
@@ -33,20 +40,25 @@ interface WeaknessWidgetProps {
   title?: string
   /** Default 3; bumped to 5 on /stats if the surface wants more rows. */
   topN?: number
+  /** Stats-S4: compact = single-line preview (dashboard); full = top-N rows (default). */
+  mode?: 'compact' | 'full'
 }
 
 export function WeaknessWidget({
-  title = 'Top 3 weakness areas',
+  title,
   topN = 3,
+  mode = 'full',
 }: WeaknessWidgetProps) {
+  const resolvedTitle = title ?? (mode === 'compact' ? 'Weakest area' : 'Top 3 weakness areas')
+  const effectiveTopN = mode === 'compact' ? 1 : topN
   const q = useQuery({
-    queryKey: ['stats', 'weakness', topN],
-    queryFn: () => api.stats.weakness(topN),
+    queryKey: ['stats', 'weakness', effectiveTopN],
+    queryFn: () => api.stats.weakness(effectiveTopN),
   })
 
   return (
-    <Section title={title}>
-      <WeaknessBody isLoading={q.isLoading} isError={q.isError} data={q.data} />
+    <Section title={resolvedTitle}>
+      <WeaknessBody isLoading={q.isLoading} isError={q.isError} data={q.data} mode={mode} />
     </Section>
   )
 }
@@ -55,9 +67,10 @@ interface BodyProps {
   isLoading: boolean
   isError: boolean
   data: { top: Array<{ sphere_id: string; lesson_title: string | null; retention: number }> } | undefined
+  mode: 'compact' | 'full'
 }
 
-function WeaknessBody({ isLoading, isError, data }: BodyProps) {
+function WeaknessBody({ isLoading, isError, data, mode }: BodyProps) {
   if (isLoading) {
     return (
       <div data-testid="weakness-skeleton" aria-hidden="true" className="space-y-2">
@@ -84,6 +97,20 @@ function WeaknessBody({ isLoading, isError, data }: BodyProps) {
         className="text-sm text-[color:var(--color-fg-muted)]"
       >
         No weak spheres yet. Keep practicing.
+      </p>
+    )
+  }
+  if (mode === 'compact') {
+    const s = data.top[0]
+    return (
+      <p data-testid="weakness-compact" className="text-sm">
+        <span className="text-[color:var(--color-fg-subtle)]">Weakest: </span>
+        <span className="text-[color:var(--color-fg)]">
+          {s.lesson_title ?? s.sphere_id}
+        </span>
+        <span className="ml-2 text-[color:var(--color-fg-muted)] tabular-nums">
+          {Math.round(s.retention * 100)}%
+        </span>
       </p>
     )
   }

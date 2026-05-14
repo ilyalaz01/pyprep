@@ -84,6 +84,29 @@ describe('OverviewCards — structure', () => {
   })
 })
 
+// Stats-S3 (Phase 10.5): each tile renders an icon in its eyebrow row.
+describe('OverviewCards — Stats-S3 icons', () => {
+  test('every tile renders an <svg> icon', () => {
+    render(<OverviewCards data={sample} />)
+    for (const label of ['Reviewed', 'Time invested', 'Active streak', 'Progress']) {
+      expect(tileBy(label).querySelector('svg')).not.toBeNull()
+    }
+  })
+
+  // Anti-Duolingo regression guard: the Calendar icon for the streak
+  // tile is a deliberate "NOT Flame" design call. If a future contributor
+  // swaps in Flame, this test must catch it. We check the icons module
+  // does not export Flame and the rendered streak tile's <svg> does not
+  // carry the Lucide Flame path data.
+  test('NO Flame icon anywhere in OverviewCards (anti-Duolingo)', async () => {
+    const icons = await import('./icons')
+    expect((icons as Record<string, unknown>).Flame).toBeUndefined()
+    const { container } = render(<OverviewCards data={sample} />)
+    // The Lucide Flame path starts with 'M8.5 14.5' (verbatim path-d signature).
+    expect(container.innerHTML).not.toContain('M8.5 14.5')
+  })
+})
+
 describe('OverviewCards — anti-Duolingo discipline (P7 brief §C)', () => {
   test('no emoji or flame anywhere in the rendered output', () => {
     const { container } = render(<OverviewCards data={sample} />)

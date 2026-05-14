@@ -84,7 +84,7 @@ export function HomeDashboard() {
         </p>
       </Section>
 
-      {showWeakness && <WeaknessWidget />}
+      {showWeakness && <WeaknessWidget mode="compact" />}
     </div>
   )
 }

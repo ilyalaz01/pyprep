@@ -22,11 +22,27 @@
  * SessionSummary IS honest because the renderer has the answer
  * data in-memory; only the aggregate /stats tile is dropped.
  * See NOTES N040 for the post-MVP path to restore.
+ *
+ * Stats-S3 (Phase 10.5): tile gains an icon in the eyebrow row
+ * next to the label; value+units dominate the baseline row below.
+ * Icons hand-rolled in ./icons.tsx (Lucide MIT paths, 4-icon
+ * vocabulary — no npm dependency per ADR-025 spirit):
+ *   Check (Reviewed), Clock (Time), Calendar (Active streak —
+ *   NOT Flame, per anti-Duolingo rule), Sparkles (Progress).
+ *
+ * No outer card container — each Tile already has hairline border
+ * + rounded + padding. The S3 spec mentioned "Tier 1.3 treatment",
+ * but Tier 1.3 was for Section component; tiles already self-
+ * contain at their own granularity. Wrapping would create double-
+ * border noise.
  */
+import type { ReactNode } from 'react'
+
 import type { Overview } from '../lib/types'
 import {
   formatReviews, formatStreak, formatTime, formatXp,
 } from '../lib/format-stats'
+import { Calendar, Check, Clock, Sparkles } from './icons'
 
 interface OverviewCardsProps {
   data: Overview
@@ -40,10 +56,10 @@ export function OverviewCards({ data }: OverviewCardsProps) {
       data-testid="overview-cards"
       className="grid grid-cols-2 lg:grid-cols-4 gap-3"
     >
-      <Tile value={reviews.value} units={reviews.units} label="Reviewed" />
-      <Tile value={formatTime(data.total_seconds)} label="Time invested" />
-      <Tile value={streak.value} units={streak.units} label="Active streak" />
-      <Tile value={formatXp(data.xp)} units="XP" label="Progress" />
+      <Tile value={reviews.value} units={reviews.units} label="Reviewed" icon={<Check />} />
+      <Tile value={formatTime(data.total_seconds)} label="Time invested" icon={<Clock />} />
+      <Tile value={streak.value} units={streak.units} label="Active streak" icon={<Calendar />} />
+      <Tile value={formatXp(data.xp)} units="XP" label="Progress" icon={<Sparkles />} />
     </div>
   )
 }
@@ -52,17 +68,22 @@ interface TileProps {
   value: string
   units?: string
   label: string
+  icon: ReactNode
 }
 
-function Tile({ value, units, label }: TileProps) {
+function Tile({ value, units, label, icon }: TileProps) {
   return (
     <div
       data-tile={label}
       className={[
         'border border-[color:var(--color-border)] rounded p-4',
-        'flex flex-col gap-1',
+        'flex flex-col gap-2',
       ].join(' ')}
     >
+      <div className="flex items-center gap-1.5 text-[color:var(--color-fg-subtle)]">
+        {icon}
+        <p className="text-xs uppercase tracking-wide">{label}</p>
+      </div>
       <div className="flex items-baseline gap-1.5">
         <span className="text-2xl font-semibold tabular-nums text-[color:var(--color-fg)]">
           {value}
@@ -73,9 +94,6 @@ function Tile({ value, units, label }: TileProps) {
           </span>
         ) : null}
       </div>
-      <p className="text-xs uppercase tracking-wide text-[color:var(--color-fg-subtle)]">
-        {label}
-      </p>
     </div>
   )
 }
