@@ -406,7 +406,7 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | Report saved | ⬜ |
 | T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |
-| T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | ⬜ (see candidate list below) |
+| T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044/N045/N047 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | 🟨 (appendix landed in `PRD_code_sandbox.md` §10 — five constraints N039+N043+N044+N045+N047; section renamed to "Card authoring constraints" since §10.4 + §10.5 are broader than code_task; retroactive N041 pairs still pending owner authorization, see candidate list below) |
 
 **T10.8 retroactive N041 fix-MC pair candidates (surfaced during module-sweep audits):**
 
@@ -415,7 +415,7 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 - `m3-s3-c10` (session-scope mutable contamination) — paired fix-MC compares `scope='function'` (default, safe) vs `scope='session'` + immutable wrapper vs factory-fixture-returning-fresh vs deep-copy-per-test.
 - (Future-add) any further d4 traps surfaced during Module 4 sweeps. Update this list as Module 4 closes.
 
-**T10.8 constraint-catalog promotion:** N039 (Pyodide-vs-CPython divergences), N043 (single-file harness — `solution.py` + `test_solution.py` only), N044 (verify pyproject.toml deps before importing non-stdlib) are all code_task authoring constraints that future authors need before writing their first card. Currently scattered as numbered NOTES entries. Promote to a dedicated appendix in `docs/PRD_code_sandbox.md` (section §10 or similar) titled "Code_task authoring constraints" so the rules are co-located with the sandbox PRD they govern.
+**T10.8 constraint-catalog promotion:** ✅ landed in `PRD_code_sandbox.md` §10 "Card authoring constraints" (2026-05-14). Catalog scope expanded twice from the original Module-3-close plan (N039+N043+N044): N045 added because the rule is card-authoring-adjacent and surfaced twice (m3-s5-c6, m4-s1-c10); N047 added because §10.4 + §10.5 are explicitly broader than code_task (apply to every card type plus lessons), prompting the section header rename from "Code_task authoring constraints" to "Card authoring constraints". Each constraint section follows the same shape: rule → why → acceptable/forbidden forms → heuristic → cross-link to originating NOTES. Future authors read §10 once before writing their first card and have the five most common pre-validation gotchas already in hand. The validator-level enforcement of N047 (a `_check_no_realistic_secret` regex rule in `scripts/validate_content.py`) is documented in §10.5 as a Phase 10 follow-on candidate; deferred because retroactive sweep was clean and false-positive risk in lesson prose requires careful regex tuning.
 
 **Phase 10 exit gate:** Segal §16 final-submission checklist 100% green.
 
