@@ -108,7 +108,7 @@ function StatsReady({ data }: { data: Overview }) {
       <Section title="By module">
         <PerModuleTable />
       </Section>
-      <Section title="Activity, last 30 days">
+      <Section title="Activity, last 90 days">
         <DailyChart />
       </Section>
       <WeaknessWidget />

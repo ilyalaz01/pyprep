@@ -1,6 +1,8 @@
-// P7.T7.7 — DailyChart rendering tests. Pins 30 bars, proportional
-// heights, 1px baseline on zero days, 5 anchor x-axis labels,
-// tooltips, anti-Duolingo glyphs, async states.
+// P10.5.S1 — DailyChart wraps CalendarHeatmap. Bar-specific assertions
+// were dropped with the rewrite (no more bars, max-scaling, baseline
+// indicator, 5-anchor x-axis); the per-cell + grid contract lives in
+// CalendarHeatmap.test.tsx. This file pins data flow + async states
+// + anti-Duolingo discipline against the live /stats render path.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 
@@ -16,7 +18,7 @@ const OVERVIEW = {
   orphan_review_count: 0, total_seconds: 553,
 }
 
-function makeDays(counts: number[], startIso = '2026-04-13'): { days: Array<{ date: string; reviews_total: number; retention: number }> } {
+function makeDays(counts: number[], startIso = '2026-02-12'): { days: Array<{ date: string; reviews_total: number; retention: number }> } {
   const start = new Date(`${startIso}T00:00:00Z`)
   return {
     days: counts.map((n, i) => {
@@ -37,11 +39,9 @@ function stubFetch(daily: { days: Array<{ date: string; reviews_total: number; r
     if (url.includes('/api/auth/me')) return json(ME)
     if (url.includes('/api/config')) return json(CONFIG)
     if (url.includes('/api/stats/me/per-module')) return json({ modules: [] })
-    // T7.8 sibling on /stats — return empty so it doesn't disturb
-    // this test's focus on the daily chart.
     if (url.includes('/api/stats/me/weakness')) return json({ top: [] })
     if (url.includes('/api/stats/me/daily')) {
-      if (daily === 'loading') return new Promise(() => {}) // never resolves
+      if (daily === 'loading') return new Promise(() => {})
       return 'error' in daily
         ? new Response('boom', { status: 500 })
         : json(daily)
@@ -55,68 +55,24 @@ beforeEach(() => setToken('eyJ.test.token'))
 afterEach(() => vi.unstubAllGlobals())
 
 describe('DailyChart — structure', () => {
-  test('renders 30 bars when 30 days returned', async () => {
-    const counts = Array.from({ length: 30 }, (_, i) => i % 4)
+  test('mounts a calendar-heatmap when data arrives', async () => {
+    const counts = Array.from({ length: 90 }, (_, i) => i % 4)
     stubFetch(makeDays(counts))
     renderAt('/stats')
     await screen.findByTestId('daily-chart')
-    const svg = screen.getByTestId('daily-chart')
-    expect(svg.querySelectorAll('rect')).toHaveLength(30)
+    expect(screen.getByTestId('calendar-heatmap')).toBeInTheDocument()
   })
 
-  test('bar height proportional to reviews / max', async () => {
-    // Day 0: 5 reviews (max), Day 1: 1 review → height ratio ~5:1.
-    const counts = [5, 1, ...Array(28).fill(0)]
-    stubFetch(makeDays(counts))
+  test('every non-zero cell has a <title> tooltip with date + singular/plural', async () => {
+    stubFetch(makeDays([1, 2, 0]))
     renderAt('/stats')
     await screen.findByTestId('daily-chart')
-    const rects = screen.getByTestId('daily-chart').querySelectorAll('rect')
-    const day0H = Number(rects[0].getAttribute('height'))
-    const day1H = Number(rects[1].getAttribute('height'))
-    expect(day0H).toBeGreaterThan(day1H)
-    // Day 0 = max → bar should occupy ~70 viewBox units (MAX_BAR_H).
-    expect(day0H).toBeGreaterThanOrEqual(65)
-  })
-
-  test('zero-review days render a 1px baseline (not invisible)', async () => {
-    stubFetch(makeDays(Array(30).fill(0)))
-    renderAt('/stats')
-    await screen.findByTestId('daily-chart')
-    const rects = screen.getByTestId('daily-chart').querySelectorAll('rect')
-    for (const r of rects) {
-      expect(r.getAttribute('data-bar-zero')).toBe('true')
-      expect(Number(r.getAttribute('height'))).toBe(1)
-    }
-  })
-
-  test('every bar has a <title> tooltip with date + singular/plural', async () => {
-    const counts = [1, 2, 0, ...Array(27).fill(3)]
-    stubFetch(makeDays(counts))
-    renderAt('/stats')
-    await screen.findByTestId('daily-chart')
-    const rects = screen.getByTestId('daily-chart').querySelectorAll('rect')
-    expect(rects[0].querySelector('title')?.textContent).toMatch(/1 review$/)
-    expect(rects[1].querySelector('title')?.textContent).toMatch(/2 reviews$/)
-    expect(rects[2].querySelector('title')?.textContent).toMatch(/no reviews$/)
-  })
-
-  test('5 x-axis date labels at the per-7-day anchors', async () => {
-    stubFetch(makeDays(Array(30).fill(0), '2026-04-13'))
-    renderAt('/stats')
-    await screen.findByTestId('daily-chart')
-    // Anchors: indices 0, 7, 14, 21, 29 of a 30-day window
-    // starting 2026-04-13 → Apr 13, Apr 20, Apr 27, May 4, May 12.
-    for (const expected of ['Apr 13', 'Apr 20', 'Apr 27', 'May 4', 'May 12']) {
-      expect(screen.getByText(expected)).toBeInTheDocument()
-    }
-  })
-
-  test('shorter window renders only the available anchor labels', async () => {
-    stubFetch(makeDays([1, 2, 3], '2026-05-10'))
-    renderAt('/stats')
-    await screen.findByTestId('daily-chart')
-    expect(screen.getByText('May 10')).toBeInTheDocument()
-    expect(screen.getByText('May 12')).toBeInTheDocument()
+    const titles = Array.from(
+      screen.getByTestId('calendar-heatmap').querySelectorAll('title'),
+    ).map((t) => t.textContent)
+    expect(titles.some((t) => t?.endsWith(': 1 review'))).toBe(true)
+    expect(titles.some((t) => t?.endsWith(': 2 reviews'))).toBe(true)
+    expect(titles.some((t) => t?.endsWith(': no reviews'))).toBe(true)
   })
 })
 
@@ -153,16 +109,28 @@ describe('DailyChart — anti-Duolingo discipline (ADR-025)', () => {
     }
   })
 
-  test('bars are monochrome (no color-coded "good vs bad" days)', async () => {
+  test('cells share a single fill color (no value-coded green/red)', async () => {
     // High-vol day + low-vol day must render with the SAME fill color
-    // (var(--color-fg-muted) for both). Coloring by value would
-    // shame-code low-activity days.
-    stubFetch(makeDays([10, 1, ...Array(28).fill(5)]))
+    // (var(--color-fg-muted) for both). Magnitude is encoded via opacity,
+    // not hue — keeps the monochrome anti-Duolingo discipline.
+    stubFetch(makeDays([10, 1, 5, 0, 5, 5, 5]))
     renderAt('/stats')
     await screen.findByTestId('daily-chart')
-    const rects = screen.getByTestId('daily-chart').querySelectorAll('rect')
-    const high = rects[0].getAttribute('fill')
-    const low = rects[1].getAttribute('fill')
-    expect(high).toBe(low)
+    const rects = Array.from(
+      screen.getByTestId('calendar-heatmap').querySelectorAll('rect'),
+    )
+    const fills = new Set(
+      rects
+        .map((r) => r.getAttribute('fill'))
+        .filter((f) => f && f !== 'transparent'),
+    )
+    // Only two distinct fills allowed: zero-day bg-elevated and the
+    // single non-zero color (--color-fg-muted, varied via fill-opacity).
+    for (const f of fills) {
+      expect([
+        'var(--color-bg-elevated)',
+        'var(--color-fg-muted)',
+      ]).toContain(f)
+    }
   })
 })
