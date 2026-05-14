@@ -38,8 +38,8 @@ PyPrep takes approach **2**. See `PLAN.md` ADR-001 for rationale: zero attack su
 - **NFR-SBX-4:** Pyodide assets served from CDN with version pinned
   (no auto-upgrade). Self-hosted fallback is **post-MVP**; CDN
   outages will visibly fail code-task cards in MVP-1. Pinned-version
-  source of truth: `VITE_PYODIDE_VERSION` in `.env-example`
-  (currently `0.26.4`).
+  source of truth: `VITE_PYODIDE_CDN` in `.env-example`
+  (version encoded in URL path, currently `v0.26.4`).
 
 ### 2.3 Security
 

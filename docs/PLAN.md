@@ -702,7 +702,7 @@ Owner's first proposed fix was caller-frame inspection (walk the stack at `__imp
 
 **Context:** Pyodide assets (base runtime + `pytest` package + deps) ship as ~80 MB compressed. Three delivery options: (a) CDN (jsdelivr) at a pinned version; (b) self-host alongside our static assets; (c) build-bundle via a Vite plugin. Cold-start budget NFR-SBX-1 is ≤ 6 s on 50 Mbps.
 
-**Decision:** Option (a). Pinned jsdelivr CDN, version sourced from env var `VITE_PYODIDE_VERSION` (currently `0.26.4`) and CDN base from `VITE_PYODIDE_CDN`. No auto-upgrade — any version change is a deliberate `.env-example` diff that touches harness tests. Self-hosted fallback is Phase 10 polish (NFR-SBX-4).
+**Decision:** Option (a). Pinned jsdelivr CDN, full URL (including version) sourced from env var `VITE_PYODIDE_CDN` (currently `https://cdn.jsdelivr.net/pyodide/v0.26.4/full/`). No auto-upgrade — any version change is a deliberate `VITE_PYODIDE_CDN` diff that touches harness tests. Self-hosted fallback is Phase 10 polish (NFR-SBX-4).
 
 **Rationale:**
 - Zero ops. Zero bundle cost on every push (assets aren't in our dist).

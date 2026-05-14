@@ -808,9 +808,9 @@ fallback option above is no longer needed.
 
 **Phase:** 6.5 (P6.5/P1-2 CI rollout) · **Date:** 2026-05-12 · **Status:** lesson logged
 
-`VITE_PYODIDE_CDN` and `VITE_PYODIDE_VERSION` (and any future `VITE_*`
-env) are inlined by Vite at **build** time, not read at runtime in the
-browser. Three consequences that bit the P6.5/P1-2 CI rollout:
+`VITE_PYODIDE_CDN` (and any future `VITE_*` env) is inlined by Vite at
+**build** time, not read at runtime in the browser. Three consequences
+that bit the P6.5/P1-2 CI rollout:
 
 1. The Playwright job in `.github/workflows/ci.yml` was building
    without these env vars present, producing a `dist/` whose Pyodide
