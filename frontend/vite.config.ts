@@ -22,6 +22,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   worker: { format: 'es' },
   build: {
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
