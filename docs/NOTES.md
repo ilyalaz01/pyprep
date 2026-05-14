@@ -915,6 +915,8 @@ post. Modules 2–4 not yet authored (Phase 9). Total estimated audit
 surface ≈ 25 code_task cards once all modules ship; doing the
 Module 1 sweep now means Phase 9 authoring has the checklist ready.
 
+→ Promoted to PRD_code_sandbox.md §10.1 (Phase 10 T10.8)
+
 ---
 
 ## N040 — Cross-session accuracy requires outcome persistence [Phase 10 / post-MVP]
@@ -1138,6 +1140,8 @@ constraint was inferred but not codified before m3-s3.
 access to stdlib + any package listed in the card's `allowlist`.
 Limited only by what fits in two files.
 
+→ Promoted to PRD_code_sandbox.md §10.2 (Phase 10 T10.8)
+
 ---
 
 ## N044 — code_tasks must verify pyproject.toml deps before importing non-stdlib [AUTHORING]
@@ -1201,6 +1205,8 @@ file harness constraint). The three together form the emerging
 appendix in `PRD_code_sandbox.md` is on the post-Module-4 polish
 todo list per owner brief.
 
+→ Promoted to PRD_code_sandbox.md §10.3 (Phase 10 T10.8)
+
 ---
 
 ## N045 — Schema explanation-field naming: code_trap vs multiple_choice [AUTHORING]
@@ -1257,6 +1263,8 @@ code that was in `code_snippet` must move into the `question`
 string as a fenced block. Don't leave `code_snippet` as an extra
 key on a multiple_choice card; the schema allows unknown keys but
 the renderer may double-show.
+
+→ Promoted to PRD_code_sandbox.md §10.4 (Phase 10 T10.8)
 
 ---
 
@@ -1469,4 +1477,6 @@ and the bcrypt/argon2 hash shapes. Deferred to Phase 10 polish.
 **Cross-references:** [[N029]] (validator-enforced authoring
 discipline pattern). The placeholder shape in m4-s8-c11
 illustrates the rule operationally.
+
+→ Promoted to PRD_code_sandbox.md §10.5 (Phase 10 T10.8)
 
