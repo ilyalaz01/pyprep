@@ -27,9 +27,12 @@ tests/
 coverage-report/
 htmlcov/
 
-# Docs (not needed in runtime image; LICENSE handled separately by Dockerfile)
+# Docs not needed in runtime image. README.md is NOT excluded —
+# hatchling reads it during `uv sync` editable install build (per
+# [project] readme = "README.md" in pyproject.toml). Excluding it
+# breaks the runtime stage. Other markdown files are docs-only and
+# safe to exclude. LICENSE handled separately by Dockerfile.
 docs/
-README.md
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
 DESIGN.md
