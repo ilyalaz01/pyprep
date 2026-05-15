@@ -9,8 +9,12 @@ mounted under `/api`.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from pyprep import __version__
 from pyprep.sdk.auth import (
@@ -43,6 +47,42 @@ from .routers import stats as stats_router
 
 _BEARER = {"WWW-Authenticate": "Bearer"}
 _TEMPLATE_REL = "interview_packs/template_v1.md"
+
+# ADR-012: production single-origin SPA serving. Path is relative to this
+# file: src/pyprep/api/app.py → repo_root/frontend/dist (parents[3]). Tests
+# monkeypatch this; dev and CI run with the default which doesn't exist.
+DIST_DIR = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+
+
+def _mount_static(app: FastAPI, dist_dir: Path) -> None:
+    """ADR-012 static mount: /assets via StaticFiles, plus a post-response
+    middleware that serves top-level dist files and an SPA fallback to
+    index.html for any non-API GET 404. The middleware runs AFTER the
+    route table resolves, so dynamically-added routes (test fixtures,
+    plugins) keep matching priority. Caller has verified dist_dir.exists().
+    """
+    assets_dir = dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    index_path = dist_dir / "index.html"
+    dist_root = dist_dir.resolve()
+
+    @app.middleware("http")
+    async def spa_static_fallback(request: Request, call_next):  # type: ignore[no-untyped-def]
+        response: Response = await call_next(request)
+        if response.status_code != 404 or request.method != "GET":
+            return response
+        if request.url.path.startswith("/api"):
+            return response
+        rel = request.url.path.lstrip("/")
+        if rel:
+            candidate = (dist_dir / rel).resolve()
+            if candidate.is_file() and candidate.is_relative_to(dist_root):
+                return FileResponse(candidate)
+        if index_path.exists():
+            return FileResponse(index_path)
+        return response
 
 
 def _load_mock_template(content_root) -> str:  # type: ignore[no-untyped-def]
@@ -118,6 +158,9 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(sessions_router.router, prefix="/api")
     app.include_router(stats_router.router, prefix="/api")
     app.include_router(mock_router.router, prefix="/api")
+
+    if DIST_DIR.exists():
+        _mount_static(app, DIST_DIR)
 
     return app
 
