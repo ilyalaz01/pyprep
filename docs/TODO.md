@@ -401,8 +401,8 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 |---|---|---|---|
 | T10.1 | Finalize `README.md` with screenshots, install, run, deploy. | Reads as a real product README | ⬜ |
 | T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ⬜ |
-| T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker compose -f compose.prod.yml up` serves SPA + API on one port; CORS is no-op (same origin) | ⬜ |
-| T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ⬜ |
+| T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker build` + `docker run` serves SPA + API on one port; CORS is no-op (same origin) | ✅ (T10.3a `5a47ec6` StaticFiles mount per ADR-012 + middleware-based SPA fallback; T10.3b `b606f02` multi-stage Dockerfile + `.dockerignore`, dev `docker-compose.yml` deleted as broken — ops/ dir was missing) |
+| T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ✅ (`docs/DEPLOY.md` covers architecture, pre-deploy checklist, Fly.io walkthrough with fly.toml template, VPS Docker walkthrough, brief notes on Render/Railway/Docker Hub publish, secrets, persistence + Postgres swap path, health checks, troubleshooting; 208 lines) |
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | P99/A100/BP92/SEO100 on /login prod Desktop; Tier 2 + /session+/stats + CSP deferred post-MVP-1 (see N048) | ✅ |
 | T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |

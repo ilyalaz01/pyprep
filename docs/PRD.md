@@ -75,7 +75,7 @@ PyPrep is **shippable** when **all** of the following hold:
 3. At least 30 cards are interactive code tasks executable in-browser via Pyodide.
 4. At least 5 mock-interview prompt packs are generatable and copyable to clipboard.
 5. Stats dashboard shows per-module and per-sphere weakness ranking.
-6. App is deployable via a single `docker compose up`.
+6. App is deployable as a single container via `docker build -t pyprep:latest . && docker run -p 8000:8000 ...` (full guide: `docs/DEPLOY.md`).
 7. All MANDATORY documents under Segal §1 exist and are current.
 8. Test coverage ≥ 85%, `ruff check` returns zero violations, no file exceeds 150 LOC.
 
@@ -168,7 +168,7 @@ PyPrep is **shippable** when **all** of the following hold:
 | NFR-A11Y-1 | All flows keyboard-navigable, ARIA labels on cards |
 | NFR-I18N-1 | UI strings extractable for future RU/HE localization (no hardcoded user-facing English in components) |
 | NFR-OBS-1 | Structured JSON logs, log levels configurable via env |
-| NFR-PORT-1 | Runs on Linux and macOS via `docker compose up`; Windows via WSL |
+| NFR-PORT-1 | Runs as a `docker run` container on Linux/macOS hosts; Windows via WSL or Docker Desktop |
 
 ---
 
@@ -226,7 +226,7 @@ This timeline assumes Claude Code does the bulk of the implementation, with the 
 | **7. Stats & weakness dashboard** | Per-module / per-sphere stats, weakness ranking | Stats match raw card history |
 | **8. Mock interview generator** | Prompt packs for all 4 modules, copy-to-clipboard works | Owner runs a real mock interview using a generated prompt |
 | **9. Modules 2–4 content** | Full curriculum coverage | Coverage check ≥ 95% sub-tasks × 3 cards |
-| **10. Polish & deploy** | Docker compose, README finalized, screenshots, deploy guide | `docker compose up` produces working app on a fresh machine |
+| **10. Polish & deploy** | Production `Dockerfile`, README finalized, screenshots, deploy guide | `docker build` + `docker run` produces a working app on a fresh machine (see `docs/DEPLOY.md`) |
 
 Phases 0–8 form **MVP-1 (private, owner-only)**. Phases 9–10 form **MVP-2 (public-ready)**.
 

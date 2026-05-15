@@ -1030,7 +1030,7 @@ state behind every other endpoint is Bearer-gated.
 
 ```mermaid
 flowchart LR
-    Dev[Owner laptop] -->|docker compose| Local[Local stack]
+    Dev[Owner laptop] -->|uv run pyprep-api + pnpm dev| Local[Local stack]
     Dev -->|push| GH[GitHub]
     GH -->|GitHub Actions| Tests[CI: lint, test, build]
     GH -->|deploy script| Prod[Single VPS or Fly.io]
@@ -1048,7 +1048,7 @@ flowchart LR
     end
 ```
 
-Single `docker-compose.yml` orchestrates dev. Production deploy is post-MVP.
+Dev runs two processes locally (`uv run pyprep-api` + `pnpm --dir frontend dev`). Production is a single multi-stage `Dockerfile` (Phase 10 ship-packaging T10.3b) per ADR-012 — FastAPI serves API + built dist from the same origin. Full deploy guide: `docs/DEPLOY.md`.
 
 ---
 
