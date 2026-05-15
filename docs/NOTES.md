@@ -1537,3 +1537,69 @@ Net Lighthouse delta from dev-server baseline:
   SEO:            82 → 100  (+18)
   Accessibility:  100 → 100 (unchanged)
 
+---
+
+## N051 — Stats-S2 benchmarks/trends deferred (backend dependency) [Phase 11 / post-MVP-1]
+
+Filed during Phase 10.5 close (2026-05-15) from `PYPREP_DESIGN_REVIEW_RESPONSE.md` Stats-S2.
+
+Design review recommended adding **benchmark targets** (e.g., "your retention 78% vs target 80%") and **trend deltas** (e.g., "+12 reviews this week vs last week") to the `/stats` metric tiles. Cannot be implemented as a frontend-only change.
+
+**Why it's a backend dependency:** `/api/stats/me/overview` currently returns a current-state snapshot only — `reviews_total`, `retention_rate`, `streak_days`, `xp`, `orphan_review_count`, `total_seconds`. No historical series, no baseline constants, no period-over-period deltas. Frontend can render whatever it's served, but it cannot synthesize trends from a single scalar.
+
+**Resolution paths (any one is sufficient):**
+
+1. **Extend `Overview` schema** with `reviews_last_7d`, `reviews_prev_7d`, `retention_7d_delta` (and similar for 30d). Cheap if the underlying `reviews` rows are still queried per-request; expensive if PRD progress §3.3 on-the-fly computation has to be re-derived twice.
+2. **Hardcode benchmark constants** in the response (`target_retention=0.80`, `target_daily_reviews=20`). Cheapest path; ships a number to compare against without historical data. Owner decides whether benchmarks are honest without per-user calibration.
+3. **New `/api/stats/me/trend` endpoint** returning a 30-day or 90-day series. Most flexible (powers calendar heatmap densities + trend tiles + Phase 11 module drill-down), but largest scope.
+
+**Recommendation:** path (3) is most aligned with the calendar-heatmap pattern that landed in S1 (`7ee5142`) — both consume the same shape (daily reviews series). Bundling S2 with the trend endpoint avoids two schema migrations. Defer to Phase 11 or first post-MVP-1 iteration.
+
+**Cross-refs:** PRD progress §3.3 (on-the-fly stats computation); commit `7ee5142` (S1 calendar heatmap, currently consumes 30-day window from existing fields).
+
+---
+
+## N052 — Card content with raw markdown fences not rendered [Phase 11 / content quality]
+
+Surfaced during Phase 10.5 visual verification (2026-05-15).
+
+Owner observed cards in **Module 4 SQL spheres** (m4-s4 and m4-s7) rendering with literal triple-backtick fences ` ```sql ... ``` ` visible in the prompt body, rather than as syntax-highlighted code blocks. Behavior is inconsistent with how lesson bodies render code (which goes through the markdown processor + Shiki).
+
+**Likely root causes** (one or both):
+
+1. **Renderer gap:** the card prompt field is rendered as plain text or with a markdown subset that doesn't process fenced code blocks. Lesson body uses a different render path that does.
+2. **Schema/authoring gap:** card schema has no dedicated `code_block` field, so authors who needed to show code in the prompt embedded it as inline markdown fences. The card type spec assumes prose-only prompts.
+
+**Audit scope:** start with m4-s4 (NULL semantics, aggregates) and m4-s7 (web security, SQL injection). Pattern likely repeats anywhere a card's pedagogy hinges on showing a SQL snippet inside the prompt rather than as a separate `code_snippet` field (which `code_trap` cards already have).
+
+**Resolution paths:**
+
+- **(a) Schema-level:** add explicit `code_block` or `prompt_code` field to the relevant card-type schemas; migrate affected cards. Cleanest, but requires a content migration pass.
+- **(b) Renderer-level:** route card prompts through the same markdown processor as lesson bodies. Smaller diff, but assumes every existing prompt is markdown-safe (no accidental triple-backticks).
+- **(c) Content sweep:** rewrite affected cards to put the SQL into the existing `code_snippet` field (where applicable) or as a separate explanatory sub-card. No code changes; pure content work.
+
+**Recommendation:** path (a) is most architecturally honest — prose and code have different presentation rules and the schema should reflect that. Defer to Phase 11 / content quality pass.
+
+**Cross-refs:** N039 (Phase 1 content audit precedent for content-shape fixes); validator `_check_card_shape` rules in `scripts/validate_content.py`.
+
+---
+
+## N053 — Lesson code blocks overflow horizontally [Phase 11 / ship-packaging]
+
+Surfaced during Phase 10.5 visual verification (2026-05-15).
+
+Owner observed long SQL lines in `LessonReader` code blocks require horizontal scroll on standard desktop viewports (≥ 1280px). Primary study flow friction: readers either scroll the block independently of the prose (loses context) or are forced to read truncated lines. Pattern affects any lesson with multi-clause SQL, long pandas chains, or wide CLI invocations.
+
+**Architectural root cause:** lesson prose container is `max-w-3xl` (768px) for readability of prose; code blocks inherit that constraint. Code legibility wants more width than prose legibility allows.
+
+**Mitigation approaches (none trivial, all viable):**
+
+- **(a) Smaller font in lesson code:** drop `text-sm → text-xs` inside `pre` blocks. ~15% more characters per line. Partial fix; still overflows on the longest lines but reduces frequency. Cheapest.
+- **(b) Break code blocks out of the prose container width:** code blocks span beyond `max-w-3xl` while prose stays narrow. Architectural change to `LessonReader` layout (likely requires CSS Grid or a wrapper component). Cleanest visually; most invasive.
+- **(c) Author-side reformatting:** break long SQL into one clause per line; break long pandas chains at `.` boundaries. Content work, no code changes. Owner-time-intensive; doesn't catch future regressions.
+- **(d) Combo of (a) + (c):** smaller font + author hygiene catches most cases without architectural risk.
+
+**Recommendation:** path (d) for ship-packaging wave (low risk, low cost, ships immediately); revisit (b) if reader feedback signals overflow is still common.
+
+**Cross-refs:** `frontend/src/features/lessons/LessonReader.tsx`; Phase 10.5 commit `6cfe85e` (`Section` card chrome, same prose-container family).
+

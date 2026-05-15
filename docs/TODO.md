@@ -435,6 +435,58 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 ---
 
+## Phase 10.5 — Design polish round (post-review response)
+
+**Goal:** address design-review feedback (`PYPREP_DESIGN_REVIEW_RESPONSE.md`) without compromising anti-Duolingo discipline. Tier 1 disciplined polish + a small selection of Tier 2 + targeted Stats fixes; Tier 3 rejected wholesale. No backend changes, no new npm dependencies.
+
+**Batches closed:**
+
+- **Batch 1 — Tier 1 disciplined polish (6 commits):**
+  - T1.1 (`edc45c0`): identity chrome cleanup — remove redundant TopBar badge + HomePage greeting.
+  - T1.7 (`a5b7bc2`): keymap labels — `1234 → 1 Again · 2 Hard · 3 Good · 4 Easy`.
+  - T1.6 (`14f9246`): card progress bar in session header + reusable `ProgressBar` primitive.
+  - T1.2 (`4e06e5a`): `--color-fg` softened to OKLCH 0.88 for dark-mode body comfort.
+  - T1.3 (`6cfe85e`): `Section` component wrapped in subtle card-container chrome.
+  - T1.4 (`827cf9c` + `6fe8fa8`): WeaknessWidget retention bars + width stretch (`w-24 → w-40`).
+  - T1.5 (skipped): hover-state discipline already in place per existing system.
+
+- **Batch 2 — Stats S1 (1 commit):**
+  - S1 (`7ee5142`): calendar heatmap replaces broken 30-day bar chart on `/stats` — 90-day window, 13×7 grid, monochrome 5-step saturation (anti-Duolingo).
+
+- **Batch 3 — Stats S3 + S4 (1 commit):**
+  - S3+S4 (`0de24ec`): Lucide-path icons in `OverviewCards` tiles + `WeaknessWidget` `mode` prop (compact for `/home` preview, full for `/stats`).
+
+- **Batch 4 — Selective Tier 2 (no implementation needed):**
+  - 2.1 streak counter: already covered by `OverviewCards` streak tile (delivered via Stats-S3); no additional indicator added.
+  - 2.2 session summary: pre-existing implementation (Phase 5 + Phase 7) already exceeds review spec; no changes needed.
+
+- **Batch 5 — TopBar navigation (post-review owner finding, 1 commit):**
+  - B5 (`dd0b0a6`): clickable wordmark → `/home` + new "Stats" Link in TopBar right cluster. Closes navigation gap discovered during Phase 10.5 visual verification — `/home` was unreachable from any authed route except via browser back button, and `/stats` was unreachable from the UI at all. Tier 1.1 thin-chrome discipline preserved (no badges, no tabs, no icon bordering; `text-muted → text-fg` hover only). No `/modules` link added: Modules surface on `/home`, three-link top nav would start feeling like consumer SaaS chrome. Not in original review scope.
+
+**Items deferred post-Phase 10.5:**
+
+- **Stats-S2** (benchmarks / trend deltas): requires backend `Overview` schema extension — not frontend-only. Filed as **N051**.
+- **Stats-S5** (module drill-down): explicitly Phase 11 per review.
+- **Stats-S6** (time-dimension trends): explicitly Phase 11 per review.
+- **Tier 3 items (all):** rejected wholesale per anti-Duolingo discipline.
+- **Content rendering issues** discovered during visual verification:
+  - Raw markdown fences in card prompts (Module 4 SQL spheres) — filed as **N052**.
+  - Lesson code blocks overflow horizontally — filed as **N053**.
+
+**Phase 10.5 exit gate:** ✅ all polish items closed.
+
+- All 5 batches resolved (per the batch list above).
+- 9 commits landed (`edc45c0` → `dd0b0a6`).
+- 10 / 10 pre-push gates green throughout.
+- 0 new npm dependencies.
+- Anti-Duolingo discipline preserved (Flame regression guard pinned in `OverviewCards.test.tsx` as a design contract; Tier 1.1 thin-chrome convention extended through Batch 5 nav additions).
+- 4 review items needed no implementation (already satisfied by existing code): N030 design defers, RatingBar labels, hover-state discipline, SessionSummary pre-existing build. Pattern: reviewer screenshots lacked full project context.
+- Batch 5 (TopBar nav) was not in the original review — surfaced during owner's end-of-wave visual verification pass. Audit-first → implementation-second discipline applied (read-only navigation audit reported before any code change).
+
+**Phase 10.5 closed 2026-05-15.** MVP-1 design-polish wave complete.
+
+---
+
 ## Phase-end Review Checklist (run before flipping a phase to ✅)
 
 - [ ] All tasks in this phase ticked or explicitly deferred with note.
