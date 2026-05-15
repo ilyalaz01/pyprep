@@ -1,5 +1,9 @@
 # Contributing to PyPrep
 
+## Status
+
+PyPrep is a single-contributor MVP-1 project. Public contribution is post-launch. The pre-push hooks below mirror CI gates and exist for owner discipline during active authoring — they're not a contributor-submission gate. See `README.md` for project goals and architecture overview.
+
 ## The pre-push hook is the source of truth for CI
 
 Run this once per clone, right after `uv sync` + `pnpm install`:
@@ -13,15 +17,22 @@ order, against the same code. **A passing pre-push means CI will pass
 for the same reasons.** If pre-push goes green and CI goes red, that's
 a bug in this contract — file an issue rather than re-running.
 
-The hook chain:
+The hook chain (10 gates):
 
-| Step | Command | What it catches |
+| # | Gate | Scope |
 |---|---|---|
-| ruff | `uv run ruff check .` | lint, import order, security lints (S-rules) |
-| mypy | `uv run mypy` | strict type-check on `src/pyprep/sdk` and `src/pyprep/api` |
-| file-size | `uv run python scripts/check_file_size.py` | files >150 LOC of code |
-| handler-LOC | `uv run python scripts/audit_handlers.py` | route handlers >10 logic LOC without a NOTES waiver |
-| frontend ESLint | `pnpm --dir frontend lint` | TS/TSX style + react-hooks rules |
+| 1 | `ruff` lint | backend Python (lint, import order, security S-rules) |
+| 2 | `mypy` strict | SDK + API (`src/pyprep/sdk`, `src/pyprep/api`) |
+| 3 | File size ≤ 150 LOC | `src/` |
+| 4 | Handler logic ≤ 10 LOC | API handlers (NOTES-waivered exceptions only) |
+| 5 | ESLint | frontend |
+| 6 | `tsc -b` | frontend (build-mode catches lib/refs mismatches) |
+| 7 | WCAG AA contrast | theme tokens |
+| 8 | Em-dash content lint | no U+2014 in shipped content/code copy |
+| 9 | Vite env coverage | `VITE_*` references must exist in `.env-example` |
+| 10 | Bundle size | raw ≤ 2 MB, gzip ≤ 600 KB (per ADR-022) |
+
+Coverage is enforced separately via `pytest --cov-fail-under=85` (configured in `pyproject.toml`), not by the pre-push hook.
 
 Each hook is fast (<5s typical) so the whole gate runs in well under a
 minute. If a hook fails, `git push` is aborted — fix the issue, stage

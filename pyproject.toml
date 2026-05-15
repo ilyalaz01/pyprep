@@ -4,7 +4,7 @@ version = "1.00"
 description = "Active recall + spaced repetition + in-browser code execution for Israeli junior Python interviews."
 authors = [{ name = "Ilya Lazarev" }]
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.11"
 
 dependencies = [
