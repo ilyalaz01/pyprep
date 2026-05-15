@@ -399,13 +399,13 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 | ID | Task | DoD | Status |
 |---|---|---|---|
-| T10.1 | Finalize `README.md` with screenshots, install, run, deploy. | Reads as a real product README | ⬜ |
-| T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ⬜ |
+| T10.1 | Finalize `README.md` with screenshots, install, run, deploy. | Reads as a real product README | ✅ (`07fe6ee` — README refresh: MVP-1 status, Mock refs removed, content depth quantified, 10-gate list, T10.2 placeholder marker, Provenance footnote) |
+| T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ⬜ (deferred until post-push visual verification; will land as polish commit filling the T10.2-marked placeholder in `README.md` after push wave) |
 | T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker build` + `docker run` serves SPA + API on one port; CORS is no-op (same origin) | ✅ (T10.3a `5a47ec6` StaticFiles mount per ADR-012 + middleware-based SPA fallback; T10.3b `b606f02` multi-stage Dockerfile + `.dockerignore`, dev `docker-compose.yml` deleted as broken — ops/ dir was missing) |
 | T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ✅ (`docs/DEPLOY.md` covers architecture, pre-deploy checklist, Fly.io walkthrough with fly.toml template, VPS Docker walkthrough, brief notes on Render/Railway/Docker Hub publish, secrets, persistence + Postgres swap path, health checks, troubleshooting; 208 lines) |
-| T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ⬜ |
+| T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ✅ (`31e516d` — CONTRIBUTING gate table 5→10, single-contributor MVP-1 Status paragraph, coverage footnote; `CODE_OF_CONDUCT.md` added (Contributor Covenant 2.1, `[INSERT CONTACT METHOD]` placeholder with inline owner note); `pyproject.toml` license field modernized to PEP 639 `license = "MIT"`) |
 | T10.6 | Lighthouse final pass: ≥ 90 perf, ≥ 95 a11y on all routes. | P99/A100/BP92/SEO100 on /login prod Desktop; Tier 2 + /session+/stats + CSP deferred post-MVP-1 (see N048) | ✅ |
-| T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ⬜ |
+| T10.7 | Final coverage / lint / file-size check across whole repo. | All green | ✅ (project-wide final-check audit `1d22a26` followup + mock_router removal `0462428`: −585 LOC across 16 files, ADR-028 followthrough finally applied; coverage 96.56% → 96.37%, gate ≥ 85%; 305 backend + 450 frontend tests passing; 10/10 pre-push gates green. Wave close: `<this>`) |
 | T10.8 | Content polish: retroactive N041 fix-MC pairs for surfaced single-card d4 footguns, + promote N039/N043/N044/N045/N047 constraint catalog to `PRD_code_sandbox.md` appendix. Deferred from per-module sweeps so polish is consolidated, not incremental. | Three retroactive pairs land + appendix exists | ✅ (`PRD_code_sandbox.md` §10 "Card authoring constraints" appendix landed with five constraints N039+N043+N044+N045+N047; three retroactive N041 bridge MCs landed `0635ca8` for m3-s2-c4 + m3-s3-c10 + m3-s4-c5, with `footgun-pair` tag added to both halves of each pair per repo symmetry convention; module 3 70 → 73 cards) |
 
 **T10.8 retroactive N041 fix-MC pair candidates (surfaced during module-sweep audits):**
@@ -432,6 +432,16 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 **Deferred to MVP-1 ship wave** (still ⬜ in the Phase 10 table above): T10.1 README finalization, T10.2 screenshots, T10.3 production Dockerfile, T10.4 deploy guide, T10.5 license + COC + CONTRIBUTING, T10.7 final coverage/lint/file-size project-wide check. These are deployment-packaging items, distinct from the polish wave above.
 
 **Phase 10 polish wave closed 2026-05-14.** MVP-1 ready to ship.
+
+**Phase 10 ship-packaging exit gate (closed 2026-05-15):**
+
+- 5 / 6 items landed: **T10.1** (`07fe6ee` README MVP-1 refresh), **T10.3** (`5a47ec6` FastAPI StaticFiles mount per ADR-012 + `b606f02` multi-stage Dockerfile + `.dockerignore`), **T10.4** (`1d22a26` `docs/DEPLOY.md` + reconciliation of stale `docker-compose` refs in PLAN/PRD/TODO), **T10.5** (`31e516d` CoC + CONTRIBUTING gate table refresh + pyproject license PEP 639), **T10.7** (`1d22a26` audit + `0462428` `mock_router` removal per ADR-028 followthrough + `<this>` close).
+- **T10.2** (screenshots) deferred to post-push polish — owner visual verification required, owner not home during the ship-packaging wave. T10.2-marked placeholder comment in `README.md` reserves the slot.
+- 7 commits in this wave (`07fe6ee`..`<this>`).
+- 10 / 10 pre-push gates green throughout.
+- Coverage 96.37% (gate ≥ 85%).
+- **Net code reduction: −585 LOC** via `mock_router` removal — ADR-028 (Phase 8) deprecation finally applied 2 phases after the decision. See N049 for the drift mechanism + future-prevention rule.
+- MVP-1 awaits T10.2 + final visual + `docker build` verification + push wave.
 
 ---
 

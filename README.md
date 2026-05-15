@@ -221,4 +221,4 @@ MIT — see `LICENSE`.
 
 ## Provenance
 
-Process framework based on [Dr. Yoram Segal's Software Project Guidelines v3.00](./SOFTWARE_PROJECT_GUIDELINES.md) — design-before-code discipline, decision logs, file-size and complexity ceilings.
+Process framework based on Dr. Yoram Segal's Software Project Guidelines v3.00 — design-before-code discipline, decision logs, file-size and complexity ceilings.

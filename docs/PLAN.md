@@ -953,7 +953,7 @@ The Phase 5–7 work, in contrast, repeatedly surfaced content as the binding co
    - **Phase 9 (new)** — Modules 3 & 4 — Testing / Infrastructure Content Authoring. Module 3 (Testing & QA, `m3-s0`–`m3-s5`) and Module 4 (Linux/Docker/SQL/Git/Tooling/Operations, `m4-s0`–`m4-s9` after the `78278a5` extension adding Web Security, CI/CD, Bash).
    - **Phase 10** — unchanged (MVP-1 Polish & Deploy).
 3. `PRD_mock_interview_prompts.md` is retained as a historical artifact with a deprecation banner pointing at this ADR. `ADR-005` (Mock interview as prompt generator, not as in-app LLM call) remains as documentation of the original design decision; it is *not* withdrawn because the architectural reasoning is still correct if the feature is ever revived.
-4. `src/pyprep/sdk/prompts/MockPromptService` (built in T2.6) remains in the SDK as dormant code — no UI consumer, no API router. Removal of the SDK module is a separate cleanup decision; leaving it in place costs nothing while the question of revival is open.
+4. `src/pyprep/sdk/prompts/MockPromptService` (built in T2.6) was carried as dormant SDK code at the time of this ADR — no UI consumer, no API router invocation. The SDK module + `mock_router` + frontend client were finally removed in Phase 10 ship-packaging T10.7 followthrough (commit `0462428`); see N049 in `docs/NOTES.md` for the drift mechanism and the future-prevention rule (deprecation ADRs should append `Implemented: <commit>` to Status when removal lands).
 5. `T1.13` (pack JSON schema) is updated from "deferred to Phase 8" to "deferred — revive only if interview-pack feature is re-prioritized".
 
 **Rationale:**

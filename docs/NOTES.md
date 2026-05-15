@@ -1539,6 +1539,22 @@ Net Lighthouse delta from dev-server baseline:
 
 ---
 
+## N049 — mock_router removal (ADR-028 followthrough)
+
+Phase: 10 (T10.7 ship-packaging) · Date: 2026-05-15 · Status: closed · Commit: `0462428`
+
+T10.7 final-check audit (`1d22a26`) surfaced architectural drift: ADR-028 (Phase 8) deprecated Mock Interview Generator and removed it from roadmap. README documented "deprecated feature retained for historical context." But `/api/mock/*` endpoint remained mounted in production via `mock_router`; SDK still exported `MockPrompt` / `MockPromptRequest` / `MockPromptService`; dormant frontend `api.mock` client + types + tests still present.
+
+**Drift mechanism:** ADR-028 was a roadmap decision (don't pursue feature further) which was not paired with an implementation-removal commit. Decision documented, code never followed.
+
+**Resolution:** surgical removal of the `mock_router` surface — backend router + service + DI + SDK exports + frontend client + tests. 6 file deletions, **−585 LOC net** across 16 files. Coverage 96.56% → 96.37% (still well above the ≥ 85% gate). Preserved as historical artifacts: ADR-028 itself (with new `Implemented: ...` annotation on its Status line), `PRD_mock_interview_prompts.md` (banner truthed-up to reference `0462428`), and `content/interview_packs/{packs.json, template_v1.md}` (content data, no code path loads it after removal).
+
+**Lesson for future ADR followthrough:** when an ADR represents a removal/deprecation decision, append an `Implemented: <commit>` line to the ADR `Status` field when the removal commit lands. ADR-028 now carries this annotation (`0462428`). Future deprecation ADRs should follow the same pattern to prevent recurrence — decisions without code consequences become silent drift.
+
+**Cross-refs:** ADR-028 (`docs/PLAN.md` §10), `PRD_mock_interview_prompts.md` (deprecation banner), T10.7 row in `docs/TODO.md`.
+
+---
+
 ## N051 — Stats-S2 benchmarks/trends deferred (backend dependency) [Phase 11 / post-MVP-1]
 
 Filed during Phase 10.5 close (2026-05-15) from `PYPREP_DESIGN_REVIEW_RESPONSE.md` Stats-S2.
