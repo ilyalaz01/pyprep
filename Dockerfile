@@ -26,8 +26,10 @@ WORKDIR /app
 # uv (Astral)
 RUN pip install --no-cache-dir uv
 
-# Python deps — cache layer (manifests before source)
-COPY --chown=pyprep:pyprep pyproject.toml uv.lock ./
+# Python deps — cache layer (manifests before source).
+# README.md included because pyproject.toml declares [project] readme;
+# hatchling reads it during `uv sync` editable install build.
+COPY --chown=pyprep:pyprep pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev
 
 # Backend source + content + migrations
