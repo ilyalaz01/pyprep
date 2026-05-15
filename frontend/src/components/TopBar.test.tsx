@@ -65,4 +65,26 @@ describe('TopBar', () => {
     await waitFor(() => expect(getToken()).toBeNull())
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
   })
+
+  test('wordmark is a link to /home', async () => {
+    mockRoutes({
+      '/api/config': () =>
+        jsonResponse({ single_user: false, version: '1.00', single_user_email: null }),
+      '/api/auth/me': () => jsonResponse(ME),
+    })
+    renderAt('/home')
+    const link = await screen.findByRole('link', { name: 'PyPrep' })
+    expect(link).toHaveAttribute('href', '/home')
+  })
+
+  test('exposes a Stats link to /stats', async () => {
+    mockRoutes({
+      '/api/config': () =>
+        jsonResponse({ single_user: false, version: '1.00', single_user_email: null }),
+      '/api/auth/me': () => jsonResponse(ME),
+    })
+    renderAt('/home')
+    const link = await screen.findByRole('link', { name: 'Stats' })
+    expect(link).toHaveAttribute('href', '/stats')
+  })
 })

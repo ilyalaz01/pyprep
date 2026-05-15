@@ -1,13 +1,19 @@
 /**
  * TopBar — persistent app chrome at the top of every authed route.
  *
- *   [PyPrep wordmark]    [user email · Sign out]
+ *   [PyPrep wordmark→/home]    [Stats→/stats · user email · Sign out]
  *
  * No sidebar in MVP-1 (PRODUCT.md "one screen, one task" — chrome stays
  * thin). 56px tall. --color-bg-elevated background, 1px bottom hairline
  * in --color-border.
+ *
+ * Wordmark is a link to /home (standard pattern). "Stats" link exposes
+ * the analytics route (Batch 5 Phase 10.5 — TopBar is the only
+ * universally-mounted surface, so it owns persistent app navigation).
+ * No /modules link: Modules surface prominently on /home and
+ * wordmark→/home is one click.
  */
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 
 import { Button } from './Button'
 import { clearToken } from '../lib/auth'
@@ -30,9 +36,20 @@ export function TopBar() {
         'border-b border-[color:var(--color-border)]',
       ].join(' ')}
     >
-      <div className="font-semibold text-base tracking-tight">PyPrep</div>
+      <Link
+        to="/home"
+        className="text-base font-semibold tracking-tight hover:text-[color:var(--color-fg)] transition-colors duration-120"
+      >
+        PyPrep
+      </Link>
 
       <div className="ml-auto flex items-center gap-3">
+        <Link
+          to="/stats"
+          className="text-xs text-[color:var(--color-fg-muted)] hover:text-[color:var(--color-fg)] transition-colors duration-120"
+        >
+          Stats
+        </Link>
         {user && (
           <span className="text-xs text-[color:var(--color-fg-muted)]">
             {user.email}
