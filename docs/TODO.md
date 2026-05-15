@@ -400,7 +400,7 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 | ID | Task | DoD | Status |
 |---|---|---|---|
 | T10.1 | Finalize `README.md` with screenshots, install, run, deploy. | Reads as a real product README | ✅ (`07fe6ee` — README refresh: MVP-1 status, Mock refs removed, content depth quantified, 10-gate list, T10.2 placeholder marker, Provenance footnote) |
-| T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ⬜ (deferred until post-push visual verification; will land as polish commit filling the T10.2-marked placeholder in `README.md` after push wave) |
+| T10.2 | Take 6+ screenshots: home, module, lesson, each card type, stats, mock-interview screen. | In `assets/screenshots/` | ✅ (`<this>` — 4 screenshots in `docs/screenshots/` (home, session, lesson, stats); README placeholder replaced with image gallery section. Phase 10 ship-packaging fully closed.) |
 | T10.3 | Production `Dockerfile` for backend; FastAPI mounts `frontend/dist` via StaticFiles (single process, same origin — see ADR-012). nginx/Caddy in front is post-MVP optimization. | `docker build` + `docker run` serves SPA + API on one port; CORS is no-op (same origin) | ✅ (T10.3a `5a47ec6` StaticFiles mount per ADR-012 + middleware-based SPA fallback; T10.3b `b606f02` multi-stage Dockerfile + `.dockerignore`, dev `docker-compose.yml` deleted as broken — ops/ dir was missing) |
 | T10.4 | Deploy guide for Fly.io OR a $5 VPS. | Followable end-to-end | ✅ (`docs/DEPLOY.md` covers architecture, pre-deploy checklist, Fly.io walkthrough with fly.toml template, VPS Docker walkthrough, brief notes on Render/Railway/Docker Hub publish, secrets, persistence + Postgres swap path, health checks, troubleshooting; 208 lines) |
 | T10.5 | License (MIT), Code of Conduct, CONTRIBUTING.md. | Files present | ✅ (`31e516d` — CONTRIBUTING gate table 5→10, single-contributor MVP-1 Status paragraph, coverage footnote; `CODE_OF_CONDUCT.md` added (Contributor Covenant 2.1, `[INSERT CONTACT METHOD]` placeholder with inline owner note); `pyproject.toml` license field modernized to PEP 639 `license = "MIT"`) |
@@ -435,13 +435,12 @@ The original 5-task scaffold (T7.1-T7.5 — overview / per-module / weakness / s
 
 **Phase 10 ship-packaging exit gate (closed 2026-05-15):**
 
-- 5 / 6 items landed: **T10.1** (`07fe6ee` README MVP-1 refresh), **T10.3** (`5a47ec6` FastAPI StaticFiles mount per ADR-012 + `b606f02` multi-stage Dockerfile + `.dockerignore`), **T10.4** (`1d22a26` `docs/DEPLOY.md` + reconciliation of stale `docker-compose` refs in PLAN/PRD/TODO), **T10.5** (`31e516d` CoC + CONTRIBUTING gate table refresh + pyproject license PEP 639), **T10.7** (`1d22a26` audit + `0462428` `mock_router` removal per ADR-028 followthrough + `<this>` close).
-- **T10.2** (screenshots) deferred to post-push polish — owner visual verification required, owner not home during the ship-packaging wave. T10.2-marked placeholder comment in `README.md` reserves the slot.
-- 7 commits in this wave (`07fe6ee`..`<this>`).
+- 6 / 6 items landed: **T10.1** (`07fe6ee` README MVP-1 refresh), **T10.2** (`<this>` screenshots — home / session / lesson / stats), **T10.3** (`5a47ec6` FastAPI StaticFiles mount per ADR-012 + `b606f02` multi-stage Dockerfile + `.dockerignore`), **T10.4** (`1d22a26` `docs/DEPLOY.md` + reconciliation of stale `docker-compose` refs in PLAN/PRD/TODO), **T10.5** (`31e516d` CoC + CONTRIBUTING gate table refresh + pyproject license PEP 639), **T10.7** (`1d22a26` audit + `0462428` `mock_router` removal per ADR-028 followthrough + `818865d` close).
+- 8 commits in this wave (`07fe6ee`..`<this>`).
 - 10 / 10 pre-push gates green throughout.
 - Coverage 96.37% (gate ≥ 85%).
 - **Net code reduction: −585 LOC** via `mock_router` removal — ADR-028 (Phase 8) deprecation finally applied 2 phases after the decision. See N049 for the drift mechanism + future-prevention rule.
-- MVP-1 awaits T10.2 + final visual + `docker build` verification + push wave.
+- **MVP-1 shipped: 2026-05-15** (commit `<this>`).
 
 ---
 

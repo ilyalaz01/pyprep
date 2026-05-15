@@ -14,8 +14,19 @@ PyPrep is a focused web app that takes a CS graduate from "I can build with AI" 
 - 🧠 **FSRS spaced repetition** — modern memory model schedules each card to resurface right before you'd forget.
 - 📊 **Honest weakness dashboard** — ranks topics by where you actually struggle. No streak shaming. No XP. No flame emoji.
 
-<!-- T10.2: insert screenshot(s) here. /home dashboard + /session
-     card view + /stats overview are the three most representative. -->
+## Screenshots
+
+**Daily dashboard** — your review queue, weakest area, and module grid.
+![Home dashboard](docs/screenshots/home.png)
+
+**Active session** — Multiple-Choice card with code, options, and revealed explanation.
+![Session card](docs/screenshots/session.png)
+
+**Lesson view** — long-form interview-prep explainer with syntax-highlighted code.
+![Lesson](docs/screenshots/lesson.png)
+
+**Stats** — KPI tiles, per-module retention, 90-day activity heatmap, weakness areas.
+![Stats](docs/screenshots/stats.png)
 
 ---
 
