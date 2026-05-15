@@ -1,6 +1,6 @@
 # PyPrep
 
-> **Active recall + spaced repetition + in-browser code execution + free mock interviews — purpose-built for Israeli junior Python interviews.**
+> **Active recall + spaced repetition + in-browser code execution — purpose-built for Israeli junior Python interviews.**
 
 PyPrep is a focused web app that takes a CS graduate from "I can build with AI" to "I can pass a Python live-coding interview" in 4–6 weeks of daily use. It is not a tutorial, not a Duolingo clone, not a LeetCode replacement.
 
@@ -8,18 +8,20 @@ PyPrep is a focused web app that takes a CS graduate from "I can build with AI" 
 
 ## What's inside
 
-- 📚 **Lessons** — curated topical content covering Python core, automation/scripting, testing, Linux/Docker/SQL/Git.
-- 🎴 **Five card types** — flip cards, code traps ("what does this print?"), multiple choice with non-obvious answers, fill-in-the-blank, and full code tasks.
-- 💻 **In-browser code execution** — solve real coding problems with hidden `pytest` validation, all inside Pyodide. No server-side code execution. No security risk. No signup gate to run code.
-- 🧠 **FSRS spaced repetition** — modern memory model, schedules each card to resurface right before you'd forget.
-- 📊 **Honest weakness dashboard** — ranks topics by where you actually struggle. No streak shaming.
-- 🎯 **Mock interview prompt generator** — copies a high-quality interviewer prompt to your clipboard. Paste into Claude.ai or ChatGPT. No paid API calls, no rate limits, unlimited mock interviews.
+- 📚 **426 cards across 4 modules, 31 spheres** — Python Core & OOP (M1, 93 cards), Automation & Scripting (M2, 104), Testing & QA (M3, 73), Linux / Docker / SQL / Git (M4, 156). Every card hand-authored against interview-discriminating mechanism gotchas; zero LLM-generated drift.
+- 🎴 **Five card types** — flip cards, code traps ("what does this print?"), multiple choice with non-obvious answers, fill-in-the-blank, and full code tasks with hidden `pytest` validation.
+- 💻 **In-browser code execution** — Pyodide runs real Python in a Web Worker. Hidden tests execute client-side. No server-side `exec`. No security risk. No signup gate to run code.
+- 🧠 **FSRS spaced repetition** — modern memory model schedules each card to resurface right before you'd forget.
+- 📊 **Honest weakness dashboard** — ranks topics by where you actually struggle. No streak shaming. No XP. No flame emoji.
+
+<!-- T10.2: insert screenshot(s) here. /home dashboard + /session
+     card view + /stats overview are the three most representative. -->
 
 ---
 
 ## Status
 
-**Pre-MVP.** Architecture & docs frozen, content & code being implemented. See `docs/TODO.md` for live progress.
+**MVP-1 — feature-complete, pre-ship packaging in progress.** 426 cards across 4 modules; FSRS spaced repetition; in-browser Pyodide pytest harness; 10 pre-push gates enforce code, content, accessibility, contrast, typography, and bundle-size discipline. See `docs/TODO.md` for live progress.
 
 ---
 
@@ -83,21 +85,12 @@ All settings via environment variables. See `.env-example` for the full list. Hi
 1. Open the app. Home shows today's review queue (FSRS-scheduled) and your top 3 weakness topics.
 2. Hit **Review now** — work through due cards (~10–20 mins).
 3. If the queue is short, follow a **weakness topic** link — practice that sphere.
-4. Once a week, hit **Mock Interview** — generate a prompt, paste into Claude/ChatGPT, run a 30-min mock.
 
 ### Card session
 
 - **Space** — flip / reveal answer.
 - **1 / 2 / 3 / 4** — rate `Again` / `Hard` / `Good` / `Easy` (FSRS rating).
 - **Enter** — next card.
-
-### Mock interview
-
-1. Go to **Mock**.
-2. Pick modules / spheres / difficulty / count, OR pick a curated pack.
-3. Click **Generate**. The prompt appears.
-4. **Copy to clipboard**.
-5. Open Claude.ai or ChatGPT, paste, hit send. The LLM becomes your interviewer.
 
 ---
 
@@ -134,23 +127,42 @@ uv run pytest --cov                  # coverage gate ≥ 85%
 uv run ruff check .
 uv run ruff format .
 
-# type-check (strict on SDK)
-uv run mypy src/pyprep/sdk/
+# type-check (strict on SDK + API per pyproject.toml [tool.mypy].files)
+uv run mypy
 
 # validate content
 uv run validate-content
 
-# enforce 150 LOC file rule
-python scripts/check_file_size.py
+# frontend
+pnpm --dir frontend lint
+pnpm --dir frontend exec tsc -b
+pnpm --dir frontend test
 ```
 
-A pre-commit hook runs all of the above on staged files.
+### Pre-push gates (10/10)
+
+A `pre-push` git hook runs the full suite locally — same checks CI enforces. Any failure blocks the push.
+
+| # | Gate | Scope |
+|---|---|---|
+| 1 | `ruff` lint | backend Python |
+| 2 | `mypy` strict | SDK + API |
+| 3 | File size ≤ 150 LOC | `src/` |
+| 4 | Handler logic ≤ 10 LOC | API handlers (NOTES-waivered exceptions only) |
+| 5 | ESLint | frontend |
+| 6 | `tsc -b` | frontend (build-mode catches lib/refs mismatches) |
+| 7 | WCAG AA contrast | theme tokens |
+| 8 | Em-dash content lint | no U+2014 in shipped content/code copy |
+| 9 | Vite env coverage | `VITE_*` references must exist in `.env-example` |
+| 10 | Bundle size | raw ≤ 2 MB, gzip ≤ 600 KB (per ADR-022) |
+
+One-time install per clone: `uv run pre-commit install --hook-type pre-push`.
 
 ---
 
 ## Project Documentation
 
-This project follows [Dr. Yoram Segal's Software Project Guidelines v3.00](./SOFTWARE_PROJECT_GUIDELINES.md) (also referenced from the project root). All design decisions are captured before code.
+All design decisions are captured before code. The docs are part of the artifact.
 
 | Doc | Purpose |
 |---|---|
@@ -158,19 +170,17 @@ This project follows [Dr. Yoram Segal's Software Project Guidelines v3.00](./SOF
 | `docs/PLAN.md` | How — C4 diagrams, ADRs, data model |
 | `docs/TODO.md` | Phased task list, current status |
 | `docs/PRD_spaced_repetition.md` | FSRS algorithm spec |
-| `docs/PRD_code_sandbox.md` | Pyodide execution spec |
+| `docs/PRD_code_sandbox.md` | Pyodide execution spec + card-authoring constraints |
 | `docs/PRD_progress_tracking.md` | Stats & weakness detection |
-| `docs/PRD_mock_interview_prompts.md` | Mock-interview prompt generator |
 | `docs/PRD_content_authoring.md` | Content schema & authoring rules |
-| `docs/CLAUDE_CODE_INSTRUCTIONS.md` | How AI agents should drive this repo |
+
+Internal: `docs/CLAUDE_CODE_INSTRUCTIONS.md` (agent-driving conventions) and `docs/PRD_mock_interview_prompts.md` (deprecated feature, retained for historical context — see ADR-028).
 
 ---
 
 ## Contributing
 
 Single contributor at MVP (the project owner). Public contribution post-launch.
-
-If you're an AI agent (Claude Code, Cursor, etc.): read `docs/CLAUDE_CODE_INSTRUCTIONS.md` first. It is binding.
 
 ---
 
@@ -184,3 +194,7 @@ MIT — see `LICENSE`.
 - [py-fsrs](https://github.com/open-spaced-repetition/py-fsrs) — FSRS algorithm reference implementation.
 - [FastAPI](https://fastapi.tiangolo.com/), [React](https://react.dev/), [Tailwind](https://tailwindcss.com/), [TanStack](https://tanstack.com/).
 - Curriculum source: project owner's interview-prep notes (Modules 1–4).
+
+## Provenance
+
+Process framework based on [Dr. Yoram Segal's Software Project Guidelines v3.00](./SOFTWARE_PROJECT_GUIDELINES.md) — design-before-code discipline, decision logs, file-size and complexity ceilings.
