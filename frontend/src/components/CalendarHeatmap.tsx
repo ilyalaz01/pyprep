@@ -6,7 +6,9 @@
  * outside the data window render transparent (visually absent, not zero).
  *
  * Hand-rolled SVG per ADR-025 — no chart library. Saturation scale: 5
- * monochrome steps on --color-fg-muted, +1 zero step on --color-bg-elevated.
+ * monochrome steps on --color-fg-muted, +1 zero step on --color-border
+ * (the zero step must read as visible-subtle against the surrounding
+ * --color-bg-elevated container, hence --color-border not bg-elevated).
  * Anti-Duolingo discipline: no green/yellow/red gradient, no streak
  * gamification, no shame copy for empty days.
  */
@@ -120,7 +122,7 @@ function Cell({ col, row, iso, stat, step }: CellDesc & { step: number }) {
     return <rect x={x} y={y} width={CELL} height={CELL} rx={1} ry={1} fill="transparent" />
   }
   const count = stat?.reviews_total ?? 0
-  const fill = count === 0 ? 'var(--color-bg-elevated)' : 'var(--color-fg-muted)'
+  const fill = count === 0 ? 'var(--color-border)' : 'var(--color-fg-muted)'
   const opacity = count === 0 ? 1 : bucketOpacity(count, step)
   const title =
     count === 0

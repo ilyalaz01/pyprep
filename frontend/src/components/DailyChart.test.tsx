@@ -124,11 +124,13 @@ describe('DailyChart — anti-Duolingo discipline (ADR-025)', () => {
         .map((r) => r.getAttribute('fill'))
         .filter((f) => f && f !== 'transparent'),
     )
-    // Only two distinct fills allowed: zero-day bg-elevated and the
-    // single non-zero color (--color-fg-muted, varied via fill-opacity).
+    // Only two distinct fills allowed: zero-day `--color-border` (subtle
+    // against the surrounding `--color-bg-elevated` Section chrome) and
+    // the single non-zero color (`--color-fg-muted`, varied via
+    // fill-opacity). No green/red value-coding.
     for (const f of fills) {
       expect([
-        'var(--color-bg-elevated)',
+        'var(--color-border)',
         'var(--color-fg-muted)',
       ]).toContain(f)
     }

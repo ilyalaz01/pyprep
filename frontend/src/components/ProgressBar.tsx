@@ -1,11 +1,12 @@
 /**
  * ProgressBar — slim horizontal bar indicating a 0..1 progress value.
  *
- * Generic primitive. Used by CardShell (session position); Tier 1.4 will
- * reuse it for retention bars on /home and /stats. Single fill color +
- * single track color, no gradients, no multi-color stages (gamification
- * creep). Parent controls visual width via className; ProgressBar fills
- * 100% of its parent on the width axis.
+ * Generic primitive. Used by CardShell (session position) and
+ * WeaknessWidget (retention bars on /home and /stats). Single fill color
+ * + single track color, no gradients, no multi-color stages (gamification
+ * creep). The consumer owns width — pass `className="w-N"` for an
+ * explicit Tailwind width, or `className="flex-1"` to fill a flexbox
+ * sibling. No width default; without a width class the bar collapses.
  *
  * Accessibility: role="progressbar" + aria-valuenow as 0..100. Pass
  * `ariaLabel` for screen-reader context when the parent has no adjacent
@@ -34,7 +35,7 @@ export function ProgressBar({ value, ariaLabel, className }: ProgressBarProps) {
       aria-valuemax={100}
       aria-label={ariaLabel}
       className={[
-        'w-full h-1 rounded-sm overflow-hidden',
+        'h-1 rounded-sm overflow-hidden',
         'bg-[color:var(--color-border)]',
         className ?? '',
       ].join(' ').trim()}

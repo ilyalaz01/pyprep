@@ -1619,3 +1619,25 @@ Owner observed long SQL lines in `LessonReader` code blocks require horizontal s
 
 **Cross-refs:** `frontend/src/features/lessons/LessonReader.tsx`; Phase 10.5 commit `6cfe85e` (`Section` card chrome, same prose-container family).
 
+---
+
+## N054 — WeaknessWidget compact mode: add Strongest area (Phase 11 backlog)
+
+**Phase:** 11 backlog · **Status:** open · **Filed:** 2026-05-15
+
+Owner visual verify during Phase 10 ship-packaging close: requested compact `WeaknessWidget` on `/home` show both "Weakest" and "Strongest" areas instead of weakest only. Adds positive-signal counterweight to weakness-focused feedback (motivation balance, aligns with anti-Duolingo discipline — facts over shame).
+
+**Implementation requires backend extension:**
+
+- **Current:** `/api/stats/weakness` returns `top: SphereStats[]` (3 highest-weakness spheres, ranked descending by weakness score).
+- **Need:** also `bottom: SphereStats[]` (3 lowest-weakness, ranked ascending) in the same response shape, OR a new endpoint `/api/stats/strongest` with parallel signature.
+
+**Frontend changes after backend:**
+
+- `WeaknessWidget` compact mode: two lines instead of one (`"Weakest: {weakest.title} {N}%"` / `"Strongest: {strongest.title} {M}%"`).
+- Full mode (on `/stats`) unchanged — already shows 3 weakest rows.
+
+Deferred per MVP-1 ship-scope discipline. Pure additive change with no migration or schema break — natural Phase 11 candidate.
+
+**Cross-refs:** `frontend/src/components/WeaknessWidget.tsx`; Phase 10.5 Stats-S4 (commit `0de24ec`, which introduced the compact-vs-full `mode` prop split).
+
