@@ -49,7 +49,7 @@ PyPrep is a focused web app that takes a CS graduate from "I can build with AI" 
 
 ```bash
 # 1. clone and enter
-git clone https://github.com/<you>/pyprep.git
+git clone https://github.com/ilyalaz01/pyprep.git
 cd pyprep
 
 # 2. backend
