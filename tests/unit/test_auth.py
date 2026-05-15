@@ -169,7 +169,13 @@ def test_login_returns_access_token(auth: AuthService) -> None:
     assert isinstance(token, AccessToken)
     assert token.user_id == user.id
     assert token.expires_at == T0 + dt.timedelta(days=7)
-    payload = jwt.decode(token.token, SECRET, algorithms=["HS256"])
+    # verify_exp=False: this test asserts payload shape, not expiry behavior.
+    # The frozen clock fixture pins issuance to T0; with TTL=7d the token's
+    # exp claim is fixed in wall-clock time, so any CI run past that instant
+    # would trip jose's expiry check against the real wall clock.
+    payload = jwt.decode(
+        token.token, SECRET, algorithms=["HS256"], options={"verify_exp": False}
+    )
     assert payload["sub"] == user.id
 
 
@@ -338,7 +344,11 @@ def test_issued_token_carries_jti_claim(auth: AuthService) -> None:
     test could pass for stochastic reasons under a non-frozen clock)."""
     auth.register(email="jti@example.com", password="hunter2!")
     tok = auth.login(email="jti@example.com", password="hunter2!")
-    payload = jwt.decode(tok.token, SECRET, algorithms=["HS256"])
+    # verify_exp=False: see note on the parallel decode in
+    # test_login_returns_access_token. This test asserts payload shape.
+    payload = jwt.decode(
+        tok.token, SECRET, algorithms=["HS256"], options={"verify_exp": False}
+    )
     assert "jti" in payload
     assert isinstance(payload["jti"], str) and len(payload["jti"]) > 0
 
