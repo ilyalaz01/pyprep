@@ -20,7 +20,6 @@ from pyprep.sdk.auth import AuthService, InvalidTokenError, User
 from pyprep.sdk.auth.protocol import UserStore
 from pyprep.sdk.cards import CardService
 from pyprep.sdk.content_loader import ContentIndex
-from pyprep.sdk.prompts import MockPromptService
 from pyprep.sdk.repos.reviews import ReviewRepository
 from pyprep.sdk.repos.sessions import SessionRepository
 from pyprep.sdk.repos.users import UserRepository
@@ -86,16 +85,6 @@ def get_stats_service(
     cards: CardService = Depends(get_card_service),
 ) -> StatsService:
     return StatsService(ReviewRepository(session), cards)
-
-
-def get_mock_prompt_service(
-    request: Request,
-    cards: CardService = Depends(get_card_service),
-    stats: StatsService = Depends(get_stats_service),
-) -> MockPromptService:
-    return MockPromptService(
-        cards=cards, template=request.app.state.mock_template, stats=stats
-    )
 
 
 def get_auth_service(

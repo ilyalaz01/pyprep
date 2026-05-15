@@ -13,7 +13,7 @@
  */
 import { call } from './http'
 import type {
-  AccessToken, AnswerResult, Config, Daily, Health, Lesson, MockPrompt,
+  AccessToken, AnswerResult, Config, Daily, Health, Lesson,
   ModuleDetail, ModulesList, NextCard, Overview, PerModule, ReviewQueue,
   Session, SessionMode, SessionSummary, User, Weakness,
 } from './types'
@@ -82,13 +82,5 @@ export const api = {
     // 90 per the handler-side Query(le=90); UI default is 30.
     perModule: () => call<PerModule>('/api/stats/me/per-module'),
     daily: (days = 30) => call<Daily>(`/api/stats/me/daily${qs({ days })}`),
-  },
-
-  mock: {
-    prompt: (body: {
-      modules?: number[]; spheres?: string[]; difficulty_min?: number;
-      difficulty_max?: number; count?: number; duration_minutes?: number;
-      weakness_focus?: boolean; seed?: number
-    }) => call<MockPrompt>('/api/mock/prompt', post(body)),
   },
 }

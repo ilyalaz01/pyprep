@@ -198,7 +198,7 @@ All design decisions are captured before code. The docs are part of the artifact
 | `docs/PRD_progress_tracking.md` | Stats & weakness detection |
 | `docs/PRD_content_authoring.md` | Content schema & authoring rules |
 
-Internal: `docs/CLAUDE_CODE_INSTRUCTIONS.md` (agent-driving conventions) and `docs/PRD_mock_interview_prompts.md` (deprecated feature, retained for historical context — see ADR-028).
+Internal: `docs/CLAUDE_CODE_INSTRUCTIONS.md` (agent-driving conventions) and `docs/PRD_mock_interview_prompts.md` (deprecated per ADR-028; implementation removed in Phase 10 ship-packaging — PRD retained as historical artifact).
 
 ---
 

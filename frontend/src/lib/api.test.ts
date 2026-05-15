@@ -147,14 +147,3 @@ describe('api.sessions', () => {
 // api.stats endpoint tests are siblings in api.stats.test.ts to keep
 // this file under the 150-LOC gate after P7.T7.2 added per-module +
 // daily endpoints.
-
-describe('api.mock', () => {
-  test('prompt POSTs /api/mock/prompt with body', async () => {
-    mockJson({ text: '...', cards_used: ['c1'], estimated_minutes: 30 })
-    await api.mock.prompt({ modules: [1], count: 5, seed: 7 })
-    const { url, init } = lastCall()
-    expect(url).toContain('/api/mock/prompt')
-    expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body as string).seed).toBe(7)
-  })
-})

@@ -6,10 +6,9 @@ LLMs, content sources, etc.). Inbound rate limiting on `/api/*`
 endpoints (audit N024) is a separate concern, deferred to Phase 10
 and implemented at the FastAPI middleware layer — see NOTES N024.
 
-MVP has no external integrations (per ADR-005 mock interviews are local
-prompt-generators). The seam is pre-built so future callers route through
-one rate-limit-aware chokepoint instead of scattering `httpx.request(...)`
-across services.
+MVP has no external integrations. The seam is pre-built so future callers
+route through one rate-limit-aware chokepoint instead of scattering
+`httpx.request(...)` across services.
 
 Rate-limiting is a sliding window per host: keep a list of call timestamps
 per host; if more than `max_calls` fall inside the last `window_seconds`,

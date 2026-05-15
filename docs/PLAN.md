@@ -939,7 +939,7 @@ The hand-rolled implementation lives in one component (`frontend/src/components/
 
 ### ADR-028: Mock Interview Generator removed from roadmap; Phase 8/9 renumbered for content authoring
 
-**Status:** Accepted (Phase 8 kickoff — 2026-05-13).
+**Status:** Accepted (Phase 8 kickoff — 2026-05-13). **Implemented:** Phase 10 ship-packaging T10.7 follow-up (`mock_router`, `MockPromptService`, SDK exports, tests, and `mock_template` app state removed).
 
 **Context:** The original roadmap placed Mock Interview Generator at Phase 8 (T8.1–T8.7) and Modules 2–4 content at Phase 9 (T9.1–T9.5). Mock Interview Generator was originally scoped in `PRD_mock_interview_prompts.md` and ADR-005: composable prompts that the user pastes into their own Claude/ChatGPT subscription, with five pre-curated packs and a `/mock` route in the SPA. The feature never had product traction during the Phase 5–7 build cycles. No owner request, no real-world prompt iteration, no demand surfaced from the m1-s0 study runs.
 

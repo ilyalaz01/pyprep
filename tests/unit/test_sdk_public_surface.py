@@ -40,10 +40,6 @@ EXPECTED = {
     "SphereStats",
     "StatsRepository",
     "StatsService",
-    # prompts
-    "MockPrompt",
-    "MockPromptRequest",
-    "MockPromptService",
     # auth
     "AccessToken",
     "AuthError",

@@ -131,10 +131,3 @@ export interface DailyStat {
   retention: number
 }
 export interface Daily { days: DailyStat[] }
-
-// --- Mock prompt --------------------------------------------------------
-export interface MockPrompt {
-  text: string
-  cards_used: string[]
-  estimated_minutes: number
-}

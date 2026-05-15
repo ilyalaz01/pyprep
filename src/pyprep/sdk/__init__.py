@@ -27,7 +27,6 @@ from .content_loader import (
     ContentLoaderError,
     SphereContent,
 )
-from .prompts import MockPrompt, MockPromptRequest, MockPromptService
 from .repos import Base, ReviewRepository, SessionRepository, UserRepository
 from .scheduler import CardState, FSRSScheduler, Rating
 from .sessions import (
@@ -72,9 +71,6 @@ __all__ = [
     "InvalidCredentialsError",
     "InvalidEmailError",
     "InvalidTokenError",
-    "MockPrompt",
-    "MockPromptRequest",
-    "MockPromptService",
     "ModuleStats",
     "Overview",
     "PasswordTooLongError",
