@@ -51,8 +51,9 @@ cd frontend && pnpm install && cp .env.example .env.local && cd ..
 # 4. one-time per clone: pre-push hook (mirrors CI gates locally)
 uv run pre-commit install --hook-type pre-push
 
-# 5. run both
-docker compose up                    # OR run uv run pyprep-api and pnpm --dir frontend dev separately
+# 5. run (two processes — backend on 8000, frontend on 5173)
+uv run pyprep-api                    # terminal 1
+pnpm --dir frontend dev              # terminal 2
 ```
 
 Open `http://localhost:5173`. Default single-user mode is enabled — no registration screen.
@@ -72,7 +73,7 @@ All settings via environment variables. See `.env-example` for the full list. Hi
 |---|---|---|
 | `PYPREP_SINGLE_USER` | `true` | Skip registration; auto-login as the configured user |
 | `PYPREP_DATABASE_URL` | `sqlite:///./pyprep.db` | DB connection string |
-| `PYPREP_JWT_SECRET` | _required_ | JWT signing secret |
+| `PYPREP_SECRET_KEY` | _required_ | JWT signing secret (≥ 32 chars) |
 | `PYPREP_FSRS_REQUEST_RETENTION` | `0.9` | Target retrievability for next review |
 | `PYPREP_DAILY_NEW_CARD_CAP` | `15` | Max new cards introduced per day |
 
@@ -157,6 +158,29 @@ A `pre-push` git hook runs the full suite locally — same checks CI enforces. A
 | 10 | Bundle size | raw ≤ 2 MB, gzip ≤ 600 KB (per ADR-022) |
 
 One-time install per clone: `uv run pre-commit install --hook-type pre-push`.
+
+---
+
+## Production build
+
+Single-image multi-stage Docker build:
+
+```bash
+docker build -t pyprep:latest .
+
+docker run --rm -p 8000:8000 \
+  -v $(pwd)/data:/data \
+  -e PYPREP_SECRET_KEY="$(openssl rand -hex 48)" \
+  -e PYPREP_SINGLE_USER=true \
+  -e PYPREP_SINGLE_USER_PASSWORD=change-me \
+  pyprep:latest
+```
+
+Open `http://localhost:8000`. SQLite database persists in `./data/pyprep.db`.
+
+Architecture: FastAPI serves API at `/api/*` and built frontend at `/` from the same origin (ADR-012). Single container, no CORS surface, no nginx layer for MVP-1.
+
+Full deploy guide (host options, secrets management, persistence strategy): see `docs/DEPLOY.md` (forthcoming, Phase 10 ship-packaging T10.4).
 
 ---
 

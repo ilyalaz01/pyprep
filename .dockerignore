@@ -1,0 +1,78 @@
+# VCS
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Python local caches
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# Node — rebuilt in stage 1
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Tests (not needed at runtime)
+tests/
+
+# Coverage artifacts
+.coverage
+coverage-report/
+htmlcov/
+
+# Docs (not needed in runtime image; LICENSE handled separately by Dockerfile)
+docs/
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+DESIGN.md
+PRODUCT.md
+KICKOFF.md
+PYPREP_DESIGN_REVIEW_RESPONSE.md
+
+# Local databases
+*.db
+*.db-journal
+
+# Env files (mounted at runtime, not baked in)
+.env
+.env.local
+.env-example
+.env.example
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.example
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Scripts (pre-commit hooks; not needed at runtime)
+scripts/
+
+# Agent/skill metadata
+.agents/
+.claude/
+skills-lock.json
+.pre-commit-config.yaml
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Misc handoff artifacts
+GIT_STATUS.txt
+RECENT_COMMITS.txt
+pyprep.db
